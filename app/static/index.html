@@ -1187,13 +1187,16 @@ function applyRenderMode() {
 async function loadColors() {
   const v = viewer, url = v?.colorsUrl, seq = loadSeq;
   if (!url || v.colorMesh) return applyRenderMode();
+  // one load per shown model: a second click while it runs leaves the work to the first
+  if (v.colorsLoad?.url === url && v.colorsLoad.seq === seq) return;
+  const job = (v.colorsLoad = { url, seq });
   $("viewer").classList.add("loading");
   try {
     v.gltfLoader ||= new (await import("three/addons/loaders/GLTFLoader.js")).GLTFLoader();
     const gltf = await v.gltfLoader.loadAsync(url);
-    if (seq !== loadSeq || v.colorsUrl !== url) return;
     let geom = null;
     gltf.scene.traverse((o) => { if (o.isMesh && !geom) geom = o.geometry; });
+    if (seq !== loadSeq || v.colorsUrl !== url || v.colorMesh) { geom?.dispose(); return; }
     geom.rotateX(-Math.PI / 2);
     for (const axis of pendingRot) rotateGeometry(v.THREE, geom, axis);
     geom.computeVertexNormals();
@@ -1201,15 +1204,19 @@ async function loadColors() {
     v.colorMesh = new v.THREE.Mesh(geom, mat);
     v.scene.add(v.colorMesh);
   } catch {
-    renderMode = "solid";
-    showError("Les couleurs de ce modèle n'ont pas pu être chargées ; l'aperçu reste en mode Solide.");
+    if (seq === loadSeq) {
+      renderMode = "solid";
+      showError("Les couleurs de ce modèle n'ont pas pu être chargées ; l'aperçu reste en mode Solide.");
+    }
   } finally {
+    if (v.colorsLoad === job) v.colorsLoad = null;
     if (seq === loadSeq) $("viewer").classList.remove("loading");
     applyRenderMode();
   }
 }
 function setRenderMode(mode) {
   renderMode = mode;
+  updateRenderButtons();
   if (mode === "render") loadColors();
   else applyRenderMode();
 }

@@ -76,7 +76,12 @@ jobs:
           do { Start-Sleep 3; $server = & $find } until ($server -or (Get-Date) -gt $deadline -or $app.HasExited)
           if (-not $server) { throw "l'app n'a pas démarré son moteur" }
           $port = [regex]::Match($server.CommandLine, '--port (\d+)').Groups[1].Value
-          Invoke-RestMethod "http://127.0.0.1:$port/api/status" | Out-Null
+          # the process shows up a moment before the server listens
+          $ok = $false
+          for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
+            try { Invoke-RestMethod "http://127.0.0.1:$port/api/status" | Out-Null; $ok = $true } catch { Start-Sleep 1 }
+          }
+          if (-not $ok) { throw "le moteur de l'app ne répond pas" }
           Start-Sleep 8
           $log = "$env:LOCALAPPDATA\com.pencilpark.berriacraft\logs\serveur.log"
           Get-Content $log -Tail 8
