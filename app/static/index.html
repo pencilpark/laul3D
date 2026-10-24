@@ -663,6 +663,7 @@ function render() {
   });
 
   document.querySelectorAll("#rotateBar button.ghost").forEach((b) => (b.disabled = isBusy || !viewLevel));
+  $("rotApply").disabled = isBusy;
   $("apply").disabled = isBusy;
   renderResult(j);
   renderAdjust(j);
@@ -784,13 +785,16 @@ document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.oncli
 function updateRotConfirm() {
   const n = pendingRot.length;
   $("rotConfirm").classList.toggle("hidden", !n);
-  $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour. Le modèle n'est pas encore recalculé.` : "";
+  $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour, pas encore recalculé. Recalcule ou annule pour pouvoir imprimer.` : "";
+  // never export a file that differs from what the preview shows
+  ["orca", "expStl", "expBlend"].forEach((id) => ($(id).disabled = n > 0));
 }
-$("rotApply").onclick = () => {
-  if (!current || !pendingRot) return;
-  const seq = shownRot() + pendingRot;
-  pendingRot = ""; updateRotConfirm();
-  runLevel(viewLevel || "lowpoly", { rot_seq: seq });
+$("rotApply").onclick = async () => {
+  if (!current || !pendingRot || runPending) return;
+  $("rotApply").disabled = true;
+  // the preview stays pending until the server accepts the run
+  if (await runLevel(viewLevel || "lowpoly", { rot_seq: shownRot() + pendingRot })) { pendingRot = ""; updateRotConfirm(); }
+  $("rotApply").disabled = busy(current);
 };
 $("rotCancel").onclick = () => { pendingRot = ""; updateRotConfirm(); shownVersion = null; if (current) render(); };
 $("rotReset").onclick = () => { pendingRot = ""; updateRotConfirm(); if (current) runLevel(viewLevel || "lowpoly", { rot_seq: "" }); };
