@@ -148,6 +148,17 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 #viewer canvas { display: block; width: 100%; height: 100%; }
 #viewer .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); text-align: center; padding: 16px; }
 #jobCard:has(#levels:empty) :is(.pipeline, #rotateBar) { display: none; }
+#viewer canvas:focus-visible { outline-offset: -2px; }
+#viewer :is(.viewbar, .navhelp, .gizmo-hit) { display: none; }
+#viewer.has-model .viewbar { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--panel); }
+.viewbar button { min-width: 34px; height: 32px; padding: 0 10px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; transition: background .18s; }
+.viewbar button:hover { background: rgba(255,255,255,.07); }
+#viewer.has-model .navhelp { position: absolute; left: 10px; bottom: 8px; z-index: 2; display: block; margin: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
+/* ViewHelper draws in the bottom-right 128 px of the canvas; this layer takes its clicks away from the orbit controls */
+#viewer.has-model .gizmo-hit { position: absolute; right: 0; bottom: 0; z-index: 2; display: block; width: 128px; height: 128px; cursor: pointer; }
+.rotconfirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; margin-top: 4px; padding: 10px 12px; background: var(--accent-tint); }
+.rotconfirm span { flex: 1 1 220px; font-size: 14px; }
+button.primary.inline { width: auto; min-height: 38px; font-size: 14px; }
 .previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .previews img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--frame); }
 /* no WebGL: the Blender previews take the viewer's place */
@@ -274,13 +285,20 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <div class="levels" id="levels" role="group" aria-labelledby="pipeLab"></div>
       </div>
 
-      <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div></div>
+      <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
+        <div class="viewbar" role="toolbar" aria-label="Vues du modèle">
+          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button>
+        </div>
+        <p class="navhelp" aria-hidden="true">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
+        <div class="gizmo-hit" title="Clique un axe pour regarder le modèle de ce côté"></div>
+      </div>
       <div class="previews hidden" id="previews" style="margin-top:8px"></div>
 
       <div class="actions" style="margin-top:12px" id="rotateBar">
-        <div class="labrow rot-lab"><span class="lab">Redresser le modèle</span><button type="button" class="tip" aria-label="Aide : redresser le modèle" aria-describedby="tipRot">?</button><span class="tip-text" role="tooltip" id="tipRot">Le modèle est couché ou de travers ? Fais-le tourner d'un quart de tour. Il est recalculé à chaque clic, en quelques secondes en LowPoly.</span></div>
+        <div class="labrow rot-lab"><span class="lab">Redresser le modèle</span><button type="button" class="tip" aria-label="Aide : redresser le modèle" aria-describedby="tipRot">?</button><span class="tip-text" role="tooltip" id="tipRot">Le modèle est couché ou de travers ? Fais-le tourner d'un quart de tour : l'aperçu tourne tout de suite, puis clique « Recalculer avec cette orientation » pour l'appliquer.</span></div>
         <button class="ghost" data-rot="x" disabled>Basculer vers l'avant</button><button class="ghost" data-rot="y" disabled>Pencher à droite</button><button class="ghost" data-rot="z" disabled>Pivoter</button>
-        <button class="ghost" id="rotReset" disabled>Annuler les rotations</button>
+        <button class="ghost" id="rotReset" disabled>Orientation d'origine</button>
+        <div class="rotconfirm hidden" id="rotConfirm"><span id="rotMsg" role="status"></span><button type="button" class="primary inline" id="rotApply">Recalculer avec cette orientation</button><button type="button" class="ghost" id="rotCancel">Annuler</button></div>
       </div>
     </div>
   </section>
@@ -330,7 +348,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false;
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "";
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
@@ -533,7 +551,9 @@ async function loadHistory() {
 
 function clearModel() {
   loadSeq++;
-  if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; }
+  if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; viewer.requestRender(); }
+  $("viewer").classList.remove("has-model");
+  pendingRot = ""; updateRotConfirm();
   $("viewerEmpty").textContent = "Chargement du modèle…";
   $("viewerEmpty").classList.remove("hidden");
   $("previews").classList.add("hidden");
@@ -740,11 +760,27 @@ async function runLevel(level, settings = {}, extra = {}) {
   runPending = false;
 }
 
+// turns stack on the orientation of the model on screen, which may predate the current settings
+const shownRot = () => current?.results?.[viewLevel]?.settings?.rot_seq ?? current?.settings?.rot_seq ?? "";
+// with a 3D view, quarter turns are previewed first and only recomputed on confirmation
 document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.onclick = () => {
   if (!current) return;
-  runLevel(viewLevel || "lowpoly", { rot_seq: (current.settings.rot_seq || "") + b.dataset.rot });
+  if (viewer?.mesh) { pendingRot += b.dataset.rot; previewRotation(b.dataset.rot); updateRotConfirm(); return; }
+  runLevel(viewLevel || "lowpoly", { rot_seq: shownRot() + b.dataset.rot });
 }));
-$("rotReset").onclick = () => { if (current) runLevel(viewLevel || "lowpoly", { rot_seq: "" }); };
+function updateRotConfirm() {
+  const n = pendingRot.length;
+  $("rotConfirm").classList.toggle("hidden", !n);
+  $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour. Le modèle n'est pas encore recalculé.` : "";
+}
+$("rotApply").onclick = () => {
+  if (!current || !pendingRot) return;
+  const seq = shownRot() + pendingRot;
+  pendingRot = ""; updateRotConfirm();
+  runLevel(viewLevel || "lowpoly", { rot_seq: seq });
+};
+$("rotCancel").onclick = () => { pendingRot = ""; updateRotConfirm(); shownVersion = null; if (current) render(); };
+$("rotReset").onclick = () => { pendingRot = ""; updateRotConfirm(); if (current) runLevel(viewLevel || "lowpoly", { rot_seq: "" }); };
 $("apply").onclick = () => {
   if (!current) return;
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
@@ -764,42 +800,120 @@ $("expBlend").onclick = () => exportFile("blend");
 $("orca").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel }).catch((e) => showError(e.message));
 $("finder").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/reveal`, { level: viewLevel }).catch((e) => showError(e.message));
 
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+// camera directions in the viewer frame (Y up, model front facing +Z)
+const VIEWS = { face: [0, 0.12, 1], side: [1, 0.12, 0], top: [0, 1, 0.001], iso: [0.55, 0.35, 0.8] };
+// Blender quarter turns (Z up) as viewer axes: x -> +X, y -> -Z, z -> +Y
+const ROT_AXES = { x: [1, 0, 0], y: [0, 0, -1], z: [0, 1, 0] };
+
 async function initViewer() {
   if (viewer) return viewer;
   const THREE = await import("three");
   const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
   const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+  const { ViewHelper } = await import("three/addons/helpers/ViewHelper.js");
   const box = $("viewer");
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
-  box.appendChild(renderer.domElement);
+  renderer.autoClear = false;
+  const canvas = renderer.domElement;
+  canvas.tabIndex = 0;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", "Aperçu 3D du modèle. Les flèches du clavier déplacent la vue ; les boutons Face, Profil et Dessus la tournent.");
+  box.prepend(canvas);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 4 / 3, 1, 5000);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5550, 1.6));
+  const controls = new OrbitControls(camera, canvas);
+  controls.listenToKeyEvents(canvas);
+  controls.enableDamping = !reduceMotion.matches;
+  const helper = new ViewHelper(camera, canvas);
+  helper.center = controls.target;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
   const key = new THREE.DirectionalLight(0xffffff, 1.8);
   key.position.set(150, 300, 220);
   scene.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, 0.5);
   fill.position.set(-200, 100, -150);
   scene.add(fill);
-  const grid = new THREE.GridHelper(220, 22, 0x9a948a, 0x9a948a);
-  grid.material.opacity = 0.35; grid.material.transparent = true;
+  const grid = new THREE.GridHelper(220, 22, 0x5a5a5a, 0x5a5a5a);
+  grid.material.opacity = 0.5; grid.material.transparent = true;
   scene.add(grid);
-  const vol = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(220, 250, 220)), new THREE.LineBasicMaterial({ color: 0x9a948a, transparent: true, opacity: 0.25 }));
+  const vol = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(220, 250, 220)), new THREE.LineBasicMaterial({ color: 0x6e6e6e, transparent: true, opacity: 0.35 }));
   vol.position.y = 125;
   scene.add(vol);
+  // render on demand: an idle viewer costs nothing on a modest GPU
+  const clock = new THREE.Clock();
+  let frame = 0;
+  function draw() {
+    frame = 0;
+    const dt = Math.min(clock.getDelta(), 0.05);
+    let again;
+    if (helper.animating) {
+      helper.update(reduceMotion.matches ? 10 : dt);
+      again = helper.animating;
+      if (!again) controls.update();
+    } else again = controls.update() && controls.enableDamping;
+    renderer.clear();
+    renderer.render(scene, camera);
+    helper.render(renderer);
+    if (again) requestRender();
+  }
+  function requestRender() { if (!frame) frame = requestAnimationFrame(draw); }
+  controls.addEventListener("change", requestRender);
+  box.querySelector(".gizmo-hit").addEventListener("pointerup", (e) => { if (helper.handleClick(e)) { clock.getDelta(); requestRender(); } });
   function resize() {
     const w = box.clientWidth, h = box.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
+    requestRender();
   }
   new ResizeObserver(resize).observe(box);
   resize();
-  (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
-  viewer = { THREE, scene, camera, controls, loader: new STLLoader(), mesh: null };
+  viewer = { THREE, scene, camera, controls, loader: new STLLoader(), mesh: null, home: null, requestRender };
   return viewer;
+}
+
+function frameModel(v, resetView) {
+  const T = v.THREE, g = v.mesh.geometry;
+  g.computeBoundingBox();
+  const size = new T.Vector3(), c = new T.Vector3();
+  g.boundingBox.getSize(size); g.boundingBox.getCenter(c);
+  v.home = { center: c.clone(), dist: Math.max(size.x, size.y, size.z) * 2.2 + 40 };
+  v.controls.target.copy(c);
+  if (resetView) v.camera.position.copy(c).addScaledVector(new T.Vector3(...VIEWS.iso).normalize(), v.home.dist);
+  v.controls.update();
+  v.requestRender();
+}
+
+function setView(name) {
+  const v = viewer;
+  if (!v?.mesh) return;
+  if (name === "reset") { v.controls.target.copy(v.home.center); name = "iso"; }
+  v.camera.position.copy(v.controls.target).addScaledVector(new v.THREE.Vector3(...VIEWS[name]).normalize(), v.home.dist);
+  v.controls.update();
+  v.requestRender();
+}
+
+function zoom(factor) {
+  const v = viewer;
+  if (!v?.mesh) return;
+  const offset = v.camera.position.clone().sub(v.controls.target).multiplyScalar(factor);
+  offset.setLength(Math.min(Math.max(offset.length(), v.home.dist * 0.2), v.home.dist * 4));
+  v.camera.position.copy(v.controls.target).add(offset);
+  v.controls.update();
+  v.requestRender();
+}
+document.querySelectorAll("#viewer [data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+document.querySelectorAll("#viewer [data-zoom]").forEach((b) => (b.onclick = () => zoom(+b.dataset.zoom)));
+
+function previewRotation(axis) {
+  const v = viewer, T = v.THREE, g = v.mesh.geometry;
+  g.applyMatrix4(new T.Matrix4().makeRotationAxis(new T.Vector3(...ROT_AXES[axis]), Math.PI / 2));
+  g.computeBoundingBox();
+  const c = new T.Vector3();
+  g.boundingBox.getCenter(c);
+  g.translate(-c.x, -g.boundingBox.min.y, -c.z);
+  frameModel(v, false);
 }
 
 async function showModel(url, flat) {
@@ -811,19 +925,17 @@ async function showModel(url, flat) {
     geom.rotateX(-Math.PI / 2);
     geom.computeVertexNormals();
     if (v.mesh) { v.scene.remove(v.mesh); v.mesh.geometry.dispose(); }
-    const mat = new v.THREE.MeshStandardMaterial({ color: 0xd8cfc2, roughness: 0.75, metalness: 0, flatShading: flat });
+    const mat = new v.THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.75, metalness: 0, flatShading: flat });
     v.mesh = new v.THREE.Mesh(geom, mat);
     v.scene.add(v.mesh);
-    geom.computeBoundingBox();
-    const b = geom.boundingBox, size = new v.THREE.Vector3(), c = new v.THREE.Vector3();
-    b.getSize(size); b.getCenter(c);
-    const d = Math.max(size.x, size.y, size.z) * 2.2 + 40;
-    v.controls.target.copy(c);
-    v.camera.position.set(c.x + d * 0.55, c.y + d * 0.35, c.z + d * 0.8);
+    frameModel(v, true);
+    pendingRot = ""; updateRotConfirm();
+    $("viewer").classList.add("has-model");
     $("viewerEmpty").classList.add("hidden");
     $("previews").classList.add("hidden");
   } catch (e) {
     if (seq !== loadSeq) return;
+    $("viewer").classList.remove("has-model");
     const missing = /404/.test(String(e?.message || e));
     $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau." : "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle.";
     $("viewerEmpty").classList.remove("hidden");
