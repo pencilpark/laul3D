@@ -47,17 +47,21 @@ def _first_existing(paths):
     return next((p for p in paths if p and os.path.exists(p)), None)
 
 
+TOOLS = os.path.join(DATA, "tools")  # what the app installs itself (setup_tools)
+
+
 def blender_path():
     env = os.environ.get("LOWPOLY_BLENDER")
     if env:
         return env
     if IS_MAC:
         return _first_existing(["/Applications/Blender.app/Contents/MacOS/Blender",
-                                os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender")])
+                                os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender"),
+                                os.path.join(TOOLS, "Blender.app", "Contents", "MacOS", "Blender")])
     if IS_WIN:
         found = sorted(glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
                                               "Blender Foundation", "Blender*", "blender.exe")))
-        return found[-1] if found else None
+        return found[-1] if found else _first_existing([os.path.join(TOOLS, "blender", "blender.exe")])
     return shutil.which("blender")
 
 
@@ -68,7 +72,8 @@ def orca_path():
     if IS_MAC:
         return _first_existing(["/Applications/OrcaSlicer.app", os.path.expanduser("~/Applications/OrcaSlicer.app")])
     if IS_WIN:
-        return _first_existing([os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "OrcaSlicer", "orca-slicer.exe")])
+        return _first_existing([os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "OrcaSlicer", "orca-slicer.exe"),
+                                os.path.join(TOOLS, "OrcaSlicer", "orca-slicer.exe")])
     return shutil.which("orca-slicer")
 
 
