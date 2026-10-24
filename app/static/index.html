@@ -52,19 +52,22 @@ main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr)
 }
 .card { background: var(--panel); padding: 16px; }
 .stack > * + * { margin-top: 16px; }
-#drop { border: 1.5px dashed var(--field-line); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+#drop { position: relative; display: block; border: 1.5px dashed var(--field-line); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+#drop:has(:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #drop:hover { border-color: var(--accent-text); background: rgba(207,17,73,.06); }
 #drop.over { border-style: solid; border-color: var(--accent); background: rgba(207,17,73,.12); }
-#drop p { margin: 4px 0; }
+.dz-line { display: block; margin: 4px 0; }
 #drop b { font-size: 17px; font-weight: 500; }
 .dz-icon { display: block; width: 28px; height: 28px; margin: 0 auto 8px; color: var(--accent-text); }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 12px; }
-.thumb { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--chip); border: 2px solid transparent; cursor: pointer; }
+.thumb { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; overflow: hidden; background: var(--chip); border: 2px solid transparent; color: inherit; font: inherit; cursor: pointer; }
+.thumb:disabled { cursor: not-allowed; opacity: .6; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb span { position: absolute; inset: auto 0 0 0; font-size: 11px; padding: 2px 4px; background: rgba(0,0,0,.55); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb.main { border-color: var(--accent); }
 .thumb .noimg { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; color: var(--muted); padding: 4px; text-align: center; word-break: break-all; }
-label { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }
+label, .lab { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field + .field, .row + .field, .field + .row, .row + .row { margin-top: 12px; }
 input[type=text], input[type=number], select { width: 100%; padding: 9px 10px 8px; border: 0; border-bottom: 1.5px solid var(--field-line); border-radius: 0; background: var(--drop); color: var(--ink); font: inherit; transition: border-color .15s; }
@@ -102,6 +105,7 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 .level:hover { background: color-mix(in srgb, var(--drop) 94%, #fff); }
 .level.sel { background: var(--accent-tint); box-shadow: inset 0 -2px 0 var(--accent-text); }
 .level b { display: block; font-size: 15px; font-weight: 500; }
+.lvl { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .level small { color: var(--muted); font-size: 14px; display: block; }
 .level .lstate { margin-top: 6px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .arrow { color: var(--muted); }
@@ -117,8 +121,11 @@ td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .history { list-style: none; padding: 0; margin: 0; }
-.history li { padding: 9px 0; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
-.history li:hover b { color: var(--accent-text); }
+.history li.sub { padding: 9px 0; }
+.proj { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 9px 8px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .18s; }
+.proj:hover { background: rgba(255,255,255,.05); }
+.proj:hover b { color: var(--accent-text); }
+.proj[aria-current="true"] { background: var(--accent-tint); }
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 input[type=text]:focus-visible, input[type=number]:focus-visible, select:focus-visible { outline: none; border-bottom-color: var(--accent-text); box-shadow: 0 1.5px 0 var(--accent-text); background-color: rgba(207,17,73,.08); }
 .seg button:focus-visible { outline-offset: -2px; }
@@ -140,33 +147,33 @@ input[type=range]:focus-visible { outline-offset: 4px; }
   <section class="stack side">
     <div class="card">
       <h2>Nouveau modèle</h2>
-      <div id="drop">
+      <label id="drop" for="file">
         <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-        <p><b>Dépose tes photos ici</b></p>
-        <p class="sub">ou clique pour choisir (JPG, HEIC, PNG)</p>
-        <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="hidden">
-      </div>
-      <div class="thumbs" id="localThumbs"></div>
+        <span class="dz-line"><b>Dépose tes photos ici</b></span>
+        <span class="dz-line sub">ou clique pour choisir (JPG, HEIC, PNG)</span>
+        <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="vh">
+      </label>
+      <div class="thumbs" id="localThumbs" role="group" aria-label="Photos ajoutées"></div>
       <div class="hint" id="routeHint"></div>
 
       <div class="field" style="margin-top:16px"><label for="name">Nom</label><input id="name" type="text" value="buste"></div>
-      <div class="field"><label>Moteur</label>
-        <div class="seg" id="mode">
-          <button data-v="auto" class="on">Auto</button><button data-v="photogrammetry">Photogrammétrie</button><button data-v="ia">IA, 1 photo</button>
+      <div class="field"><span class="lab" id="modeLab">Moteur</span>
+        <div class="seg" id="mode" role="group" aria-labelledby="modeLab">
+          <button type="button" data-v="auto" class="on" aria-pressed="true">Auto</button><button type="button" data-v="photogrammetry" aria-pressed="false">Photogrammétrie</button><button type="button" data-v="ia" aria-pressed="false">IA, 1 photo</button>
         </div>
       </div>
-      <div class="field"><label>Niveau de départ</label>
-        <div class="seg" id="level">
-          <button data-v="lowpoly" class="on">LowPoly</button><button data-v="medium">Moyen</button><button data-v="detailed">Détaillé</button>
+      <div class="field"><span class="lab" id="levelLab">Niveau de départ</span>
+        <div class="seg" id="level" role="group" aria-labelledby="levelLab">
+          <button type="button" data-v="lowpoly" class="on" aria-pressed="true">LowPoly</button><button type="button" data-v="medium" aria-pressed="false">Moyen</button><button type="button" data-v="detailed" aria-pressed="false">Détaillé</button>
         </div>
         <div class="hint">Commence en LowPoly pour valider la forme et l'orientation en quelques secondes, puis affine.</div>
       </div>
-      <div class="field" id="facesField"><label for="faces">Facettes LowPoly : <span id="facesVal">1000</span> triangles</label><input id="faces" type="range" min="200" max="5000" step="100" value="1000"></div>
+      <div class="field" id="facesField"><label for="faces">Facettes LowPoly : <span id="facesVal">1000</span> triangles</label><input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles"></div>
       <div class="row">
         <div><label for="height">Hauteur (mm)</label><input id="height" type="number" min="10" max="245" step="1" value="80"></div>
         <div><label for="nozzle">Buse</label><select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select></div>
       </div>
-      <div class="field"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur coupés</label><input id="base" type="range" min="0" max="15" step="1" value="3"></div>
+      <div class="field"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur coupés</label><input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %"></div>
       <label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label>
       <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle</button></div>
     </div>
@@ -190,8 +197,8 @@ input[type=range]:focus-visible { outline-offset: 4px; }
       <div class="alert ok hidden" id="notice"></div>
 
       <div class="pipeline" style="margin-top:16px">
-        <label>Pipeline LowPoly vers détaillé</label>
-        <div class="levels" id="levels"></div>
+        <span class="lab" id="pipeLab">Pipeline LowPoly vers détaillé</span>
+        <div class="levels" id="levels" role="group" aria-labelledby="pipeLab"></div>
       </div>
 
       <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Le modèle s'affichera ici.</div></div>
@@ -220,9 +227,9 @@ input[type=range]:focus-visible { outline-offset: 4px; }
 
     <div class="card hidden" id="adjustCard">
       <h2>Ajuster et relancer</h2>
-      <div class="field"><label>Moteur</label>
-        <div class="seg" id="aMode">
-          <button data-v="auto">Auto</button><button data-v="photogrammetry">Photogrammétrie</button><button data-v="ia">IA, 1 photo</button>
+      <div class="field"><span class="lab" id="aModeLab">Moteur</span>
+        <div class="seg" id="aMode" role="group" aria-labelledby="aModeLab">
+          <button type="button" data-v="auto" aria-pressed="false">Auto</button><button type="button" data-v="photogrammetry" aria-pressed="false">Photogrammétrie</button><button type="button" data-v="ia" aria-pressed="false">IA, 1 photo</button>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
@@ -230,7 +237,7 @@ input[type=range]:focus-visible { outline-offset: 4px; }
         <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1"></div>
       </div>
       <div class="field"><label for="aFaces">Facettes LowPoly : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
-      <div class="field hidden" id="mainPick"><label>Photo principale pour l'IA (clique pour changer)</label><div class="thumbs" id="serverThumbs"></div></div>
+      <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo principale pour l'IA (clique pour changer)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
       <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Appliquer au niveau affiché</button></div>
       <details style="margin-top:14px"><summary>Journal</summary><pre id="log"></pre></details>
     </div>
@@ -241,22 +248,27 @@ input[type=range]:focus-visible { outline-offset: 4px; }
 const $ = (id) => document.getElementById(id);
 const LEVELS = { lowpoly: ["LowPoly", "facettes visibles"], medium: ["Moyen", "env. 20 000 triangles"], detailed: ["Détaillé", "qualité maximale"] };
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
-let files = [], mainLocal = null, current = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
+let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
 let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
+// lists are rebuilt on every poll: put keyboard focus back on the element with the same key
+const focusKey = () => document.activeElement?.dataset?.focus || null;
+const restoreFocus = (key) => { if (key && !focusKey()) document.querySelector(`[data-focus="${CSS.escape(key)}"]`)?.focus({ preventScroll: true }); };
 
 function seg(id, onChange) {
   const el = $(id);
+  const mark = (pick) => el.querySelectorAll("button").forEach((b) => { const on = pick(b); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
   el.addEventListener("click", (e) => {
-    if (e.target.tagName !== "BUTTON") return;
-    el.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
-    onChange?.(e.target.dataset.v);
+    const b = e.target.closest("button");
+    if (!b) return;
+    mark((x) => x === b);
+    onChange?.(b.dataset.v);
   });
   return {
     get: () => el.querySelector("button.on")?.dataset.v,
-    set: (v) => el.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)),
+    set: (v) => mark((b) => b.dataset.v === v),
   };
 }
 const modeSeg = seg("mode", updateRoute);
@@ -312,12 +324,17 @@ function addFiles(list) {
 }
 
 function renderLocalThumbs() {
+  const key = focusKey();
   const box = $("localThumbs");
   box.replaceChildren();
   files.forEach((f) => {
-    const d = document.createElement("div");
+    const d = document.createElement("button");
+    d.type = "button";
     d.className = "thumb" + (f.name === mainLocal ? " main" : "");
     d.title = f.name;
+    d.dataset.focus = "lt-" + f.name;
+    d.setAttribute("aria-pressed", f.name === mainLocal);
+    d.setAttribute("aria-label", `${f.name}, photo principale`);
     if (/\.(heic|heif|tiff?)$/i.test(f.name)) {
       const n = document.createElement("div");
       n.className = "noimg"; n.textContent = f.name; d.appendChild(n);
@@ -331,6 +348,7 @@ function renderLocalThumbs() {
     d.onclick = () => { mainLocal = f.name; renderLocalThumbs(); };
     box.appendChild(d);
   });
+  restoreFocus(key);
   $("go").disabled = files.length === 0;
   updateRoute();
 }
@@ -345,16 +363,15 @@ function updateRoute() {
     : `${n} photo(s) : IA TripoSR sur la photo principale (encadrée). Forme approximative, l'arrière est deviné.`;
 }
 
-$("drop").onclick = () => $("file").click();
 $("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
 ["dragenter", "dragover"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); }));
 ["dragleave", "drop"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); }));
 $("drop").addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 document.addEventListener("dragover", (e) => e.preventDefault());
 document.addEventListener("drop", (e) => { e.preventDefault(); if (!e.target.closest("#drop")) addFiles(e.dataTransfer.files); });
-$("faces").oninput = () => ($("facesVal").textContent = $("faces").value);
-$("base").oninput = () => ($("baseVal").textContent = $("base").value);
-$("aFaces").oninput = () => ($("aFacesVal").textContent = $("aFaces").value);
+$("faces").oninput = () => { $("facesVal").textContent = $("faces").value; $("faces").setAttribute("aria-valuetext", `${$("faces").value} triangles`); };
+$("base").oninput = () => { $("baseVal").textContent = $("base").value; $("base").setAttribute("aria-valuetext", `${$("base").value} %`); };
+$("aFaces").oninput = () => { $("aFacesVal").textContent = $("aFaces").value; $("aFaces").setAttribute("aria-valuetext", `${$("aFaces").value} triangles`); };
 
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
@@ -382,17 +399,23 @@ async function loadHistory() {
   try {
     const jobs = await api("/api/jobs");
     if (!jobs.length) return;
+    const key = focusKey();
     const box = $("history");
     box.replaceChildren();
     for (const j of jobs) {
       const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "proj"; b.dataset.focus = "proj-" + j.id;
+      if (j.id === openId) b.setAttribute("aria-current", "true");
       const lv = Object.keys(j.results || {}).map((l) => LEVELS[l][0]).join(", ") || "aucun résultat";
-      li.innerHTML = `<b></b><span class="sub"></span>`;
-      li.querySelector("b").textContent = j.name;
-      li.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
-      li.onclick = () => openJob(j.id);
+      b.innerHTML = `<b></b><span class="sub"></span>`;
+      b.querySelector("b").textContent = j.name;
+      b.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
+      b.onclick = () => openJob(j.id);
+      li.appendChild(b);
       box.appendChild(li);
     }
+    restoreFocus(key);
   } catch {}
 }
 
@@ -407,6 +430,8 @@ function clearModel() {
 function openJob(id) {
   clearTimeout(pollTimer);
   const gen = ++pollGen;
+  openId = id;
+  document.querySelectorAll("#history .proj").forEach((b) => (b.dataset.focus === "proj-" + id ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current")));
   viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null;
   clearModel();
   $("jobError").classList.add("hidden"); $("notice").classList.add("hidden");
@@ -447,7 +472,7 @@ function staleReasons(j, level) {
 }
 
 function render() {
-  const j = current, isBusy = busy(j);
+  const j = current, isBusy = busy(j), key = focusKey();
   $("jobTitle").textContent = j.name;
   const st = $("jobState");
   st.className = "state " + j.state;
@@ -472,14 +497,16 @@ function render() {
     const r = j.results[k], running = isBusy && j.running_level === k, stale = staleReasons(j, k);
     const el = document.createElement("div");
     el.className = "level" + (viewLevel === k ? " sel" : "");
-    el.innerHTML = `<b>${i ? '<span class="arrow">→ </span>' : ""}${label}</b><small>${sub}</small><div class="lstate"></div>`;
+    const name = `${i ? '<span class="arrow" aria-hidden="true">→ </span>' : ""}${label}`;
+    el.innerHTML = `<b>${r ? `<button type="button" class="lvl" data-focus="lvl-${k}" aria-pressed="${viewLevel === k}">${name}</button>` : name}</b><small>${sub}</small><div class="lstate"></div>`;
     const ls = el.querySelector(".lstate");
     if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
     else {
       if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? " · périmé (" + escapeHtml(stale.join(", ")) + ")" : ""}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
-        b.className = "ghost"; b.textContent = r ? "Régénérer" : "Générer"; b.disabled = isBusy;
+        b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Régénérer" : "Générer"; b.disabled = isBusy;
+        b.setAttribute("aria-label", `${b.textContent} le niveau ${label}`);
         b.onclick = (e) => { e.stopPropagation(); runLevel(k); };
         ls.appendChild(b);
       }
@@ -494,6 +521,7 @@ function render() {
   renderAdjust(j);
   $("log").textContent = (j.log || []).join("\n");
   $("log").scrollTop = $("log").scrollHeight;
+  restoreFocus(key);
 }
 
 function fileUrl(rel, v) {
@@ -537,6 +565,7 @@ function renderAdjust(j) {
     $("aBase").value = s.base_cut;
     $("aFaces").value = s.faces;
     $("aFacesVal").textContent = s.faces;
+    $("aFaces").setAttribute("aria-valuetext", `${s.faces} triangles`);
   }
   aModeSeg.set(adjustMode || j.mode);
   const ia = j.engine === "ia";
@@ -545,9 +574,14 @@ function renderAdjust(j) {
     const box = $("serverThumbs");
     box.replaceChildren();
     (j.photos || []).filter((p) => !p.error).forEach((p) => {
-      const t = document.createElement("div");
+      const t = document.createElement("button");
+      t.type = "button";
       t.className = "thumb" + (p.name === j.main_photo ? " main" : "");
       t.title = p.name;
+      t.dataset.focus = "st-" + p.name;
+      t.setAttribute("aria-pressed", p.name === j.main_photo);
+      t.setAttribute("aria-label", `${p.name}, photo principale`);
+      t.disabled = busy(current);
       const img = document.createElement("img"); img.alt = ""; img.src = fileUrl("thumbs/" + p.thumb, 1);
       t.appendChild(img);
       if (p.name === j.main_photo) { const s2 = document.createElement("span"); s2.textContent = "principale"; t.appendChild(s2); }
