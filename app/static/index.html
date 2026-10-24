@@ -82,6 +82,17 @@ details.advanced { margin-top: 14px; }
 details.advanced > summary, details.howto > summary { padding: 8px 0; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
 details.advanced[open] > summary { margin-bottom: 4px; }
 .rot-lab { flex-basis: 100%; }
+.verdict { display: flex; align-items: center; gap: 10px; }
+.verdict::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--ok); }
+.verdict.bad::before { background: var(--bad); }
+.verdict-sub { margin: -4px 0 12px; color: var(--muted); font-size: 14px; }
+.checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
+.checks li { display: flex; gap: 9px; color: var(--ink); }
+.checks li::before { content: ""; flex: none; width: 7px; height: 7px; margin-top: 7px; background: var(--ok); }
+.checks li.warn::before { background: var(--warn); }
+.checks li.bad::before { background: var(--bad); }
+details.tech { margin-top: 14px; }
+details.tech > summary { padding: 6px 0; font-size: 14px; color: var(--muted); cursor: pointer; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field + .field, .row + .field, .field + .row, .row + .row { margin-top: 12px; }
 input[type=text], input[type=number], select { width: 100%; padding: 9px 10px 8px; border: 0; border-bottom: 1.5px solid var(--field-line); border-radius: 0; background: var(--drop); color: var(--ink); font: inherit; transition: border-color .15s; }
@@ -256,15 +267,21 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 
   <section class="stack inspector">
     <div class="card hidden" id="resultCard">
-      <h2 id="resultTitle">Résultat</h2>
-      <table id="report"></table>
+      <p class="kick"><span>3</span> Impression</p>
+      <h2 class="verdict" id="resultTitle">Résultat</h2>
+      <p class="verdict-sub" id="verdictSub"></p>
+      <ul class="checks" id="verdictList"></ul>
       <div class="actions" style="margin-top:14px">
         <button class="primary" id="orca">Préparer l'impression dans OrcaSlicer</button>
-        <button class="ghost" id="expStl">Exporter le STL</button>
-        <button class="ghost" id="finder">Afficher dans le Finder</button>
-        <button class="ghost" id="expBlend">Exporter le .blend</button>
       </div>
       <div class="hint" id="slicerHint"></div>
+      <div class="labrow" style="margin-top:14px"><span class="lab">Autres enregistrements</span><button type="button" class="tip" aria-label="Aide : autres enregistrements" aria-describedby="tipFiles">?</button><span class="tip-text" role="tooltip" id="tipFiles">STL : fichier standard de l'impression 3D, accepté par tous les logiciels de découpe. .blend : fichier Blender, pour retoucher le modèle. Les fichiers sont copiés dans Téléchargements.</span></div>
+      <div class="actions">
+        <button class="ghost" id="expStl">Enregistrer le STL</button>
+        <button class="ghost" id="expBlend">Enregistrer pour Blender</button>
+        <button class="ghost" id="finder">Afficher dans le Finder</button>
+      </div>
+      <details class="tech"><summary>Détails techniques</summary><table id="report"></table></details>
     </div>
 
     <div class="card hidden" id="adjustCard">
@@ -609,23 +626,37 @@ function renderResult(j) {
   const r = viewLevel && j.results[viewLevel];
   $("resultCard").classList.toggle("hidden", !r);
   if (!r) return;
-  $("resultTitle").textContent = `Résultat ${LEVELS[viewLevel][0]}`;
   const yes = (ok, t, f) => `<span class="${ok ? "good" : "badc"}">${ok ? t : f}</span>`;
   const thinWarn = r.thin_faces > Math.max(5, r.triangles * 0.01);
   const fr = (v) => String(v).replace(".", ",");
+  const closed = r.non_manifold_edges === 0 && r.boundary_edges === 0;
+  const supports = r.overhang_pct > 5;
+  const dims = r.dimensions_mm.map((v) => v.toLocaleString("fr-FR")).join(" × ") + " mm";
+  // verdict in plain words first; the measures stay under "Détails techniques"
+  $("resultTitle").textContent = r.printable ? "Prêt à imprimer" : "À vérifier avant d'imprimer";
+  $("resultTitle").classList.toggle("bad", !r.printable);
+  $("verdictSub").textContent = `Niveau ${LEVELS[viewLevel][0]} · ${dims} · environ ${Math.round(r.volume_cm3).toLocaleString("fr-FR")} cm³ de matière`;
+  const notes = [];
+  if (!closed) notes.push(["bad", "Le modèle n'est pas complètement fermé : recalcule ce niveau ou essaie un autre niveau."]);
+  if (r.self_intersections) notes.push(["bad", "Des surfaces se croisent : recalcule ce niveau."]);
+  if (r.shells > 1) notes.push(["warn", `${r.shells} morceaux séparés. Normal seulement si « Garder les pièces détachées » est coché.`]);
+  if (thinWarn) notes.push(["warn", `Parois très fines par endroits (moins de ${fr(r.min_wall_mm)} mm) : agrandis le modèle ou choisis un niveau moins détaillé.`]);
+  if (supports) notes.push(["warn", `${fr(Math.round(r.overhang_pct))} % de la surface est en surplomb : il faudra des supports.`]);
+  if (!notes.length || (closed && !r.self_intersections && r.shells === 1 && !thinWarn)) notes.unshift(["ok", "Fermé, d'un seul morceau, sans paroi trop fine."]);
+  $("verdictList").innerHTML = notes.map(([t, s]) => `<li class="${t}">${escapeHtml(s)}</li>`).join("");
   const rows = [
-    ["Dimensions", r.dimensions_mm.map((v) => v.toLocaleString("fr-FR")).join(" × ") + " mm"],
-    ["Triangles", r.triangles.toLocaleString("fr-FR")],
+    ["Taille", dims],
+    ["Facettes (triangles)", r.triangles.toLocaleString("fr-FR")],
     ["Volume", r.volume_cm3.toLocaleString("fr-FR") + " cm³"],
-    ["Étanche (manifold)", yes(r.non_manifold_edges === 0 && r.boundary_edges === 0, "oui", `non (${r.non_manifold_edges} arêtes)`)],
-    ["Auto-intersections", yes(r.self_intersections === 0, "aucune", r.self_intersections)],
-    ["Coques", yes(r.shells === 1, "1", r.shells)],
-    [`Parois sous ${fr(r.min_wall_mm)} mm`, `<span class="${thinWarn ? "warn" : "good"}">${r.thin_faces} face(s)</span>`],
-    ["Surplombs > 45°", `<span class="${r.overhang_pct > 5 ? "warn" : "good"}">${fr(r.overhang_pct)} % de la surface</span>`],
-    ["Moteur", r.engine === "photogrammetry" ? (tools?.photogrammetry_engine || "photogrammétrie") : "IA TripoSR"],
+    ["Fermé, sans trou", yes(closed, "oui", `non (${r.non_manifold_edges + r.boundary_edges} arêtes ouvertes)`)],
+    ["Surfaces qui se croisent", yes(r.self_intersections === 0, "aucune", r.self_intersections)],
+    ["Morceaux séparés", yes(r.shells === 1, "1", r.shells)],
+    [`Parois de moins de ${fr(r.min_wall_mm)} mm`, `<span class="${thinWarn ? "warn" : "good"}">${r.thin_faces} face(s)</span>`],
+    ["Surplombs (pente > 45°)", `<span class="${supports ? "warn" : "good"}">${fr(r.overhang_pct)} % de la surface</span>`],
+    ["Méthode", r.engine === "photogrammetry" ? `toutes les photos (${tools?.photogrammetry_engine || "photogrammétrie"})` : "IA sur une photo (TripoSR)"],
   ];
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
-  $("slicerHint").textContent = `Dans OrcaSlicer : profil Creality Ender-3 V3, ${r.overhang_pct > 5 ? "supports arborescents (menton, nez, oreilles), " : ""}socle à plat sur le plateau.${thinWarn ? " Des parois sont plus fines que 2 × la buse : agrandis le modèle ou passe en niveau moins détaillé." : ""}`;
+  $("slicerHint").textContent = `OrcaSlicer s'ouvre avec ce modèle. Vérifie que l'imprimante choisie est « Creality Ender-3 V3 »${supports ? ", coche « Activer les supports »" : ""}, puis clique « Découper le plateau ».`;
   const pv = $("previews");
   pv.replaceChildren(...(r.previews || []).map((p) => { const img = document.createElement("img"); img.alt = ""; img.src = fileUrl(p, r.version); return img; }));
   if (shownVersion !== `${viewLevel}:${r.version}`) {
