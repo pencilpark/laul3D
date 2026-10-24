@@ -15,3 +15,4 @@ desktop/src-tauri/resources/python/
 tools/
 *.dmg
 *.msi
+desktop/src-tauri/resources/

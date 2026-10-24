@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berria Craft</title>
+<style>
+@font-face { font-family: "Jost"; src: url(fonts/jost-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+:root { --bg: #111111; --panel: #1e1e1e; --ink: #ffffff; --muted: rgba(255,255,255,.66); --accent: #cf1149; --accent-text: #e84e77; --track: #2a2a2a; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 400 15px/1.45 "Jost", "Futura", "Century Gothic", sans-serif; -webkit-font-smoothing: antialiased; cursor: default; user-select: none; }
+main { width: min(460px, calc(100% - 32px)); padding: 28px 28px 24px; background: var(--panel); }
+.kick { margin: 0 0 6px; font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0 0 18px; font-size: 26px; font-weight: 500; line-height: 1.1; letter-spacing: -0.025em; }
+#step { margin: 0 0 12px; min-height: 22px; }
+.track { height: 4px; overflow: hidden; background: var(--track); }
+.track::before { content: ""; display: block; width: 32%; height: 100%; background: var(--accent); animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+@media (prefers-reduced-motion: reduce) { .track::before { width: 100%; animation: none; opacity: .5; } }
+.note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+#error { display: none; }
+body.failed #wait { display: none; }
+body.failed #error { display: block; }
+#error h2 { margin: 0 0 10px; font-size: 17px; font-weight: 500; color: var(--accent-text); }
+#error p { margin: 0 0 10px; }
+#detail { padding: 10px 12px; background: var(--bg); font-size: 13px; overflow-wrap: anywhere; user-select: text; }
+</style>
+</head>
+<body>
+<main>
+  <p class="kick">Berria Craft</p>
+  <h1>Photos vers impression 3D</h1>
+  <div id="wait" role="status">
+    <p id="step">Démarrage du moteur de calcul…</p>
+    <div class="track"></div>
+    <p class="note" id="slow" hidden>La première ouverture prépare l'environnement de calcul sur cet ordinateur : une minute au plus.</p>
+  </div>
+  <div id="error" role="alert">
+    <h2>Le moteur de calcul n'a pas démarré</h2>
+    <p id="detail"></p>
+    <p class="note">Quitte Berria Craft (Cmd Q ou fermeture de la fenêtre) puis rouvre-le. Si le message revient, garde-le : il indique la cause.</p>
+  </div>
+</main>
+<script>
+window.setStep = (text) => { document.getElementById("step").textContent = text; };
+const error = new URLSearchParams(location.search).get("error");
+if (error) {
+  document.getElementById("detail").textContent = error.charAt(0).toUpperCase() + error.slice(1) + ".";
+  document.body.classList.add("failed");
+}
+setTimeout(() => { document.getElementById("slow").hidden = false; }, 6000);
+</script>
+</body>
+</html>
