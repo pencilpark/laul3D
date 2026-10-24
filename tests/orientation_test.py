@@ -34,7 +34,8 @@ def ring(frame, n=24):
         down /= np.linalg.norm(down)
         r = np.stack([np.cross(down, forward), down, forward])  # camera from world: x right, y down, z forward
         t = -r @ c
-        lines.append(f"{k + 1} {' '.join(map(str, quaternion(r)))} {t[0]} {t[1]} {t[2]} 1 img_{k + 1:04d}.jpg")
+        # one folder per camera setting, the first photo not in the first folder by name
+        lines.append(f"{k + 1} {' '.join(map(str, quaternion(r)))} {t[0]} {t[1]} {t[2]} 1 cam{2 - k % 2}/img_{k + 1:04d}.jpg")
         lines.append("")  # points line, empty here
     return "\n".join(lines) + "\n", frame @ np.array([np.sin(0.3), -np.cos(0.3), 0.0])
 
@@ -52,7 +53,7 @@ def main():
         assert np.allclose(m @ m.T, np.eye(3), atol=1e-9) and np.isclose(np.linalg.det(m), 1.0), m
         assert np.allclose(m @ frame[:, 2], [0, 0, 1], atol=0.05), m @ frame[:, 2]
         side = m @ first_side
-        assert side[1] < -0.95, side
+        assert side[1] < -0.999, side  # the next photo, 15° away, would give -0.966
     print("orientation : redressement et face avant OK sur 5 repères quelconques")
 
 

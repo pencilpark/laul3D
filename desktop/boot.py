@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 
@@ -23,6 +24,9 @@ HOME = os.environ.get("LOWPOLY_HOME") or (
     os.path.join(os.environ["LOCALAPPDATA"], "com.pencilpark.berriacraft") if IS_WIN
     else os.path.expanduser("~/Library/Application Support/com.pencilpark.berriacraft"))
 UV = os.path.join(RES, "bin", "uv.exe" if IS_WIN else "uv")
+# what runs right now, for the stdin watcher: a setup command, then the server
+CHILDREN = {"setup": None, "server": None}
+LOCK = threading.Lock()
 
 
 def say(kind, text=""):
@@ -30,11 +34,28 @@ def say(kind, text=""):
 
 
 def run(cmd, **kw):
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       creationflags=NO_WINDOW, **kw)
-    if r.returncode != 0:
-        lines = (r.stderr or r.stdout).strip().splitlines()
-        raise RuntimeError(lines[-1] if lines else f"code {r.returncode}")
+    with LOCK:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                errors="replace", creationflags=NO_WINDOW, **kw)
+        CHILDREN["setup"] = proc
+    out, _ = proc.communicate()
+    with LOCK:
+        CHILDREN["setup"] = None
+    if proc.returncode != 0:
+        lines = (out or "").strip().splitlines()
+        raise RuntimeError(lines[-1] if lines else f"code {proc.returncode}")
+
+
+def watch_stdin():
+    """The app closed our stdin (quitting, or killed): stop whatever runs, at any stage, then leave."""
+    sys.stdin.read()
+    LOCK.acquire()  # kept until the exit: nothing new starts while we stop what runs
+    setup, server = CHILDREN["setup"], CHILDREN["server"]
+    if setup and setup.poll() is None:
+        setup.kill()
+    if server:
+        stop(server)
+    os._exit(0)
 
 
 def runtime():
@@ -91,8 +112,11 @@ def serve(python, port):
     log.flush()
     # own process group, so stopping the server also stops the Blender or photogrammetry run it started
     group = {"creationflags": NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if IS_WIN else {"start_new_session": True}
-    return subprocess.Popen([python, "-m", "uvicorn", "app.server:app", "--host", "127.0.0.1", "--port", str(port)],
-                            cwd=APP, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **group)
+    with LOCK:
+        CHILDREN["server"] = subprocess.Popen(
+            [python, "-m", "uvicorn", "app.server:app", "--host", "127.0.0.1", "--port", str(port)],
+            cwd=APP, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **group)
+        return CHILDREN["server"]
 
 
 def wait_ready(proc, port, timeout=180):
@@ -125,6 +149,8 @@ def stop(proc):
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # the app reads UTF-8 whatever the Windows code page
     port = int(sys.argv[sys.argv.index("--port") + 1])
+    threading.Thread(target=watch_stdin, daemon=True).start()
+    proc = None
     try:
         os.makedirs(HOME, exist_ok=True)
         rt_dir, rt_python = runtime()
@@ -134,11 +160,12 @@ def main():
         proc = serve(python, port)
         wait_ready(proc, port)
     except Exception as e:  # noqa: BLE001
+        if proc:
+            stop(proc)
         say("ERROR", str(e) or type(e).__name__)
         return 1
     say("READY", str(port))
-    sys.stdin.read()  # end of file: the app is quitting
-    stop(proc)
+    threading.Event().wait()  # watch_stdin ends the process when the app quits
     return 0
 
 

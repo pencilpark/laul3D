@@ -48,6 +48,19 @@ def _first_existing(paths):
 
 
 TOOLS = os.path.join(DATA, "tools")  # what the app installs itself (setup_tools)
+BLENDER_MIN = (5, 0)  # the smoothing uses the SDF grid nodes, new in Blender 5.0
+
+
+def blender_version(exe):
+    """(major, minor) from the X.Y folder Blender keeps beside its program (in Contents/Resources on a Mac)."""
+    base = os.path.dirname(os.path.realpath(exe))
+    if IS_MAC:
+        base = os.path.join(os.path.dirname(base), "Resources")
+    try:
+        names = os.listdir(base)
+    except OSError:
+        return None
+    return max((tuple(map(int, n.split("."))) for n in names if re.fullmatch(r"\d+\.\d+", n)), default=None)
 
 
 def blender_path():
@@ -55,14 +68,18 @@ def blender_path():
     if env:
         return env
     if IS_MAC:
-        return _first_existing(["/Applications/Blender.app/Contents/MacOS/Blender",
-                                os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender"),
-                                os.path.join(TOOLS, "Blender.app", "Contents", "MacOS", "Blender")])
-    if IS_WIN:
-        found = sorted(glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
-                                              "Blender Foundation", "Blender*", "blender.exe")))
-        return found[-1] if found else _first_existing([os.path.join(TOOLS, "blender", "blender.exe")])
-    return shutil.which("blender")
+        found = [os.path.join(TOOLS, "Blender.app", "Contents", "MacOS", "Blender"),
+                 "/Applications/Blender.app/Contents/MacOS/Blender",
+                 os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender")]
+    elif IS_WIN:
+        found = [os.path.join(TOOLS, "blender", "blender.exe"),
+                 *glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
+                                         "Blender Foundation", "Blender*", "blender.exe"))]
+    else:
+        return shutil.which("blender")
+    # the copy the app installed first (the tested version), then the newest recent enough
+    usable = [p for p in found if os.path.exists(p) and (blender_version(p) or (0, 0)) >= BLENDER_MIN]
+    return next((p for p in usable if p.startswith(TOOLS)), None) or max(usable, key=blender_version, default=None)
 
 
 def orca_path():
@@ -259,7 +276,7 @@ def photogrammetry(photo_dir, photos, work_dir, level, log):
     keep, dropped = select_sharp(photos)
     if dropped:
         log(f"{len(dropped)} photo(s) floue(s) écartée(s) : {', '.join(dropped)}")
-    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, stage_photos, PipelineError)
+    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, PipelineError)
 
 
 def prepare_main_image(photo_dir, name, work_dir):
@@ -306,7 +323,7 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
 def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
-        raise PipelineError("Blender est introuvable : clique « Calcul 3D : installer » en haut de la fenêtre.")
+        raise PipelineError("Blender 5 ou plus est introuvable : clique « Calcul 3D : installer » en haut de la fenêtre.")
     script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
     base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
     engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
@@ -367,14 +384,24 @@ def export_copy(path):
     return dest
 
 
+def launch_detached(cmd):
+    """Windows: a short-lived Python starts the app, so it is no descendant of the server and survives the engine's
+    stop (taskkill /T ends the whole tree when Berria Craft closes)."""
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    code = f"import subprocess, sys; subprocess.Popen(sys.argv[1:], creationflags={flags})"
+    subprocess.run([sys.executable, "-I", "-c", code, *cmd], creationflags=NO_WINDOW, timeout=60, check=True)
+
+
 def open_in_orca(stl):
     orca = orca_path()
     if not orca:
         raise PipelineError("OrcaSlicer est introuvable : ouvre l'assistant d'installation.")
     if IS_MAC:
         subprocess.Popen(["open", "-a", orca, stl])
+    elif IS_WIN:
+        launch_detached([orca, stl])
     else:
-        subprocess.Popen([orca, stl], creationflags=NO_WINDOW)
+        subprocess.Popen([orca, stl])
 
 
 def reveal(path):

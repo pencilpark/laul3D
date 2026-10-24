@@ -59,6 +59,7 @@ VCREDIST_MIN = (14, 51)
 NET_ERROR = "connexion à Internet impossible ; vérifie la connexion puis clique « Réessayer »"
 
 LOCK = threading.Lock()
+VCREDIST_LOCK = threading.Lock()  # the AI and photogrammetry installs both need it, and may run together
 STATE = {"status": "idle", "current": None, "step": "", "done": 0, "total": 0, "error": None}
 
 
@@ -198,8 +199,14 @@ def vcredist_ok():
 
 def ensure_vcredist(step):
     """Installs Microsoft's Visual C++ runtime when missing; Windows asks the user's consent (UAC)."""
-    if not pl.IS_WIN or vcredist_ok():
+    if not pl.IS_WIN:
         return
+    with VCREDIST_LOCK:  # one download and one consent; the second caller finds the runtime installed
+        if not vcredist_ok():
+            _install_vcredist(step)
+
+
+def _install_vcredist(step):
     step("Composants Microsoft Visual C++ : Windows va demander ton accord")
     exe = os.path.join(pl.DATA, "downloads", "vc_redist.x64.exe")
     os.makedirs(os.path.dirname(exe), exist_ok=True)

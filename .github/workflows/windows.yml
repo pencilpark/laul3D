@@ -79,6 +79,12 @@ jobs:
       - name: Photogrammetry orientation logic
         run: .venv\Scripts\python.exe tests\orientation_test.py
 
+      - name: Photogrammetry staging, private fallback folder, OrcaSlicer detached
+        run: .venv\Scripts\python.exe tests\photogrammetry_win_test.py
+
+      - name: Launcher stops its children when closed early or when the engine never answers
+        run: .venv\Scripts\python.exe tests\boot_test.py
+
       - name: Tools installer real run (COLMAP + OpenMVS, accented path)
         env:
           LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
@@ -99,4 +105,6 @@ jobs:
             ci-out/**/*.png
             ci-out/**/*.stl
             ci-out/**/*.json
+            ci-out/**/*.log
+            ci-out/**/*.glb
           if-no-files-found: warn

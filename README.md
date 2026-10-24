@@ -90,4 +90,4 @@ $B -b --factory-startup --python-exit-code 1 -P engine/blender_lowpoly.py -- \
 .venv/bin/python engine/triposr_infer.py photo.jpg sortie/brut.obj
 ```
 
-Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/save_race_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py`.
+Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py`.
