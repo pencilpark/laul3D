@@ -281,9 +281,10 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
     if not ok:
         raise PipelineError("aucune photo lisible")
     name = main_photo if any(p["name"] == main_photo for p in ok) else max(ok, key=lambda p: p["sharpness"])["name"]
+    key = f"{name}|couleurs"  # meshes cached before the colored preview have none: computed again
     if os.path.exists(out) and os.path.exists(marker):
         with open(marker, encoding="utf-8") as f:
-            if f.read() == name:
+            if f.read() == key:
                 log(f"reconstruction IA de {name} déjà en cache")
                 return out, name
     image = prepare_main_image(photo_dir, name, work_dir)
@@ -298,25 +299,34 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
         raise PipelineError("TripoSR a échoué : " + (lines[-1] if lines else f"code {code}"))
     os.replace(tmp, out)
     with open(marker, "w", encoding="utf-8") as f:
-        f.write(name)
+        f.write(key)
     return out, name
 
 
 def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
-        raise PipelineError("Blender est introuvable : ouvre l'assistant d'installation.")
+        raise PipelineError("Blender est introuvable : clique « Calcul 3D : installer » en haut de la fenêtre.")
     script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
     base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
     engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
     cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
                   "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
                   "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
-                  "--preview-engine", engine, "--save-blend"]
+                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
+    try:  # photogrammetry_win: the scan stays in COLMAP's frame, this rotation stands it up
+        with open(raw + ".orient.json", encoding="utf-8") as f:
+            orient = json.load(f)
+        if orient.get("matrix"):
+            cmd += ["--orient", *(str(v) for row in orient["matrix"] for v in row)]
+        if orient.get("raw_axes"):
+            cmd += ["--raw-axes"]
+    except (OSError, ValueError):
+        pass
     code, lines = run(cmd, log)
     report = next((json.loads(l[7:]) for l in lines if l.startswith("REPORT ")), None)
     if report is None:
