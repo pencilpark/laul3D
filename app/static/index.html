@@ -943,9 +943,12 @@ async function showModel(url, flat) {
     if (seq !== loadSeq) return;
     $("viewer").classList.remove("has-model");
     const missing = /404/.test(String(e?.message || e));
-    $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau." : "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle.";
+    const views = $("previews").children.length;
+    $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau."
+      : views ? "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle."
+      : "L'aperçu 3D n'est pas disponible sur cet ordinateur. Le modèle est prêt : tu peux l'ouvrir dans OrcaSlicer.";
     $("viewerEmpty").classList.remove("hidden");
-    $("previews").classList.toggle("hidden", missing);
+    $("previews").classList.toggle("hidden", missing || !views);
   }
 }
 
