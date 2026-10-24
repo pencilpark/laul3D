@@ -76,6 +76,9 @@ jobs:
       - name: Tools installer logic
         run: .venv\Scripts\python.exe tests\setup_tools_test.py
 
+      - name: Photogrammetry orientation logic
+        run: .venv\Scripts\python.exe tests\orientation_test.py
+
       - name: Tools installer real run (COLMAP + OpenMVS, accented path)
         env:
           LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
