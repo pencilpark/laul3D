@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+projects/
+data/
+ci-out/
+smoke-*.json
+.DS_Store
+.playwright-mcp/
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/binaries/
+desktop/src-tauri/resources/python/
+tools/
+*.dmg
+*.msi

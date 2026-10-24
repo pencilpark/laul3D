@@ -1,0 +1,9 @@
+# Socle : serveur local, photos, photogrammétrie, pilotage de Blender. Versions testées le 2026-10-24.
+fastapi==0.162.0
+starlette==1.9.0
+pydantic==2.14.1
+uvicorn==0.54.0
+python-multipart==0.0.32
+pillow==10.1.0
+pillow-heif==0.22.0
+numpy==2.4.6

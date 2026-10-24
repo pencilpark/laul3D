@@ -1,0 +1,12 @@
+# Pack IA (TripoSR + détourage rembg). Sous Windows avec GPU NVIDIA, le setup installe torch depuis l'index CUDA de PyTorch.
+torch==2.14.1
+transformers==4.35.0
+tokenizers==0.14.1
+huggingface-hub==0.17.3
+safetensors==0.8.0
+omegaconf==2.3.0
+einops==0.7.0
+trimesh==4.0.5
+scikit-image==0.26.0
+rembg==2.0.69
+onnxruntime==1.31.0
