@@ -108,4 +108,5 @@ jobs:
             ci-out/**/*.json
             ci-out/**/*.log
             ci-out/**/*.glb
+            ci-out/**/scan_*/*
           if-no-files-found: warn

@@ -366,6 +366,23 @@ def bake_colors(target, sources, reach):
     return True
 
 
+def describe_textures(sources):
+    for img in {n.image for o in sources for s in o.material_slots if s.material and s.material.node_tree
+                for n in s.material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image}:
+        w, h = img.size  # reading the size loads the file
+        log(f"texture du scan : {os.path.basename(img.filepath)}, {w} x {h}{'' if w else ' (illisible)'}")
+    if not any(o.data.uv_layers for o in sources if base_color_linked(o)):
+        log("texture du scan sans coordonnées de texture")
+
+
+def colors_blank(obj):
+    """A bake that hit nothing, or a black texture: no colors is better than a black model."""
+    data = obj.data.color_attributes.active_color.data
+    cols = [0.0] * (len(data) * 4)
+    data.foreach_get("color", cols)
+    return max(max(cols[i], cols[i + 1], cols[i + 2]) for i in range(0, len(cols), 4)) < 0.02
+
+
 def flatten_face_colors(obj):
     """LowPoly: one color per facet, the look of a painted figurine."""
     data = obj.data.color_attributes.active_color.data
@@ -522,6 +539,8 @@ def main():
         if o not in sources:
             bpy.data.objects.remove(o, do_unlink=True)
     log(f"import : {len(meshes)} maillage(s), {len(bm.faces)} faces{', couleurs du scan gardées' if sources else ''}")
+    if sources:
+        describe_textures(sources)
 
     turn = Euler([math.radians(r) for r in a.rot], "XYZ").to_matrix().to_4x4()
     if a.orient:
@@ -608,10 +627,13 @@ def main():
             o.matrix_world = refit @ fit @ turn @ mw
         # the result moved off the scan by remeshing, smoothing and decimation: a few percent of the height
         if bake_colors(work, sources, reach=0.03 * height):
-            if a.level == "lowpoly":
-                flatten_face_colors(work)
-            report["colors"] = export_colors(work, a.outdir, a.name)
-            log("couleurs du scan projetées")
+            if colors_blank(work):
+                log("couleurs du scan noires après projection : aperçu Rendu désactivé pour ce modèle")
+            else:
+                if a.level == "lowpoly":
+                    flatten_face_colors(work)
+                report["colors"] = export_colors(work, a.outdir, a.name)
+                log("couleurs du scan projetées")
     for o in list(bpy.data.objects):
         if o is not work:
             bpy.data.objects.remove(o, do_unlink=True)
