@@ -91,8 +91,8 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 .state.done { color: var(--ok); } .state.error { color: var(--bad); } .state.running, .state.queued { color: var(--warn); }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.error { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 10px 12px; margin-top: 12px; }
-.notice { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); padding: 10px 12px; margin-top: 12px; word-break: break-all; }
+.alert { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 10px 12px; margin-top: 12px; }
+.alert.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); padding: 10px 12px; margin-top: 12px; word-break: break-all; }
 .pipeline { container-type: inline-size; }
 .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @container (max-width: 440px) { .levels { grid-template-columns: 1fr; } }
@@ -180,8 +180,8 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
         <span class="sub" id="jobStep"></span>
       </div>
       <div class="sub" id="jobMeta" style="margin-top:6px"></div>
-      <div class="error hidden" id="jobError"></div>
-      <div class="notice hidden" id="notice"></div>
+      <div class="alert hidden" id="jobError"></div>
+      <div class="alert ok hidden" id="notice"></div>
 
       <div class="pipeline" style="margin-top:16px">
         <label>Pipeline LowPoly vers détaillé</label>
