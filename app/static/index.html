@@ -119,6 +119,10 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
 .history { list-style: none; padding: 0; margin: 0; }
 .history li { padding: 9px 0; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
 .history li:hover b { color: var(--accent-text); }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+input[type=text]:focus-visible, input[type=number]:focus-visible, select:focus-visible { outline: none; border-bottom-color: var(--accent-text); box-shadow: 0 1.5px 0 var(--accent-text); background-color: rgba(207,17,73,.08); }
+.seg button:focus-visible { outline-offset: -2px; }
+input[type=range]:focus-visible { outline-offset: 4px; }
 .hidden { display: none !important; }
 </style>
 </head>
