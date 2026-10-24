@@ -24,6 +24,8 @@ HOME = os.environ.get("LOWPOLY_HOME") or (
     os.path.join(os.environ["LOCALAPPDATA"], "com.pencilpark.berriacraft") if IS_WIN
     else os.path.expanduser("~/Library/Application Support/com.pencilpark.berriacraft"))
 UV = os.path.join(RES, "bin", "uv.exe" if IS_WIN else "uv")
+# own process group, so stopping a child also stops what it started (uv's Python, the server's Blender)
+GROUP = {"creationflags": NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if IS_WIN else {"start_new_session": True}
 # what runs right now, for the stdin watcher: a setup command, then the server
 CHILDREN = {"setup": None, "server": None}
 LOCK = threading.Lock()
@@ -36,7 +38,7 @@ def say(kind, text=""):
 def run(cmd, **kw):
     with LOCK:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                                errors="replace", creationflags=NO_WINDOW, **kw)
+                                errors="replace", **GROUP, **kw)
         CHILDREN["setup"] = proc
     out, _ = proc.communicate()
     with LOCK:
@@ -50,11 +52,9 @@ def watch_stdin():
     """The app closed our stdin (quitting, or killed): stop whatever runs, at any stage, then leave."""
     sys.stdin.read()
     LOCK.acquire()  # kept until the exit: nothing new starts while we stop what runs
-    setup, server = CHILDREN["setup"], CHILDREN["server"]
-    if setup and setup.poll() is None:
-        setup.kill()
-    if server:
-        stop(server)
+    for proc in (CHILDREN["setup"], CHILDREN["server"]):
+        if proc:
+            stop(proc)
     os._exit(0)
 
 
@@ -110,12 +110,10 @@ def serve(python, port):
     log = open(os.path.join(HOME, "logs", "serveur.log"), "a", encoding="utf-8")
     log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} port {port}\n")
     log.flush()
-    # own process group, so stopping the server also stops the Blender or photogrammetry run it started
-    group = {"creationflags": NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if IS_WIN else {"start_new_session": True}
     with LOCK:
         CHILDREN["server"] = subprocess.Popen(
             [python, "-m", "uvicorn", "app.server:app", "--host", "127.0.0.1", "--port", str(port)],
-            cwd=APP, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **group)
+            cwd=APP, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, **GROUP)
         return CHILDREN["server"]
 
 
