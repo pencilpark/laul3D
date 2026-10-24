@@ -9,22 +9,12 @@
 {"imports": {"three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/"}}
 </script>
 <style>
+/* Pencil Park palette (revamp.pencil-park.com, assets/css/base.css): dark only, like the site */
 :root {
-  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e2ded6;
-  --accent: #c2531b; --accent-ink: #ffffff; --ok: #2f7d4f; --warn: #a86a00; --bad: #b3261e;
-  --chip: #efebe4; --drop: #fbfaf7;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #161514; --panel: #201f1d; --ink: #ecebe8; --muted: #a39e95; --line: #34322e;
-    --accent: #e0723a; --accent-ink: #161514; --ok: #5cbf86; --warn: #e0a83a; --bad: #ef6b62;
-    --chip: #2b2926; --drop: #1b1a18;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #161514; --panel: #201f1d; --ink: #ecebe8; --muted: #a39e95; --line: #34322e;
-  --accent: #e0723a; --accent-ink: #161514; --ok: #5cbf86; --warn: #e0a83a; --bad: #ef6b62;
-  --chip: #2b2926; --drop: #1b1a18;
+  --bg: #111111; --panel: #1e1e1e; --ink: #ffffff; --muted: rgba(255,255,255,.66); --line: rgba(255,255,255,.14);
+  --accent: #cf1149; --accent-ink: #ffffff; --accent-text: #e84e77; --ok: #5cbf86; --warn: #e0a83a; --bad: #e84e77;
+  --chip: #2a2a2a; --drop: #111111;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -95,7 +85,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 pre { max-height: 260px; overflow: auto; background: var(--drop); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
 .history { list-style: none; padding: 0; margin: 0; }
 .history li { padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
-.history li:hover b { color: var(--accent); }
+.history li:hover b { color: var(--accent-text); }
 .hidden { display: none !important; }
 </style>
 </head>
