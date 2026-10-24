@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "engine"))
 import pipeline as pl  # noqa: E402
+import setup_ai  # noqa: E402
 
 PROJECTS = os.environ.get("LOWPOLY_PROJECTS", os.path.join(ROOT, "projects"))
 STATIC = os.path.join(ROOT, "app", "static")
@@ -154,7 +155,7 @@ def process(job, level, log):
     n_ok = sum(1 for p in job["photos"] if "error" not in p)
     if n_ok == 0:
         raise pl.PipelineError("aucune photo lisible")
-    engine = pl.choose_engine(job["mode"], n_ok, pl.tools_status())
+    engine = pl.choose_engine(job["mode"], n_ok, tools_now())
     with LOCK:
         job["engine"] = engine
     if engine == "photogrammetry" and n_ok < pl.MIN_PHOTOGRAMMETRY:
@@ -256,10 +257,23 @@ def index():
     return FileResponse(os.path.join(STATIC, "index.html"), headers={"Cache-Control": "no-store"})
 
 
+def tools_now():
+    # the AI libraries land before the models: the module counts as installed once the installer has finished
+    tools = pl.tools_status()
+    tools["ia"] = tools["ia"] and not setup_ai.running()
+    return tools
+
+
 @app.get("/api/status")
 def status():
-    return {"tools": pl.tools_status(), "setup": pl.setup_state(), "queue": TASKS.qsize(),
-            "printer": {"name": "Creality Ender-3 V3", "bed_mm": [220, 220, 250]}}
+    return {"tools": tools_now(), "setup": pl.setup_state(), "ai_install": setup_ai.snapshot(),
+            "queue": TASKS.qsize(), "printer": {"name": "Creality Ender-3 V3", "bed_mm": [220, 220, 250]}}
+
+
+@app.post("/api/setup/ai")
+def install_ai():
+    setup_ai.start()
+    return setup_ai.snapshot()
 
 
 @app.get("/api/jobs")
