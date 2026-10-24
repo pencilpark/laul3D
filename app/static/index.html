@@ -96,8 +96,9 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 .pipeline { container-type: inline-size; }
 .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @container (max-width: 440px) { .levels { grid-template-columns: 1fr; } }
-.level { padding: 10px; cursor: pointer; background: var(--drop); box-shadow: inset 0 0 0 1.5px transparent; }
-.level.sel { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.level { padding: 10px; cursor: pointer; background: var(--drop); transition: background .18s; }
+.level:hover { background: color-mix(in srgb, var(--drop) 94%, #fff); }
+.level.sel { background: var(--accent-tint); box-shadow: inset 0 -2px 0 var(--accent); }
 .level b { display: block; font-size: 15px; font-weight: 500; }
 .level small { color: var(--muted); font-size: 14px; display: block; }
 .level .lstate { margin-top: 6px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -234,7 +235,7 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
 const $ = (id) => document.getElementById(id);
 const LEVELS = { lowpoly: ["LowPoly", "facettes visibles"], medium: ["Moyen", "env. 20 000 triangles"], detailed: ["Détaillé", "qualité maximale"] };
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
-let files = [], mainLocal = null, current = null, viewLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
+let files = [], mainLocal = null, current = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
 let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -400,7 +401,7 @@ function clearModel() {
 function openJob(id) {
   clearTimeout(pollTimer);
   const gen = ++pollGen;
-  viewLevel = null; shownVersion = null; adjustMode = null;
+  viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null;
   clearModel();
   $("jobError").classList.add("hidden"); $("notice").classList.add("hidden");
   poll(id, gen, 0);
@@ -454,6 +455,11 @@ function render() {
   if (j.error) showError(j.error);
   else if (!$("jobError").textContent.startsWith("Serveur")) $("jobError").classList.add("hidden");
 
+  if (pendingLevel && !isBusy && j.results[pendingLevel]) { viewLevel = pendingLevel; pendingLevel = null; shownVersion = null; }
+  if (!viewLevel || !j.results[viewLevel]) {
+    const done = Object.keys(LEVELS).filter((k) => j.results[k]);
+    viewLevel = done.length ? done[done.length - 1] : null;
+  }
   const box = $("levels");
   box.replaceChildren();
   Object.entries(LEVELS).forEach(([k, [label, sub]], i) => {
@@ -476,10 +482,6 @@ function render() {
     box.appendChild(el);
   });
 
-  if (!viewLevel || !j.results[viewLevel]) {
-    const done = Object.keys(LEVELS).filter((k) => j.results[k]);
-    viewLevel = done.length ? done[done.length - 1] : null;
-  }
   document.querySelectorAll("#rotateBar button").forEach((b) => (b.disabled = isBusy || !viewLevel));
   $("apply").disabled = isBusy;
   renderResult(j);
@@ -553,7 +555,7 @@ async function runLevel(level, settings = {}, extra = {}) {
   if (!current) return;
   try {
     const job = await post(`/api/jobs/${encodeURIComponent(current.id)}/run`, { level, settings, ...extra });
-    viewLevel = level; shownVersion = null;
+    pendingLevel = level;
     current = job; render();
     clearTimeout(pollTimer);
     const gen = ++pollGen;
