@@ -5,6 +5,7 @@ Staging (names, EXIF orientation, camera folders), model choice, atomic cache, B
 on Windows also the private fallback folder and OrcaSlicer surviving the engine's stop.
 """
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -162,22 +163,33 @@ def test_vcredist_lock():
     print("setup_tools : un seul téléchargement Visual C++ pour deux installations simultanées")
 
 
+BROAD = {"S-1-1-0": "Tout le monde", "S-1-5-32-545": "Utilisateurs", "S-1-5-11": "Utilisateurs authentifiés",
+         "S-1-5-4": "Interactif"}
+ALLOWED = {"S-1-5-18", "S-1-5-32-544", "S-1-3-4"}  # Windows itself, administrators, the folder's owner
+
+
 def test_private_dir():
-    folder = os.path.join(tempfile.mkdtemp(prefix="berria-pgw-"), "Privé")
-    pgw._private_dir(folder)
-    work = os.path.join(folder, "colmap_lowpoly", "images")  # the workspace inside, as reconstruct makes it
-    os.makedirs(work)
-    with open(os.path.join(work, "img_0001.jpg"), "wb") as f:
-        f.write(b"photo")
-    script = ("(Get-Acl -LiteralPath $env:TARGET).Access | ForEach-Object { "
-              "$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }")
-    me = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True).stdout
-    sid = me.strip().split(",")[-1].strip('"')
-    for path in (folder, work):
-        r = pl.powershell(script, env={**os.environ, "TARGET": path})
-        listing = subprocess.run(["icacls", path], capture_output=True, text=True, errors="replace").stdout
-        assert set(r.stdout.split()) == {sid, "S-1-5-18"}, (path, r.stdout, r.stderr[-1500:], listing, sid)
-    print("photogrammetry_win : le dossier de repli et son contenu ne sont lisibles que par le compte et Windows")
+    assert pgw._ascii_workspace("C:\\Frédéric absent\\projet", "lowpoly") is None  # no short name: the fallback
+    root = pgw._public_root()  # as reconstruct makes it when no ASCII path exists
+    try:
+        assert root.isascii() and root.startswith(os.environ["PUBLIC"]), root
+        work = os.path.join(root, "colmap_lowpoly", "images")
+        os.makedirs(work)
+        with open(os.path.join(work, "img_0001.jpg"), "wb") as f:
+            f.write(b"photo")
+        script = ("(Get-Acl -LiteralPath $env:TARGET).Access | ForEach-Object { "
+                  "$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }")
+        me = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True).stdout
+        sid = me.strip().split(",")[-1].strip('"')
+        for path in (root, work, os.path.join(work, "img_0001.jpg")):
+            r = pl.powershell(script, env={**os.environ, "TARGET": path})
+            sids = set(r.stdout.split())
+            listing = subprocess.run(["icacls", path], capture_output=True, text=True, errors="replace").stdout
+            assert sid in sids and sids <= ALLOWED | {sid} and not sids & set(BROAD), (path, r.stdout, r.stderr[-1500:], listing)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+    assert not os.path.exists(root)
+    print("photogrammetry_win : le dossier de repli dans Public et son contenu restent fermés aux autres comptes")
 
 
 def wait_pid(path):
