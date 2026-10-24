@@ -462,15 +462,21 @@ function renderLocalThumbs() {
   restoreFocus(key);
   $("photoTools").classList.toggle("hidden", !files.length);
   $("photoCount").textContent = plural(files.length, "photo");
-  $("go").disabled = files.length === 0 || uploading;
   updateRoute();
 }
 
 function updateRoute() {
   const n = files.length, mode = modeSeg.get();
   const pgName = tools?.photogrammetry_engine || "photogrammétrie";
+  $("go").disabled = !n || uploading;
   if (!n) { $("routeHint").textContent = "Une photo suffit pour un essai rapide. Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet."; return; }
   const eng = mode === "auto" ? (n >= 20 && tools?.photogrammetry !== false ? "photogrammetry" : "ia") : mode;
+  // same rule as pipeline.choose_engine: block a run that can only fail
+  if (eng === "ia" && tools?.ia === false) {
+    $("go").disabled = true;
+    $("routeHint").textContent = `${plural(n, "photo")} : il faut le module « Une photo (IA) », pas encore installé (menu LowPoly3D, Assistant d'installation). Sinon, ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`;
+    return;
+  }
   $("routeHint").textContent = eng === "photogrammetry"
     ? `${plural(n, "photo")} : le modèle sera reconstruit à partir de toutes les photos (${pgName}).${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`
     : `${plural(n, "photo")} : l'IA estime la forme à partir de la photo principale (encadrée). L'arrière est deviné.`;

@@ -152,7 +152,10 @@ def choose_engine(mode, n_ok, tools):
     if tools["ia"]:
         return "ia"
     if tools["photogrammetry"]:
-        return "photogrammetry"
+        # photogrammetry on a handful of photos fails after a long run: say so now
+        raise PipelineError(f"Avec {n_ok} photo{'s' if n_ok > 1 else ''}, il faut le module « Une photo (IA) », pas encore installé : "
+                            f"ouvre l'assistant d'installation (menu LowPoly3D). Sinon, ajoute des photos : au moins "
+                            f"{MIN_PHOTOGRAMMETRY}, et 50 ou plus pour un buste fidèle.")
     raise PipelineError("Aucun moteur de reconstruction n'est installé : ouvre l'assistant d'installation.")
 
 
