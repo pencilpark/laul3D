@@ -294,18 +294,20 @@ def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
         raise PipelineError("Blender est introuvable : ouvre l'assistant d'installation.")
-    cmd = [blender, "-b", "--factory-startup", "--python-exit-code", "1",
-           "-P", os.path.join(ROOT, "engine", "blender_lowpoly.py"), "--",
-           "--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
-           "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
-           "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews", "--save-blend"]
+    script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
+    base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
+    engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
+    cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
+                  "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
+                  "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
+                  "--preview-engine", engine, "--save-blend"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
     code, lines = run(cmd, log)
     report = next((json.loads(l[7:]) for l in lines if l.startswith("REPORT ")), None)
-    if code != 0 or report is None:
+    if report is None:
         fatal = next((l[6:] for l in reversed(lines) if l.startswith("FATAL ")), None)
         if fatal:
             try:
@@ -313,6 +315,17 @@ def blender_prep(raw, out_dir, name, level, s, log):
             except ValueError:
                 pass
         raise PipelineError("Blender a échoué : " + (fatal or f"code {code}"))
+    previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None)
+    if code != 0 or previews is None:
+        # REPORT comes before the views: only the viewport renderer died (typically no OpenGL),
+        # the model is safe; retry the views with Cycles on the CPU
+        log("Aperçus indisponibles avec le rendu rapide : nouvel essai en rendu CPU.")
+        code, lines = run(base + ["--previews-only", "--input", report["stl"], "--outdir", out_dir,
+                                  "--name", name, "--preview-engine", "cycles"], log)
+        previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None) if code == 0 else None
+        if not previews:
+            log("Aperçus indisponibles : le modèle reste utilisable.")
+    report["previews"] = previews or []
     return report
 
 
