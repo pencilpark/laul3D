@@ -36,9 +36,10 @@ def say(kind, text=""):
 
 
 def run(cmd, **kw):
+    # never our stdin: on Windows a child touching that pipe at startup waits for watch_stdin's pending read
     with LOCK:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                                errors="replace", **GROUP, **kw)
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, encoding="utf-8", errors="replace", **GROUP, **kw)
         CHILDREN["setup"] = proc
     out, _ = proc.communicate()
     with LOCK:
@@ -135,7 +136,8 @@ def stop(proc):
     if proc.poll() is not None:
         return
     if IS_WIN:
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], stdin=subprocess.DEVNULL, capture_output=True,
+                       creationflags=NO_WINDOW)
         return
     os.killpg(proc.pid, signal.SIGTERM)
     try:
