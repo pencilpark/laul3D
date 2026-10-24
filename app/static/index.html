@@ -137,6 +137,8 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
 input[type=text]:focus-visible, input[type=number]:focus-visible, select:focus-visible { outline: none; border-bottom-color: var(--accent-text); box-shadow: 0 1.5px 0 var(--accent-text); background-color: rgba(207,17,73,.08); }
 .seg button:focus-visible { outline-offset: -2px; }
 input[type=range]:focus-visible { outline-offset: 4px; }
+.field-err { margin-top: 4px; font-size: 13px; color: var(--bad); }
+input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 .hidden { display: none !important; }
 </style>
 </head>
@@ -177,7 +179,7 @@ input[type=range]:focus-visible { outline-offset: 4px; }
       </div>
       <div class="field" id="facesField"><label for="faces">Facettes LowPoly : <span id="facesVal">1000</span> triangles</label><input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles"></div>
       <div class="row">
-        <div><label for="height">Hauteur (mm)</label><input id="height" type="number" min="10" max="245" step="1" value="80"></div>
+        <div><label for="height">Hauteur (mm)</label><input id="height" type="number" min="10" max="245" step="1" value="80" aria-describedby="heightErr"><div class="field-err hidden" id="heightErr"></div></div>
         <div><label for="nozzle">Buse</label><select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select></div>
       </div>
       <div class="field"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur coupés</label><input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %"></div>
@@ -198,10 +200,11 @@ input[type=range]:focus-visible { outline-offset: 4px; }
         <span class="state hidden" id="jobState"></span>
         <div class="spinner hidden" id="spin"></div>
         <span class="sub" id="jobStep"></span>
+        <span class="vh" role="status" id="live"></span>
       </div>
       <div class="sub" id="jobMeta" style="margin-top:6px"></div>
-      <div class="alert hidden" id="jobError"></div>
-      <div class="alert ok hidden" id="notice"></div>
+      <div class="alert hidden" id="jobError" role="alert"></div>
+      <div class="alert ok hidden" id="notice" role="status"></div>
 
       <div class="pipeline" style="margin-top:16px">
         <span class="lab" id="pipeLab">Pipeline LowPoly vers détaillé</span>
@@ -240,8 +243,8 @@ input[type=range]:focus-visible { outline-offset: 4px; }
         </div>
       </div>
       <div class="row" style="margin-top:12px">
-        <div><label for="aHeight">Hauteur (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1"></div>
-        <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1"></div>
+        <div><label for="aHeight">Hauteur (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
+        <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1" aria-describedby="aBaseErr"><div class="field-err hidden" id="aBaseErr"></div></div>
       </div>
       <div class="field"><label for="aFaces">Facettes LowPoly : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
       <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo principale pour l'IA (clique pour changer)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
@@ -380,9 +383,18 @@ $("faces").oninput = () => { $("facesVal").textContent = $("faces").value; $("fa
 $("base").oninput = () => { $("baseVal").textContent = $("base").value; $("base").setAttribute("aria-valuetext", `${$("base").value} %`); };
 $("aFaces").oninput = () => { $("aFacesVal").textContent = $("aFaces").value; $("aFaces").setAttribute("aria-valuetext", `${$("aFaces").value} triangles`); };
 
+function fieldError(id, msg) {
+  $(id).setAttribute("aria-invalid", msg ? "true" : "false");
+  $(id + "Err").textContent = msg || "";
+  $(id + "Err").classList.toggle("hidden", !msg);
+  if (msg) $(id).focus();
+  return !!msg;
+}
+["height", "aHeight", "aBase"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, null)));
+
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
-  if (!Number.isFinite(height) || height < 10 || height > 245) { showError("Hauteur invalide : entre 10 et 245 mm."); return; }
+  if (fieldError("height", Number.isFinite(height) && height >= 10 && height <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
   $("go").disabled = true;
   $("go").textContent = "Envoi des photos...";
   const fd = new FormData();
@@ -486,7 +498,10 @@ function render() {
   st.textContent = STATE_FR[j.state] || j.state;
   $("spin").classList.toggle("hidden", !isBusy);
   const elapsed = isBusy && j.started ? ` · ${Math.round(Date.now() / 1000 - j.started)} s` : "";
-  $("jobStep").textContent = isBusy ? `${j.step}${j.running_level ? " · " + LEVELS[j.running_level][0] : ""}${elapsed}` : "";
+  const step = isBusy ? `${j.step}${j.running_level ? " · " + LEVELS[j.running_level][0] : ""}` : "";
+  $("jobStep").textContent = step + elapsed;
+  const announce = `${j.name} : ${step || STATE_FR[j.state] || j.state}`;
+  if ($("live").textContent !== announce) $("live").textContent = announce;
   const nOk = (j.photos || []).filter((p) => !p.error).length;
   const engineText = j.engine ? (j.engine === "photogrammetry" ? `photogrammétrie ${tools?.photogrammetry_engine || ""}`.trim() : `IA TripoSR sur ${j.main_photo || "la photo la plus nette"}`) : null;
   $("jobMeta").textContent = [`${nOk || "?"} photo(s)`, engineText, j.settings.rot_seq ? `orientation ${j.settings.rot_seq.toUpperCase().split("").join(" puis ")}` : null].filter(Boolean).join(" · ");
@@ -618,8 +633,8 @@ $("rotReset").onclick = () => { if (current) runLevel(viewLevel || "lowpoly", { 
 $("apply").onclick = () => {
   if (!current) return;
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
-  if (!Number.isFinite(h) || h < 10 || h > 245) { showError("Hauteur invalide : entre 10 et 245 mm."); return; }
-  if (!Number.isFinite(base) || base < 0 || base > 20) { showError("Socle invalide : entre 0 et 20 %."); return; }
+  if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
+  if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
   runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value }, adjustMode ? { mode: adjustMode } : {});
 };
 async function exportFile(kind) {
