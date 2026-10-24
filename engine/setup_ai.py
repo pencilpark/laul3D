@@ -187,10 +187,13 @@ def _model(folder, name, url, size, sha256, md5):
     if cached:
         _set(step=f"Copie {label}")
         shutil.copyfile(cached, dest + ".partial")
-        _advance(size)
-    else:
-        _set(step=f"Téléchargement {label}")
-        _download(url, dest + ".partial", size)
+        if _digest_ok(dest + ".partial", sha256, md5):
+            _advance(size)
+            os.replace(dest + ".partial", dest)
+            return
+        os.remove(dest + ".partial")  # same size, other revision: fetch the pinned file
+    _set(step=f"Téléchargement {label}")
+    _download(url, dest + ".partial", size)
     if os.path.getsize(dest + ".partial") != size or not _digest_ok(dest + ".partial", sha256, md5):
         os.remove(dest + ".partial")
         raise RuntimeError(f"fichier {name} incomplet ou altéré ; réessaie")

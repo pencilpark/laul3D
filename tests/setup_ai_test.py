@@ -1,7 +1,9 @@
 """Checks of the in-app AI installer that need no download: platform support, CUDA build choice, progress from uv output.
 
 python tests/setup_ai_test.py
+python tests/setup_ai_test.py --real   real install into LOWPOLY_DATA (CI, after the smoke test filled the model caches)
 """
+import hashlib
 import os
 import subprocess
 import sys
@@ -9,7 +11,9 @@ import tempfile
 from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.environ["LOWPOLY_DATA"] = tempfile.mkdtemp(prefix="lowpoly3d-ai-data-")
+REAL = "--real" in sys.argv
+if not REAL:
+    os.environ["LOWPOLY_DATA"] = tempfile.mkdtemp(prefix="lowpoly3d-ai-data-")
 sys.path.insert(0, os.path.join(ROOT, "engine"))
 import pipeline as pl  # noqa: E402
 import setup_ai  # noqa: E402
@@ -143,14 +147,42 @@ def check_disk_space():
     assert setup_ai.STATE["status"] == "error" and "espace libre" in setup_ai.STATE["error"], setup_ai.STATE
 
 
+def check_cache_fallback():
+    # a cached file of the right size from another revision must not stop the install
+    good, other = b"pinned rev", b"other rev!"
+    stale = os.path.join(tempfile.mkdtemp(prefix="lowpoly3d-ai-cache-"), "config.yaml")
+    with open(stale, "wb") as f:
+        f.write(other)
+
+    def download(url, path, size):
+        with open(path, "wb") as f:
+            f.write(good)
+
+    with mock.patch.object(setup_ai, "_hf_cache", return_value=stale), mock.patch.object(setup_ai, "_download", side_effect=download):
+        setup_ai._model("test", "config.yaml", "https://example.invalid/config.yaml", len(good), hashlib.sha256(good).hexdigest(), None)
+    with open(os.path.join(pl.DATA, "models", "test", "config.yaml"), "rb") as f:
+        assert f.read() == good
+
+
+def real_install():
+    setup_ai._install()
+    s = setup_ai.snapshot()
+    assert s["status"] == "done", s
+    assert set(pl.local_model_env()) == {"LOWPOLY_TRIPOSR_WEIGHTS", "LOWPOLY_DINO_CONFIG", "U2NET_HOME"}, pl.local_model_env()
+    print(f"setup_ai : installation réelle terminée dans {pl.DATA}")
+
+
 def main():
+    if REAL:
+        return real_install()
     check_unsupported()
     check_backend()
     check_progress()
     check_verify()
+    check_cache_fallback()
     check_not_ready_while_installing()
     check_disk_space()
-    print("setup_ai : compatibilité, index CUDA, progression, vérification, erreurs réseau et disque OK")
+    print("setup_ai : compatibilité, index CUDA, progression, vérification, cache, erreurs réseau et disque OK")
 
 
 if __name__ == "__main__":
