@@ -1,5 +1,6 @@
 """Local LowPoly3D server: drop photos, get a printable STL. Started by the desktop app (or start.command)."""
 import copy
+import itertools
 import json
 import os
 import queue
@@ -87,14 +88,27 @@ def job_dir(jid):
     return os.path.join(PROJECTS, jid)
 
 
+SAVE_SEQ = itertools.count(1)
+SAVED = {}  # job id -> number of the snapshot on disk
+
+
 def save(job):
+    # the worker and request threads can save the same job at once: one temp file per
+    # snapshot, and an older snapshot never replaces a newer one
     with LOCK:
         data = copy.deepcopy(job)
+        seq = next(SAVE_SEQ)
     data["log"] = data["log"][-400:]
     path = os.path.join(job_dir(job["id"]), "job.json")
-    with open(path + ".tmp", "w", encoding="utf-8") as f:
+    tmp = f"{path}.{seq}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=1, ensure_ascii=False)
-    os.replace(path + ".tmp", path)
+    with LOCK:
+        if seq < SAVED.get(job["id"], 0):
+            os.remove(tmp)
+            return
+        os.replace(tmp, path)
+        SAVED[job["id"]] = seq
 
 
 def safe_save(job, log=None):
