@@ -1,4 +1,4 @@
-# Pack IA (TripoSR + détourage rembg). Sous Windows avec GPU NVIDIA, le setup installe torch depuis l'index CUDA de PyTorch.
+# Pack IA (TripoSR + détourage rembg), installé depuis l'app par engine/setup_ai.py avec requirements-core.txt en contraintes. Sous Windows avec carte NVIDIA, torch vient de l'index CUDA de PyTorch (cu126 ou cu130).
 torch==2.14.1
 transformers==4.35.0
 tokenizers==0.14.1

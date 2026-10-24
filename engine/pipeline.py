@@ -76,8 +76,21 @@ def object_capture_path():
     return os.environ.get("LOWPOLY_PHOTOGRAMMETRY") or _first_existing([os.path.expanduser("~/.local/bin/HelloPhotogrammetry")])
 
 
+def local_model_env():
+    """Model files installed by the app (setup_ai) under DATA/models, as the variables triposr_infer reads."""
+    m = os.path.join(DATA, "models")
+    env = {}
+    if all(os.path.exists(os.path.join(m, "triposr", f)) for f in ("model.ckpt", "config.yaml")):
+        env["LOWPOLY_TRIPOSR_WEIGHTS"] = os.path.join(m, "triposr")
+    if os.path.exists(os.path.join(m, "dino-vitb16", "config.json")):
+        env["LOWPOLY_DINO_CONFIG"] = os.path.join(m, "dino-vitb16", "config.json")
+    if os.path.exists(os.path.join(m, "u2net", "u2net.onnx")):
+        env["U2NET_HOME"] = os.path.join(m, "u2net")
+    return env
+
+
 def triposr_weights():
-    local = os.environ.get("LOWPOLY_TRIPOSR_WEIGHTS")
+    local = os.environ.get("LOWPOLY_TRIPOSR_WEIGHTS") or local_model_env().get("LOWPOLY_TRIPOSR_WEIGHTS")
     if local and os.path.exists(os.path.join(local, "model.ckpt")):
         return local
     return None
@@ -145,14 +158,17 @@ def choose_engine(mode, n_ok, tools):
         return mode
     if mode == "ia":
         if not tools["ia"]:
-            raise PipelineError("Le moteur IA n'est pas encore installé : autorise le pack IA dans l'assistant d'installation.")
+            raise PipelineError("Le module « Une photo (IA) » n'est pas encore installé : clique « Une photo (IA) : installer » en haut de la fenêtre.")
         return mode
     if n_ok >= MIN_PHOTOGRAMMETRY and tools["photogrammetry"]:
         return "photogrammetry"
     if tools["ia"]:
         return "ia"
     if tools["photogrammetry"]:
-        return "photogrammetry"
+        # photogrammetry on a handful of photos fails after a long run: say so now
+        raise PipelineError(f"Avec {n_ok} photo{'s' if n_ok > 1 else ''}, il faut le module « Une photo (IA) », pas encore installé : "
+                            f"clique « Une photo (IA) : installer » en haut de la fenêtre. Sinon, ajoute des photos : au moins "
+                            f"{MIN_PHOTOGRAMMETRY}, et 50 ou plus pour un buste fidèle.")
     raise PipelineError("Aucun moteur de reconstruction n'est installé : ouvre l'assistant d'installation.")
 
 
@@ -277,8 +293,10 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
     note = "" if triposr_weights() else " (premier lancement : téléchargement des poids depuis Hugging Face)"
     log(f"IA TripoSR sur {name}{note}")
     tmp = os.path.join(work_dir, "triposr.partial.obj")
+    # variables set explicitly (dev, CI) win over the models installed by the app
+    env = {**local_model_env(), **os.environ}
     code, lines = run([PYTHON, os.path.join(ROOT, "engine", "triposr_infer.py"), image, tmp,
-                       "--preprocessed-out", os.path.join(work_dir, "main_detoure.png")], log)
+                       "--preprocessed-out", os.path.join(work_dir, "main_detoure.png")], log, env=env)
     if code != 0 or not os.path.exists(tmp):
         raise PipelineError("TripoSR a échoué : " + (lines[-1] if lines else f"code {code}"))
     os.replace(tmp, out)
@@ -291,18 +309,20 @@ def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
         raise PipelineError("Blender est introuvable : ouvre l'assistant d'installation.")
-    cmd = [blender, "-b", "--factory-startup", "--python-exit-code", "1",
-           "-P", os.path.join(ROOT, "engine", "blender_lowpoly.py"), "--",
-           "--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
-           "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
-           "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews", "--save-blend"]
+    script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
+    base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
+    engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
+    cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
+                  "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
+                  "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
+                  "--preview-engine", engine, "--save-blend"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
     code, lines = run(cmd, log)
     report = next((json.loads(l[7:]) for l in lines if l.startswith("REPORT ")), None)
-    if code != 0 or report is None:
+    if report is None:
         fatal = next((l[6:] for l in reversed(lines) if l.startswith("FATAL ")), None)
         if fatal:
             try:
@@ -310,6 +330,17 @@ def blender_prep(raw, out_dir, name, level, s, log):
             except ValueError:
                 pass
         raise PipelineError("Blender a échoué : " + (fatal or f"code {code}"))
+    previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None)
+    if code != 0 or previews is None:
+        # REPORT comes before the views: only the viewport renderer died (typically no OpenGL),
+        # the model is safe; retry the views with Cycles on the CPU
+        log("Aperçus indisponibles avec le rendu rapide : nouvel essai en rendu CPU.")
+        code, lines = run(base + ["--previews-only", "--input", report["stl"], "--outdir", out_dir,
+                                  "--name", name, "--preview-engine", "cycles"], log)
+        previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None) if code == 0 else None
+        if not previews:
+            log("Aperçus indisponibles : le modèle reste utilisable.")
+    report["previews"] = previews or []
     return report
 
 
