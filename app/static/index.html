@@ -348,7 +348,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "";
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
@@ -649,7 +649,7 @@ function render() {
     const ls = el.querySelector(".lstate");
     if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
     else {
-      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? ` · à recalculer (${stale.length > 1 ? "nouveaux réglages" : "nouveau réglage"} : ${escapeHtml(stale.join(", "))})` : ""}</span>`);
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? ` · à recalculer (${escapeHtml(stale.join(", "))})` : ""}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
         b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Recalculer" : "Générer"; b.disabled = isBusy;
@@ -753,24 +753,31 @@ function renderAdjust(j) {
 }
 
 async function runLevel(level, settings = {}, extra = {}) {
-  if (!current || runPending) return;
+  if (!current || runPending) return false;
   runPending = true;
+  const id = current.id, gen0 = pollGen;
+  let ok = false;
   try {
-    const job = await post(`/api/jobs/${encodeURIComponent(current.id)}/run`, { level, settings, ...extra });
-    pendingLevel = level;
-    current = job; render();
-    clearTimeout(pollTimer);
-    const gen = ++pollGen;
-    pollTimer = setTimeout(() => poll(current.id, gen, 0), 800);
-  } catch (e) { showError(e.message); }
+    const job = await post(`/api/jobs/${encodeURIComponent(id)}/run`, { level, settings, ...extra });
+    ok = true;
+    // another project may have been opened while the request was in flight: leave it on screen
+    if (openId === id && pollGen === gen0) {
+      pendingLevel = level;
+      current = job; render();
+      clearTimeout(pollTimer);
+      const gen = ++pollGen;
+      pollTimer = setTimeout(() => poll(id, gen, 0), 800);
+    }
+  } catch (e) { if (openId === id) showError(e.message); }
   runPending = false;
+  return ok;
 }
 
 // turns stack on the orientation of the model on screen, which may predate the current settings
 const shownRot = () => current?.results?.[viewLevel]?.settings?.rot_seq ?? current?.settings?.rot_seq ?? "";
 // with a 3D view, quarter turns are previewed first and only recomputed on confirmation
 document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.onclick = () => {
-  if (!current) return;
+  if (!current || $("viewer").classList.contains("loading")) return;
   if (viewer?.mesh) { pendingRot += b.dataset.rot; previewRotation(b.dataset.rot); updateRotConfirm(); return; }
   runLevel(viewLevel || "lowpoly", { rot_seq: shownRot() + b.dataset.rot });
 }));
@@ -812,8 +819,13 @@ const VIEWS = { face: [0, 0.12, 1], side: [1, 0.12, 0], top: [0, 1, 0.001], iso:
 // Blender quarter turns (Z up) as viewer axes: x -> +X, y -> -Z, z -> +Y
 const ROT_AXES = { x: [1, 0, 0], y: [0, 0, -1], z: [0, 1, 0] };
 
-async function initViewer() {
-  if (viewer) return viewer;
+// one shared initialization: switching levels during the first load must not create a second canvas
+function initViewer() {
+  if (!viewerInit) viewerInit = createViewer().catch((e) => { viewerInit = null; throw e; });
+  return viewerInit;
+}
+
+async function createViewer() {
   const THREE = await import("three");
   const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
   const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
@@ -924,6 +936,13 @@ function previewRotation(axis) {
 
 async function showModel(url, flat) {
   const seq = ++loadSeq;
+  // the report already describes the new result: hide the previous mesh until the new one is in
+  $("viewer").classList.add("loading");
+  $("viewer").classList.remove("has-model");
+  if (viewer?.mesh) { viewer.mesh.visible = false; viewer.requestRender(); }
+  pendingRot = ""; updateRotConfirm();
+  $("viewerEmpty").textContent = "Chargement du modèle…";
+  $("viewerEmpty").classList.remove("hidden");
   try {
     const v = await initViewer();
     const geom = await v.loader.loadAsync(url);
@@ -935,13 +954,14 @@ async function showModel(url, flat) {
     v.mesh = new v.THREE.Mesh(geom, mat);
     v.scene.add(v.mesh);
     frameModel(v, true);
-    pendingRot = ""; updateRotConfirm();
+    $("viewer").classList.remove("loading");
     $("viewer").classList.add("has-model");
     $("viewerEmpty").classList.add("hidden");
     $("previews").classList.add("hidden");
   } catch (e) {
     if (seq !== loadSeq) return;
-    $("viewer").classList.remove("has-model");
+    $("viewer").classList.remove("loading");
+    if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; viewer.requestRender(); }
     const missing = /404/.test(String(e?.message || e));
     const views = $("previews").children.length;
     $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau."
