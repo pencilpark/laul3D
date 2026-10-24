@@ -4,13 +4,13 @@ Both are installed by setup_tools under DATA/tools (colmap, openmvs) and run on 
 those of COLMAP 4.2.1 and OpenMVS 2.4.0.
 """
 import glob
-import hashlib
 import json
 import os
 import re
 import shutil
 import struct
 import subprocess
+import tempfile
 import time
 
 import numpy as np
@@ -47,23 +47,30 @@ def _short_path(path):
         return None
 
 
-def _workspace(work_dir, level):
-    """(workspace, private root to create or None). COLMAP and OpenMVS read their arguments in the Windows code page,
-    so the workspace keeps a plain ASCII path; the last resort is the shared Public folder, made private."""
+def _ascii_workspace(work_dir, level):
+    """COLMAP and OpenMVS read their arguments in the Windows code page: the workspace needs a plain ASCII path."""
     name = f"colmap_{level}"
     if work_dir.isascii():
-        return os.path.join(work_dir, name), None
+        return os.path.join(work_dir, name)
     short = _short_path(work_dir)
-    if short and short.isascii():
-        return os.path.join(short, name), None
-    root = os.path.join(os.environ.get("PUBLIC", r"C:\Users\Public"), "BerriaCraft",
-                        hashlib.sha1(work_dir.encode("utf-8")).hexdigest()[:12])
-    return os.path.join(root, name), root
+    return os.path.join(short, name) if short and short.isascii() else None
+
+
+def _public_root():
+    """Last resort: a folder of the shared Public folder, one per run, that only this account and Windows can open."""
+    base = os.path.join(os.environ.get("PUBLIC", r"C:\Users\Public"), "BerriaCraft")
+    os.makedirs(base, exist_ok=True)
+    root = tempfile.mkdtemp(prefix="travail-", dir=base)
+    try:
+        _private_dir(root)
+    except Exception:
+        shutil.rmtree(root, ignore_errors=True)
+        raise
+    return root
 
 
 def _private_dir(path):
-    """Only the current account and Windows itself may open the folder (other accounts can read Public)."""
-    os.makedirs(path, exist_ok=True)
+    """Removes the inherited entries (other accounts can read Public) and grants this account and Windows."""
     who = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, creationflags=pl.NO_WINDOW).stdout
     sid = re.search(rb"S-1-[0-9-]+", who)
     if not sid:
@@ -190,18 +197,13 @@ def reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls):
     if cached:
         log(f"reconstruction {level} déjà en cache")
         return cached
-    w, private_root = _workspace(work_dir, level)
+    w = _ascii_workspace(work_dir, level)
+    root = None if w else _public_root()
+    w = w or os.path.join(root, f"colmap_{level}")
     try:
-        if private_root:
-            _private_dir(private_root)
         return _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w)
     finally:  # converted photos and depth maps: several hundred MB, and private
-        shutil.rmtree(w, ignore_errors=True)
-        if private_root:
-            try:
-                os.rmdir(private_root)  # only once empty: another level of the project may still be running
-            except OSError:
-                pass
+        shutil.rmtree(root or w, ignore_errors=True)
 
 
 def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
