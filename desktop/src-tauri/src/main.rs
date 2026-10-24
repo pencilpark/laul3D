@@ -104,6 +104,13 @@ fn stop_engine(app: &AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        // a second launch (double click on Windows) brings this window back instead of starting a second engine
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.set_focus();
+            }
+        }))
         .manage(Engine(Mutex::new(None)))
         .setup(|app| {
             let win = app.get_webview_window("main").ok_or("fenêtre principale absente")?;
