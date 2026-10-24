@@ -31,8 +31,24 @@ b { font-weight: 600; }
 #setupLine { padding: 0 24px; }
 #setupLine:empty { display: none; }
 .infoline { margin: 4px 0 4px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
-main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; padding: 8px 24px 32px; align-items: start; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 8px 16px 24px; } header { padding: 16px 16px 8px; } #setupLine { padding: 0 16px; } }
+main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); grid-template-areas: "side stage" "side inspector"; gap: 16px; padding: 8px 24px 32px; align-items: start; }
+.side { grid-area: side; } .stage { grid-area: stage; } .inspector { grid-area: inspector; }
+.inspector:not(:has(> .card:not(.hidden))) { display: none; }
+/* desktop window: the shell fits the window, side panes scroll, the viewer takes the free height */
+@media (min-width: 1100px) and (min-height: 640px) {
+  body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  main { flex: 1; min-height: 0; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(300px, 380px); grid-template-areas: "side stage inspector"; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: 16px; }
+  main:not(:has(.inspector > .card:not(.hidden))) { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); grid-template-areas: "side stage"; }
+  .side, .inspector { min-height: 0; overflow-y: auto; }
+  .stage { min-height: 0; display: flex; }
+  #jobCard { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  #jobCard #viewer { flex: 1; height: auto; min-height: 240px; }
+}
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; grid-template-areas: "side" "stage" "inspector"; padding: 8px 16px 24px; }
+  main:has(#jobState:not(.hidden)) { grid-template-areas: "stage" "inspector" "side"; }
+  header { padding: 16px 16px 8px; } #setupLine { padding: 0 16px; }
+}
 .card { background: var(--panel); padding: 16px; }
 .stack > * + * { margin-top: 16px; }
 #drop { border: 1.5px dashed rgba(255,255,255,.28); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
@@ -77,15 +93,16 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 10px 12px; margin-top: 12px; }
 .notice { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); padding: 10px 12px; margin-top: 12px; word-break: break-all; }
+.pipeline { container-type: inline-size; }
 .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-@media (max-width: 560px) { .levels { grid-template-columns: 1fr; } }
+@container (max-width: 440px) { .levels { grid-template-columns: 1fr; } }
 .level { padding: 10px; cursor: pointer; background: var(--drop); box-shadow: inset 0 0 0 1.5px transparent; }
 .level.sel { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .level b { display: block; font-size: 15px; font-weight: 500; }
 .level small { color: var(--muted); font-size: 14px; display: block; }
 .level .lstate { margin-top: 6px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .arrow { color: var(--muted); }
-#viewer { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--frame); overflow: hidden; }
+#viewer { position: relative; width: 100%; height: clamp(300px, calc(100vh - 380px), 640px); background: var(--frame); overflow: hidden; }
 #viewer canvas { display: block; width: 100%; height: 100%; }
 #viewer .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); text-align: center; padding: 16px; }
 .previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -113,7 +130,7 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
 <div id="setupLine"></div>
 
 <main>
-  <section class="stack">
+  <section class="stack side">
     <div class="card">
       <h2>Nouveau modèle</h2>
       <div id="drop">
@@ -153,7 +170,7 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
     </div>
   </section>
 
-  <section class="stack">
+  <section class="stage">
     <div class="card" id="jobCard">
       <div class="status">
         <h2 style="margin:0" id="jobTitle">Aucun projet ouvert</h2>
@@ -165,7 +182,7 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
       <div class="error hidden" id="jobError"></div>
       <div class="notice hidden" id="notice"></div>
 
-      <div style="margin-top:16px">
+      <div class="pipeline" style="margin-top:16px">
         <label>Pipeline LowPoly vers détaillé</label>
         <div class="levels" id="levels"></div>
       </div>
@@ -179,7 +196,9 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
         <button class="ghost" id="rotReset" disabled>Réinitialiser</button>
       </div>
     </div>
+  </section>
 
+  <section class="stack inspector">
     <div class="card hidden" id="resultCard">
       <h2 id="resultTitle">Résultat</h2>
       <table id="report"></table>
