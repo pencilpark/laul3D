@@ -20,6 +20,7 @@ import pipeline as pl
 
 COLMAP_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
 ORIENTATION, MAKE, MODEL, EXIF_IFD, FOCAL, FOCAL_35MM = 0x0112, 0x010F, 0x0110, 0x8769, 0x920A, 0xA405
+UNSEEN = 0xDCDCDC  # faces no photo shows: the solid preview's grey rather than OpenMVS's orange
 # CPU time grows fast with image size: the levels follow Object Capture's preview / medium / full
 LEVELS = {"lowpoly": {"max_image": 1600, "resolution_level": 2},
           "medium": {"max_image": 2000, "resolution_level": 1},
@@ -216,9 +217,18 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     env = {**os.environ, "QT_PLUGIN_PATH": os.path.join(pl.TOOLS, "colmap", "plugins")}
     t0 = time.time()
 
+    def tool_log(tool):
+        # OpenMVS writes its messages to <tool>-<id>.log in the workspace, which goes at the end, not to the console
+        logs = sorted(glob.glob(os.path.join(w, f"{tool}-*.log")), key=os.path.getmtime)
+        if logs:
+            with open(logs[-1], encoding="utf-8", errors="replace") as f:
+                for line in f.read().splitlines()[-15:]:
+                    log(f"  {tool} : {line}")
+
     def step(what, cmd):
         code, _ = run(cmd, log, cwd=w, env=env)
         if code != 0:
+            tool_log(os.path.splitext(os.path.basename(cmd[0]))[0])
             raise error_cls(f"La photogrammétrie a échoué ({what}). " + _advice(len(photos)))
 
     log(f"COLMAP + OpenMVS : {len(photos)} photos, {cameras} réglage(s) d'appareil, niveau {level}")
@@ -246,13 +256,15 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     mesh = os.path.join(w, "scene_dense_mesh.ply")
     if not os.path.exists(mesh):
         raise error_cls("La photogrammétrie n'a pas produit de maillage. " + _advice(len(photos)))
-    # the photos' colors on the mesh, for the colored preview; a failure only loses the colors
-    code, _ = run([openmvs("TextureMesh"), "-w", w, "-i", os.path.join(w, "scene_dense_mesh.mvs"),
-                   "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj",
+    # the photos' colors on the mesh, for the colored preview; a failure only loses the colors.
+    # As in OpenMVS's own pipeline: the dense scene (cameras, images) plus, apart, the mesh to texture
+    code, _ = run([openmvs("TextureMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"), "-m", mesh,
+                   "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj", "--empty-color", str(UNSEEN),
                    "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096"], log, cwd=w, env=env)
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
     if code != 0 or not any(p.endswith(".obj") for p in textured):
-        log("texture des photos indisponible : le modèle reste sans couleurs")
+        tool_log("TextureMesh")
+        log(f"texture des photos indisponible (code {code}) : le modèle reste sans couleurs")
         textured = [mesh]
     out = _publish(work_dir, level, textured, orient)
     log(f"reconstruction terminée en {time.time() - t0:.0f} s")
