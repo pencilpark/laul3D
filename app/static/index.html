@@ -174,6 +174,9 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 #viewer.has-model .viewbar { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--panel); }
 .viewbar button { min-width: 34px; height: 32px; padding: 0 10px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; transition: background .18s; }
 .viewbar button:hover { background: rgba(255,255,255,.07); }
+.viewbar :is(#viewSolid, #viewRender)[aria-pressed="true"] { background: var(--accent-tint); }
+.viewbar button:disabled { opacity: .45; cursor: not-allowed; }
+.viewbar .vsep { width: 1px; margin: 6px 4px; background: var(--line); }
 #viewer.has-model .navhelp { position: absolute; left: 10px; bottom: 8px; z-index: 2; display: block; margin: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
 /* ViewHelper draws in the bottom-right 128 px of the canvas; this layer takes its clicks away from the orbit controls */
 #viewer.has-model .gizmo-hit { position: absolute; right: 0; bottom: 0; z-index: 2; display: block; width: 128px; height: 128px; cursor: pointer; }
@@ -281,6 +284,12 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
           <input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles">
         </div>
         <div class="field">
+          <div class="labrow"><span class="lab" id="smoothLab">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" aria-describedby="tipSmooth">?</button><span class="tip-text" role="tooltip" id="tipSmooth">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée à chaque calcul. Tu peux aussi le changer après coup, dans « Ajuster ce modèle ».</span></div>
+          <div class="seg" id="smooth" role="group" aria-labelledby="smoothLab">
+            <button type="button" data-v="0" class="on" aria-pressed="true">Aucun</button><button type="button" data-v="1" aria-pressed="false">Léger</button><button type="button" data-v="2" aria-pressed="false">Moyen</button><button type="button" data-v="3" aria-pressed="false">Fort</button>
+          </div>
+        </div>
+        <div class="field">
           <div class="labrow"><label for="nozzle">Buse de l'imprimante</label><button type="button" class="tip" aria-label="Aide : buse" aria-describedby="tipNozzle">?</button><span class="tip-text" role="tooltip" id="tipNozzle">Diamètre de la buse. L'Ender-3 V3 est livrée avec 0,4 mm. Les parois plus fines que deux fois la buse sont signalées.</span></div>
           <select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm (d'origine)</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
         </div>
@@ -320,7 +329,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 
       <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
         <div class="viewbar" role="group" aria-label="Vues du modèle">
-          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button><button type="button" id="maxView" aria-pressed="false">Agrandir</button>
+          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button><button type="button" id="maxView" aria-pressed="false">Agrandir</button><span class="vsep" aria-hidden="true"></span><button type="button" id="viewSolid" aria-pressed="true">Solide</button><button type="button" id="viewRender" aria-pressed="false">Rendu</button>
         </div>
         <p class="navhelp" aria-hidden="true">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
         <div class="gizmo-hit" title="Clique un axe pour regarder le modèle de ce côté"></div>
@@ -366,6 +375,12 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <div><label for="aHeight">Hauteur imprimée (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
         <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1" aria-describedby="aBaseErr"><div class="field-err hidden" id="aBaseErr"></div></div>
       </div>
+      <div class="field">
+        <div class="labrow"><span class="lab" id="aSmoothLab">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" aria-describedby="tipASmooth">?</button><span class="tip-text" role="tooltip" id="tipASmooth">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée au recalcul.</span></div>
+        <div class="seg" id="aSmooth" role="group" aria-labelledby="aSmoothLab">
+          <button type="button" data-v="0" aria-pressed="false">Aucun</button><button type="button" data-v="1" aria-pressed="false">Léger</button><button type="button" data-v="2" aria-pressed="false">Moyen</button><button type="button" data-v="3" aria-pressed="false">Fort</button>
+        </div>
+      </div>
       <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
       <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
       <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Recalculer avec ces réglages</button></div>
@@ -402,7 +417,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, toolsState = null, toolsAsked = false, lastToolIds = [];
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, toolsState = null, toolsAsked = false, lastToolIds = [], renderMode = "solid";
 const doneAt = {};
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -434,6 +449,9 @@ function seg(id, onChange) {
 const modeSeg = seg("mode", updateRoute);
 const levelSeg = seg("level", (v) => $("facesField").classList.toggle("hidden", v !== "lowpoly"));
 const aModeSeg = seg("aMode", (v) => (adjustMode = v));
+const smoothSeg = seg("smooth");
+const aSmoothSeg = seg("aSmooth", () => (adjustDirty = true));
+const SMOOTH_NAMES = ["aucun", "léger", "moyen", "fort"];
 
 async function api(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
@@ -684,7 +702,7 @@ $("go").onclick = async () => {
   fd.append("name", $("name").value || "modele");
   fd.append("mode", modeSeg.get());
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
-    nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, rot_seq: "" }));
+    nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -725,7 +743,7 @@ async function loadHistory() {
 
 function clearModel() {
   loadSeq++;
-  if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; viewer.requestRender(); }
+  dropModel();
   $("viewer").classList.remove("has-model");
   pendingRot = ""; updateRotConfirm();
   $("viewerEmpty").textContent = "Chargement du modèle…";
@@ -776,6 +794,7 @@ function staleReasons(j, level) {
   if (a.base_cut !== b.base_cut) out.push("socle");
   if (a.nozzle !== b.nozzle) out.push("buse");
   if (!!a.keep_parts !== !!b.keep_parts) out.push("pièces détachées");
+  if ((a.smooth || 0) !== (b.smooth || 0)) out.push("lissage");
   if (level === "lowpoly" && a.faces !== b.faces) out.push("facettes");
   if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
   if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("méthode");
@@ -880,6 +899,7 @@ function renderResult(j) {
     [`Parois de moins de ${fr(r.min_wall_mm)} mm`, `<span class="${thinWarn ? "warn" : "good"}">${r.thin_faces} face(s)</span>`],
     ["Surplombs (pente > 45°)", `<span class="${supports ? "warn" : "good"}">${fr(r.overhang_pct)} % de la surface</span>`],
     ["Méthode", r.engine === "photogrammetry" ? `toutes les photos (${tools?.photogrammetry_engine || "photogrammétrie"})` : "IA sur une photo (TripoSR)"],
+    ["Lissage", SMOOTH_NAMES[r.settings?.smooth || 0]],
   ];
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
   $("slicerHint").textContent = tools?.orcaslicer === false
@@ -889,7 +909,7 @@ function renderResult(j) {
   pv.replaceChildren(...(r.previews || []).map((p) => { const img = document.createElement("img"); img.alt = ""; img.src = fileUrl(p, r.version); return img; }));
   if (shownVersion !== `${viewLevel}:${r.version}`) {
     shownVersion = `${viewLevel}:${r.version}`;
-    showModel(fileUrl(r.stl, r.version), viewLevel === "lowpoly");
+    showModel(fileUrl(r.stl, r.version), viewLevel === "lowpoly", r.colors ? fileUrl(r.colors, r.version) : null);
   }
 }
 
@@ -903,6 +923,7 @@ function renderAdjust(j) {
     $("aFaces").value = s.faces;
     $("aFacesVal").textContent = s.faces;
     $("aFaces").setAttribute("aria-valuetext", `${s.faces} triangles`);
+    aSmoothSeg.set(String(s.smooth || 0));
   }
   aModeSeg.set(adjustMode || j.mode);
   const ia = j.engine === "ia";
@@ -982,7 +1003,8 @@ $("apply").onclick = () => {
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
   if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
-  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value }, adjustMode ? { mode: adjustMode } : {})
+  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get() },
+    adjustMode ? { mode: adjustMode } : {})
     .then((ok) => { if (ok) adjustDirty = false; });
 };
 ["aHeight", "aBase", "aFaces"].forEach((id) => $(id).addEventListener("input", () => (adjustDirty = true)));
@@ -1116,21 +1138,89 @@ $("maxView").onclick = () => setMaximized(!document.body.classList.contains("max
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("maxi")) setMaximized(false); });
 document.querySelectorAll("#viewer [data-zoom]").forEach((b) => (b.onclick = () => zoom(+b.dataset.zoom)));
 
-function previewRotation(axis) {
-  const v = viewer, T = v.THREE, g = v.mesh.geometry;
+function rotateGeometry(T, g, axis) {
   g.applyMatrix4(new T.Matrix4().makeRotationAxis(new T.Vector3(...ROT_AXES[axis]), Math.PI / 2));
   g.computeBoundingBox();
   const c = new T.Vector3();
   g.boundingBox.getCenter(c);
   g.translate(-c.x, -g.boundingBox.min.y, -c.z);
+}
+function previewRotation(axis) {
+  const v = viewer;
+  rotateGeometry(v.THREE, v.mesh.geometry, axis);
+  if (v.colorMesh) rotateGeometry(v.THREE, v.colorMesh.geometry, axis);
   frameModel(v, false);
 }
 
-async function showModel(url, flat) {
+function dropColors(v) {
+  if (!v?.colorMesh) return;
+  v.scene.remove(v.colorMesh);
+  v.colorMesh.geometry.dispose();
+  v.colorMesh.material.dispose();
+  v.colorMesh = null;
+}
+function dropModel() {
+  if (!viewer) return;
+  dropColors(viewer);
+  if (viewer.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; }
+  viewer.requestRender();
+}
+function updateRenderButtons() {
+  const has = !!viewer?.colorsUrl;
+  $("viewRender").disabled = !has;
+  $("viewRender").title = has ? "Couleurs des photos posées sur le modèle (aperçu seulement : l'impression reste d'une couleur)"
+    : "Pas de couleurs pour ce modèle : recalcule-le pour les obtenir";
+  $("viewSolid").setAttribute("aria-pressed", renderMode !== "render" || !has);
+  $("viewRender").setAttribute("aria-pressed", renderMode === "render" && has);
+}
+function applyRenderMode() {
+  const v = viewer;
+  if (!v?.mesh) return;
+  const colored = renderMode === "render" && !!v.colorMesh;
+  v.mesh.visible = !colored;
+  if (v.colorMesh) v.colorMesh.visible = colored;
+  updateRenderButtons();
+  v.requestRender();
+}
+// the colored copy loads on first use and follows the same orientation preview as the solid model
+async function loadColors() {
+  const v = viewer, url = v?.colorsUrl, seq = loadSeq;
+  if (!url || v.colorMesh) return applyRenderMode();
+  $("viewer").classList.add("loading");
+  try {
+    v.gltfLoader ||= new (await import("three/addons/loaders/GLTFLoader.js")).GLTFLoader();
+    const gltf = await v.gltfLoader.loadAsync(url);
+    if (seq !== loadSeq || v.colorsUrl !== url) return;
+    let geom = null;
+    gltf.scene.traverse((o) => { if (o.isMesh && !geom) geom = o.geometry; });
+    geom.rotateX(-Math.PI / 2);
+    for (const axis of pendingRot) rotateGeometry(v.THREE, geom, axis);
+    geom.computeVertexNormals();
+    const mat = new v.THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, flatShading: v.flat });
+    v.colorMesh = new v.THREE.Mesh(geom, mat);
+    v.scene.add(v.colorMesh);
+  } catch {
+    renderMode = "solid";
+    showError("Les couleurs de ce modèle n'ont pas pu être chargées ; l'aperçu reste en mode Solide.");
+  } finally {
+    if (seq === loadSeq) $("viewer").classList.remove("loading");
+    applyRenderMode();
+  }
+}
+function setRenderMode(mode) {
+  renderMode = mode;
+  if (mode === "render") loadColors();
+  else applyRenderMode();
+}
+$("viewSolid").onclick = () => setRenderMode("solid");
+$("viewRender").onclick = () => setRenderMode("render");
+
+async function showModel(url, flat, colorsUrl = null) {
   const seq = ++loadSeq;
   // the report already describes the new result: hide the previous mesh until the new one is in
   $("viewer").classList.add("loading");
   $("viewer").classList.remove("has-model");
+  if (viewer) { dropColors(viewer); viewer.colorsUrl = null; }
   if (viewer?.mesh) { viewer.mesh.visible = false; viewer.requestRender(); }
   pendingRot = ""; updateRotConfirm();
   $("viewerEmpty").textContent = "Chargement du modèle…";
@@ -1145,15 +1235,19 @@ async function showModel(url, flat) {
     const mat = new v.THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.75, metalness: 0, flatShading: flat });
     v.mesh = new v.THREE.Mesh(geom, mat);
     v.scene.add(v.mesh);
+    v.flat = flat;
+    v.colorsUrl = colorsUrl;
     frameModel(v, true);
     $("viewer").classList.remove("loading");
     $("viewer").classList.add("has-model");
     $("viewerEmpty").classList.add("hidden");
     $("previews").classList.add("hidden");
+    if (renderMode === "render" && colorsUrl) loadColors();
+    else applyRenderMode();
   } catch (e) {
     if (seq !== loadSeq) return;
     $("viewer").classList.remove("loading");
-    if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; viewer.requestRender(); }
+    dropModel();
     const missing = /404/.test(String(e?.message || e));
     const views = $("previews").children.length;
     $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau."
