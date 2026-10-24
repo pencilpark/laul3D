@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LowPoly3D</title>
+<title>Berria Craft</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23cf1149' d='M32 4 58 19v26L32 60 6 45V19z'/%3E%3Cpath fill='%23e84e77' d='M32 4 58 19 32 33 6 19z'/%3E%3C/svg%3E">
 <script type="importmap">
 {"imports": {"three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/"}}
@@ -212,7 +212,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 <body>
 <header>
   <div>
-    <p class="kick">LowPoly3D</p>
+    <p class="kick">Berria Craft</p>
     <h1>Photos vers impression 3D</h1>
     <div class="sub">Pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm). Tout se calcule sur cet ordinateur, aucune photo ne part en ligne.</div>
   </div>
@@ -459,7 +459,7 @@ async function loadStatus() {
         ? (aiState?.unsupported ? `<span class="pill bad" title="Le module IA ne peut pas fonctionner sur cet ordinateur : ${escapeHtml(aiState.unsupported)}.">${escapeHtml(n)} : non disponible</span>`
           : aiBusy ? `<span class="pill busy">${escapeHtml(n)} : installation…</span>`
           : `<button type="button" class="pill bad pillbtn" data-install="ai">${escapeHtml(n)} : installer</button>`)
-        : `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé : menu LowPoly3D, Assistant d'installation">${escapeHtml(n)} : à installer</span>`).join("")
+        : `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé : menu Berria Craft, Assistant d'installation">${escapeHtml(n)} : à installer</span>`).join("")
       : `<span class="pill ok" title="${escapeHtml(items.map(([, t]) => t).join(", "))}">Tout est prêt</span>`;
     renderAiBar(aiState);
     if (aiBusy) next = 1500;
@@ -468,7 +468,7 @@ async function loadStatus() {
       const pct = c.progress != null && c.status === "downloading" ? ` ${Math.round(c.progress * 100)} %` : "";
       const label = { downloading: "téléchargement", installing: "installation", waiting_authorization: "en attente d'autorisation", missing: "absent", error: "erreur", queued: "en file" }[c.status] || c.status;
       return `<span>${escapeHtml(c.name)} : ${label}${pct}</span>`;
-    }).join("")}<span>Pour suivre ou autoriser : menu LowPoly3D, Assistant d'installation.</span></div>` : "";
+    }).join("")}<span>Pour suivre ou autoriser : menu Berria Craft, Assistant d'installation.</span></div>` : "";
     if (comps.some((c) => ["downloading", "installing", "queued"].includes(c.status))) next = 3000;
     updateRoute();
   } catch { $("tools").innerHTML = `<span class="pill bad">Moteur de calcul injoignable</span>`; next = 5000; }
