@@ -31,6 +31,13 @@ jobs:
           uv venv .venv --python 3.11
           uv pip install --python .venv\Scripts\python.exe -r requirements-core.txt -r requirements-ai.txt
 
+      # quick checks first: a failure here shows in a few minutes, before the long smoke tests
+      - name: Photogrammetry staging, private fallback folder, OrcaSlicer detached
+        run: .venv\Scripts\python.exe tests\photogrammetry_win_test.py
+
+      - name: Launcher stops its children when closed early or when the engine never answers
+        run: .venv\Scripts\python.exe tests\boot_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:
@@ -78,12 +85,6 @@ jobs:
 
       - name: Photogrammetry orientation logic
         run: .venv\Scripts\python.exe tests\orientation_test.py
-
-      - name: Photogrammetry staging, private fallback folder, OrcaSlicer detached
-        run: .venv\Scripts\python.exe tests\photogrammetry_win_test.py
-
-      - name: Launcher stops its children when closed early or when the engine never answers
-        run: .venv\Scripts\python.exe tests\boot_test.py
 
       - name: Tools installer real run (COLMAP + OpenMVS, accented path)
         env:

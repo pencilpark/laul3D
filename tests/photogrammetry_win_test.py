@@ -165,14 +165,19 @@ def test_vcredist_lock():
 def test_private_dir():
     folder = os.path.join(tempfile.mkdtemp(prefix="berria-pgw-"), "Privé")
     pgw._private_dir(folder)
+    work = os.path.join(folder, "colmap_lowpoly", "images")  # the workspace inside, as reconstruct makes it
+    os.makedirs(work)
+    with open(os.path.join(work, "img_0001.jpg"), "wb") as f:
+        f.write(b"photo")
     script = ("(Get-Acl -LiteralPath $env:TARGET).Access | ForEach-Object { "
               "$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }")
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True,
-                         env={**os.environ, "TARGET": folder}).stdout.split()
     me = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True).stdout
     sid = me.strip().split(",")[-1].strip('"')
-    assert set(out) == {sid, "S-1-5-18"}, (out, sid)
-    print("photogrammetry_win : le dossier de repli n'est lisible que par le compte et Windows")
+    for path in (folder, work):
+        r = pl.powershell(script, env={**os.environ, "TARGET": path})
+        listing = subprocess.run(["icacls", path], capture_output=True, text=True, errors="replace").stdout
+        assert set(r.stdout.split()) == {sid, "S-1-5-18"}, (path, r.stdout, r.stderr[-1500:], listing, sid)
+    print("photogrammetry_win : le dossier de repli et son contenu ne sont lisibles que par le compte et Windows")
 
 
 def wait_pid(path):

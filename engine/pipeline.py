@@ -384,6 +384,14 @@ def export_copy(path):
     return dest
 
 
+def powershell(script, env=None):
+    """Windows PowerShell 5.1. A module path inherited from PowerShell 7 (app or test started from pwsh) makes it
+    load the wrong Microsoft.PowerShell.Security, without Get-Acl or Get-AuthenticodeSignature: it is dropped."""
+    clean = {k: v for k, v in (env or os.environ).items() if k.upper() != "PSMODULEPATH"}
+    return subprocess.run(["powershell", "-NoProfile", "-Command", script], env=clean, capture_output=True, text=True,
+                          errors="replace", creationflags=NO_WINDOW)
+
+
 def launch_detached(cmd):
     """Windows: a short-lived Python starts the app, so it is no descendant of the server and survives the engine's
     stop (taskkill /T ends the whole tree when Berria Craft closes)."""
