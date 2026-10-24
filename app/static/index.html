@@ -52,7 +52,7 @@ main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr)
 }
 .card { background: var(--panel); padding: 16px; }
 .stack > * + * { margin-top: 16px; }
-#drop { position: relative; display: block; border: 1.5px dashed var(--field-line); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+#drop { position: relative; display: block; margin: 0; color: var(--ink); font-size: 15px; font-weight: 400; border: 1.5px dashed var(--field-line); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
 #drop:has(:focus-visible) { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #drop:hover { border-color: var(--accent-text); background: rgba(207,17,73,.06); }
