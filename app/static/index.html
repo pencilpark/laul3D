@@ -114,7 +114,11 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 #viewer .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); text-align: center; padding: 16px; }
 #jobCard:has(#levels:empty) :is(.pipeline, #rotateBar) { display: none; }
 .previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.previews img { width: 100%; background: var(--frame); }
+.previews img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--frame); }
+/* no WebGL: the Blender previews take the viewer's place */
+#jobCard:has(#previews:not(.hidden)) #viewer { flex: none; height: auto; min-height: 0; background: none; }
+#jobCard:has(#previews:not(.hidden)) #viewer .empty { position: static; justify-content: flex-start; padding: 0; text-align: left; }
+#jobCard:has(#previews:not(.hidden)) .previews { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 table { width: 100%; border-collapse: collapse; font-size: 15px; }
 td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
