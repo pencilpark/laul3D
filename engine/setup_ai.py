@@ -24,8 +24,10 @@ DINO_REV = "f205d5d8e640a89a2b8ef0369670dfc37cc07fc2"
 MODELS = [
     ("triposr", "model.ckpt", f"https://huggingface.co/stabilityai/TripoSR/resolve/{TRIPOSR_REV}/model.ckpt", 1677246742,
      "429e2c6b22a0923967459de24d67f05962b235f79cde6b032aa7ed2ffcd970ee", None),
-    ("triposr", "config.yaml", f"https://huggingface.co/stabilityai/TripoSR/resolve/{TRIPOSR_REV}/config.yaml", 987, None, None),
-    ("dino-vitb16", "config.json", f"https://huggingface.co/facebook/dino-vitb16/resolve/{DINO_REV}/config.json", 454, None, None),
+    ("triposr", "config.yaml", f"https://huggingface.co/stabilityai/TripoSR/resolve/{TRIPOSR_REV}/config.yaml", 987,
+     "74ca708ce086bf68e97709ea6b3d91f14717921c04691e84043f0eb8fcc68e62", None),
+    ("dino-vitb16", "config.json", f"https://huggingface.co/facebook/dino-vitb16/resolve/{DINO_REV}/config.json", 454,
+     "b87c0270b97db085fd82cf114a761fd0f62ae7914fbd407c752a2260646b689c", None),
     ("u2net", "u2net.onnx", "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx", 175997641,
      None, "60024c5c889badc19c04ad937298a77b"),
 ]
