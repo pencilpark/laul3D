@@ -262,11 +262,12 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
                    "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj", "--empty-color", str(UNSEEN),
                    "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096"], log, cwd=w, env=env)
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
+    tool_log("TextureMesh")  # how many views and faces it textured
     if code != 0 or not any(p.endswith(".obj") for p in textured):
-        tool_log("TextureMesh")
         log(f"texture des photos indisponible (code {code}) : le modèle reste sans couleurs")
         textured = [mesh]
-    out = _publish(work_dir, level, textured, orient)
+    # OpenMVS's own logs stay with the scan, for a diagnosis after the workspace is gone
+    out = _publish(work_dir, level, textured + glob.glob(os.path.join(w, "*.log")), orient)
     log(f"reconstruction terminée en {time.time() - t0:.0f} s")
     return out
 
