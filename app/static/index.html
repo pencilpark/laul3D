@@ -78,6 +78,7 @@ label, .lab { display: block; font-size: 14px; font-weight: 500; color: var(--mu
 .tip-text { position: absolute; left: 0; top: 100%; z-index: 20; width: max-content; max-width: min(270px, 100%); border-top: 6px solid transparent; background: #000 padding-box; padding: 9px 11px; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; letter-spacing: 0; text-transform: none; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .15s, visibility .15s; }
 .tip:hover + .tip-text, .tip:focus-visible + .tip-text, .tip-text:hover { opacity: 1; visibility: visible; pointer-events: auto; }
 .hush .tip-text { visibility: hidden !important; }
+.tip-text.up { top: auto; bottom: 100%; border-top: 0; border-bottom: 6px solid transparent; }
 details.advanced { margin-top: 14px; }
 details.advanced > summary, details.howto > summary { padding: 8px 0; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
 details.advanced[open] > summary { margin-bottom: 4px; }
@@ -509,6 +510,12 @@ function fieldError(id, msg) {
 // Escape hides help bubbles (WCAG 1.4.13); they come back on the next pointer move or focus change
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.body.classList.add("hush"); });
 ["pointermove", "focusin"].forEach((ev) => document.addEventListener(ev, () => document.body.classList.remove("hush")));
+// bubbles open downward; near the bottom of a scrolling pane they open upward so nothing is cut off
+document.querySelectorAll(".tip").forEach((t) => ["pointerenter", "focus"].forEach((ev) => t.addEventListener(ev, () => {
+  const bubble = t.nextElementSibling, pane = t.closest(".side, .stage, .inspector");
+  const bottom = Math.min(pane ? pane.getBoundingClientRect().bottom : innerHeight, innerHeight);
+  bubble.classList.toggle("up", bottom - t.getBoundingClientRect().bottom < bubble.offsetHeight + 12);
+})));
 
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
