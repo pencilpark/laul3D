@@ -120,14 +120,6 @@ def tools_status():
     }
 
 
-def setup_state():
-    try:
-        with open(os.path.join(DATA, "state.json"), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return None
-
-
 def sharpness(img):
     g = np.asarray(img.convert("L").resize((640, max(1, int(640 * img.height / img.width)))), dtype=np.float32)
     lap = -4 * g[1:-1, 1:-1] + g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]

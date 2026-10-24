@@ -21,6 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "engine"))
 import pipeline as pl  # noqa: E402
 import setup_ai  # noqa: E402
+import setup_tools  # noqa: E402
 
 PROJECTS = os.environ.get("LOWPOLY_PROJECTS", os.path.join(ROOT, "projects"))
 STATIC = os.path.join(ROOT, "app", "static")
@@ -266,7 +267,7 @@ def tools_now():
 
 @app.get("/api/status")
 def status():
-    return {"tools": tools_now(), "setup": pl.setup_state(), "ai_install": setup_ai.snapshot(),
+    return {"tools": tools_now(), "tools_setup": setup_tools.snapshot(), "ai_install": setup_ai.snapshot(),
             "queue": TASKS.qsize(), "printer": {"name": "Creality Ender-3 V3", "bed_mm": [220, 220, 250]}}
 
 
@@ -274,6 +275,12 @@ def status():
 def install_ai():
     setup_ai.start()
     return setup_ai.snapshot()
+
+
+@app.post("/api/setup/tools")
+def install_tools(body: dict = Body(...)):
+    setup_tools.start([str(t) for t in body.get("ids", [])])
+    return setup_tools.snapshot()
 
 
 @app.get("/api/jobs")
