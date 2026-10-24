@@ -375,12 +375,18 @@ def describe_textures(sources):
         log("texture du scan sans coordonnées de texture")
 
 
+UNSEEN_GREY = 0.716  # photogrammetry_win.UNSEEN (0xDCDCDC) in linear values, as the color attribute returns them
+
+
 def colors_blank(obj):
-    """A bake that hit nothing, or a black texture: no colors is better than a black model."""
+    """A bake that hit nothing, a black texture, or one of faces no photo showed: no colors beats a dull model."""
     data = obj.data.color_attributes.active_color.data
     cols = [0.0] * (len(data) * 4)
     data.foreach_get("color", cols)
-    return max(max(cols[i], cols[i + 1], cols[i + 2]) for i in range(0, len(cols), 4)) < 0.02
+    corners = [cols[i:i + 3] for i in range(0, len(cols), 4)]
+    dark = sum(max(c) for c in corners) / len(corners) < 0.04
+    unseen = sum(all(abs(v - UNSEEN_GREY) < 0.03 for v in c) for c in corners) > 0.9 * len(corners)
+    return dark or unseen
 
 
 def flatten_face_colors(obj):
@@ -628,7 +634,7 @@ def main():
         # the result moved off the scan by remeshing, smoothing and decimation: a few percent of the height
         if bake_colors(work, sources, reach=0.03 * height):
             if colors_blank(work):
-                log("couleurs du scan noires après projection : aperçu Rendu désactivé pour ce modèle")
+                log("couleurs du scan inexploitables (noires ou absentes des photos) : aperçu Rendu désactivé pour ce modèle")
             else:
                 if a.level == "lowpoly":
                     flatten_face_colors(work)
