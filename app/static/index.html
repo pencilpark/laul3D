@@ -39,8 +39,8 @@ main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr)
 /* desktop window: the shell fits the window, side panes scroll, the viewer takes the free height */
 @media (min-width: 1100px) and (min-height: 640px) {
   body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-  main { flex: 1; min-height: 0; grid-template-columns: clamp(280px, 24vw, 340px) minmax(0, 1fr) clamp(300px, 26vw, 380px); grid-template-areas: "side stage inspector"; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: 16px; }
-  main:not(:has(.inspector > .card:not(.hidden))) { grid-template-columns: clamp(280px, 24vw, 340px) minmax(0, 1fr); grid-template-areas: "side stage"; }
+  main { flex: 1; min-height: 0; grid-template-columns: clamp(280px, 22vw, 340px) minmax(0, 1fr) clamp(300px, 24vw, 380px); grid-template-areas: "side stage inspector"; grid-template-rows: minmax(0, 1fr); align-items: stretch; padding-bottom: 16px; }
+  main:not(:has(.inspector > .card:not(.hidden))) { grid-template-columns: clamp(280px, 22vw, 340px) minmax(0, 1fr); grid-template-areas: "side stage"; }
   .side, .inspector { min-height: 0; overflow-y: auto; }
   .stage { min-height: 0; display: flex; overflow-y: auto; }
   #jobCard { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -138,7 +138,10 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 .pipeline { container-type: inline-size; }
 .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @container (max-width: 360px) { .levels { grid-template-columns: 1fr; } }
-.level { padding: 10px; cursor: pointer; background: var(--drop); transition: background .18s; }
+.level { padding: 8px 10px; cursor: pointer; background: var(--drop); transition: background .18s; }
+.level .ghost { min-height: 32px; padding: 0 10px; }
+/* short windows: the level descriptions live in the « Niveaux de détail » tooltip, the viewer gets the room */
+@media (max-height: 1000px) { .levels .level small { display: none; } }
 .level:hover { background: color-mix(in srgb, var(--drop) 94%, #fff); }
 .level.sel { background: var(--accent-tint); box-shadow: inset 0 -2px 0 var(--accent-text); }
 .level b { display: block; font-size: 15px; font-weight: 500; }
@@ -158,6 +161,11 @@ button.ghost:disabled { opacity: .45; cursor: not-allowed; }
 #viewer.has-model .navhelp { position: absolute; left: 10px; bottom: 8px; z-index: 2; display: block; margin: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
 /* ViewHelper draws in the bottom-right 128 px of the canvas; this layer takes its clicks away from the orbit controls */
 #viewer.has-model .gizmo-hit { position: absolute; right: 0; bottom: 0; z-index: 2; display: block; width: 128px; height: 128px; cursor: pointer; }
+/* « Agrandir » : the model card takes the whole window, viewer first */
+body.maxi #jobCard { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; padding: 12px 16px 16px; }
+body.maxi #jobCard > :is(.kick, #jobMeta, .pipeline, .alert) { display: none; }
+body.maxi #jobCard #viewer { flex: 1; height: auto; min-height: 0; margin-top: 10px !important; }
+#maxView[aria-pressed="true"] { background: var(--accent-tint); }
 .rotconfirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; margin-top: 4px; padding: 10px 12px; background: var(--accent-tint); }
 .rotconfirm span { flex: 1 1 220px; font-size: 14px; }
 button.primary.inline { width: auto; min-height: 38px; font-size: 14px; }
@@ -288,7 +296,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 
       <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
         <div class="viewbar" role="group" aria-label="Vues du modèle">
-          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button>
+          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button><button type="button" id="maxView" aria-pressed="false">Agrandir</button>
         </div>
         <p class="navhelp" aria-hidden="true">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
         <div class="gizmo-hit" title="Clique un axe pour regarder le modèle de ce côté"></div>
@@ -663,7 +671,7 @@ function render() {
     const ls = el.querySelector(".lstate");
     if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
     else {
-      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? ` · à recalculer (${escapeHtml(stale.join(", "))})` : ""}</span>`);
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}"${stale.length ? ` title="Réglage modifié : ${escapeHtml(stale.join(", "))}"` : ""}>${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? " · à recalculer" : ""}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
         b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Recalculer" : "Générer"; b.disabled = isBusy;
@@ -953,6 +961,13 @@ function zoom(factor) {
   v.requestRender();
 }
 document.querySelectorAll("#viewer [data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+function setMaximized(on) {
+  document.body.classList.toggle("maxi", on);
+  $("maxView").setAttribute("aria-pressed", on);
+  $("maxView").textContent = on ? "Réduire" : "Agrandir";
+}
+$("maxView").onclick = () => setMaximized(!document.body.classList.contains("maxi"));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("maxi")) setMaximized(false); });
 document.querySelectorAll("#viewer [data-zoom]").forEach((b) => (b.onclick = () => zoom(+b.dataset.zoom)));
 
 function previewRotation(axis) {
