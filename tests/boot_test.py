@@ -26,8 +26,8 @@ if mode == "setup":
 else:
     def serve(python, port):
         group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if boot.IS_WIN else {"start_new_session": True}
-        with boot.LOCK:
-            boot.CHILDREN["server"] = subprocess.Popen(sleeper, **group)
+        with boot.LOCK:  # stdin as in boot.serve: the launcher's pipe is never shared
+            boot.CHILDREN["server"] = subprocess.Popen(sleeper, stdin=subprocess.DEVNULL, **group)
             return boot.CHILDREN["server"]
     def wait_ready(proc, port, timeout=180):
         while not os.path.exists(pidfile):
