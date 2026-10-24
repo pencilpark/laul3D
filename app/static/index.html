@@ -579,7 +579,8 @@ function updateRoute() {
     return;
   }
   $("routeHint").textContent = eng === "photogrammetry"
-    ? `${plural(n, "photo")} : le modèle sera reconstruit à partir de toutes les photos (${pgName}).${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`
+    ? (n < 20 ? `${plural(n, "photo")} : trop peu pour une reconstruction, qui en demande au moins 20 (50 ou plus pour un buste fidèle). Ajoute des photos${tools?.ia ? " ou choisis « Une photo (IA) »" : ""}.`
+      : `${plural(n, "photo")} : le modèle sera reconstruit à partir de toutes les photos (${pgName}).${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`)
     : `${plural(n, "photo")} : l'IA estime la forme à partir de la photo principale (encadrée). L'arrière est deviné.`;
 }
 
