@@ -68,6 +68,20 @@ main { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr)
 .thumb.main { border-color: var(--accent); }
 .thumb .noimg { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; color: var(--muted); padding: 4px; text-align: center; word-break: break-all; }
 label, .lab { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }
+.kick { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 12px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.kick span { color: var(--accent-text); font-weight: 600; letter-spacing: 0; }
+.labrow { position: relative; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.labrow > label, .labrow > .lab { margin: 0; }
+.tip { flex: none; width: 20px; height: 20px; padding: 0; border: 0; background: var(--chip); color: var(--muted); font: 600 12px/20px "Jost", sans-serif; text-align: center; cursor: help; transition: background .18s, color .18s; }
+.tip:hover, .tip:focus-visible { background: var(--accent-tint); color: #fff; }
+/* the transparent top border bridges the gap so the pointer can move into the bubble */
+.tip-text { position: absolute; left: 0; top: 100%; z-index: 20; width: max-content; max-width: min(270px, 100%); border-top: 6px solid transparent; background: #000 padding-box; padding: 9px 11px; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.4; letter-spacing: 0; text-transform: none; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .15s, visibility .15s; }
+.tip:hover + .tip-text, .tip:focus-visible + .tip-text, .tip-text:hover { opacity: 1; visibility: visible; pointer-events: auto; }
+.hush .tip-text { visibility: hidden !important; }
+details.advanced { margin-top: 14px; }
+details.advanced > summary, details.howto > summary { padding: 8px 0; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
+details.advanced[open] > summary { margin-bottom: 4px; }
+.rot-lab { flex-basis: 100%; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field + .field, .row + .field, .field + .row, .row + .row { margin-top: 12px; }
 input[type=text], input[type=number], select { width: 100%; padding: 9px 10px 8px; border: 0; border-bottom: 1.5px solid var(--field-line); border-radius: 0; background: var(--drop); color: var(--ink); font: inherit; transition: border-color .15s; }
@@ -145,8 +159,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 <body>
 <header>
   <div>
+    <p class="kick">LowPoly3D</p>
     <h1>Photos vers impression 3D</h1>
-    <div class="sub">Creality Ender-3 V3, plateau 220 × 220 × 250 mm. Tout le calcul tourne sur cet ordinateur.</div>
+    <div class="sub">Pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm). Tout se calcule sur cet ordinateur, aucune photo ne part en ligne.</div>
   </div>
   <div class="tools" id="tools"></div>
 </header>
@@ -155,46 +170,63 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 <main>
   <section class="stack side">
     <div class="card">
-      <h2>Nouveau modèle</h2>
+      <p class="kick"><span>1</span> Photos</p>
+      <h2>Nouveau modèle 3D</h2>
       <label id="drop" for="file">
         <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         <span class="dz-line"><b>Dépose tes photos ici</b></span>
-        <span class="dz-line sub">ou clique pour choisir (JPG, HEIC, PNG)</span>
+        <span class="dz-line sub">ou clique pour les choisir (JPG, HEIC, PNG)</span>
         <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="vh">
       </label>
       <div class="thumbs" id="localThumbs" role="group" aria-label="Photos ajoutées"></div>
       <div class="hint" id="routeHint"></div>
 
-      <div class="field" style="margin-top:16px"><label for="name">Nom</label><input id="name" type="text" value="buste"></div>
-      <div class="field"><span class="lab" id="modeLab">Moteur</span>
-        <div class="seg" id="mode" role="group" aria-labelledby="modeLab">
-          <button type="button" data-v="auto" class="on" aria-pressed="true">Auto</button><button type="button" data-v="photogrammetry" aria-pressed="false">Photogrammétrie</button><button type="button" data-v="ia" aria-pressed="false">IA, 1 photo</button>
-        </div>
-      </div>
-      <div class="field"><span class="lab" id="levelLab">Niveau de départ</span>
+      <div class="field" style="margin-top:16px"><label for="name">Nom du projet</label><input id="name" type="text" value="buste"></div>
+      <div class="field">
+        <div class="labrow"><span class="lab" id="levelLab">Niveau de détail</span><button type="button" class="tip" aria-label="Aide : niveau de détail" aria-describedby="tipLevel">?</button><span class="tip-text" role="tooltip" id="tipLevel">LowPoly : grandes facettes, calculé en quelques secondes. Moyen : plus lisse. Détaillé : le plus fidèle aux photos, calcul plus long. Les autres niveaux se génèrent ensuite en un clic.</span></div>
         <div class="seg" id="level" role="group" aria-labelledby="levelLab">
           <button type="button" data-v="lowpoly" class="on" aria-pressed="true">LowPoly</button><button type="button" data-v="medium" aria-pressed="false">Moyen</button><button type="button" data-v="detailed" aria-pressed="false">Détaillé</button>
         </div>
-        <div class="hint">Commence en LowPoly pour valider la forme et l'orientation en quelques secondes, puis affine.</div>
+        <div class="hint">Commence en LowPoly pour vérifier la forme en quelques secondes, puis affine.</div>
       </div>
-      <div class="field" id="facesField"><label for="faces">Facettes LowPoly : <span id="facesVal">1000</span> triangles</label><input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles"></div>
-      <div class="row">
-        <div><label for="height">Hauteur (mm)</label><input id="height" type="number" min="10" max="245" step="1" value="80" aria-describedby="heightErr"><div class="field-err hidden" id="heightErr"></div></div>
-        <div><label for="nozzle">Buse</label><select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select></div>
+      <div class="field">
+        <div class="labrow"><label for="height">Hauteur imprimée (mm)</label><button type="button" class="tip" aria-label="Aide : hauteur imprimée" aria-describedby="tipHeight">?</button><span class="tip-text" role="tooltip" id="tipHeight">Hauteur du modèle une fois imprimé. L'Ender-3 V3 imprime jusqu'à 245 mm de haut.</span></div>
+        <input id="height" type="number" min="10" max="245" step="1" value="80" aria-describedby="heightErr"><div class="field-err hidden" id="heightErr"></div>
       </div>
-      <div class="field"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur coupés</label><input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %"></div>
-      <label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label>
-      <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle</button></div>
+      <details class="advanced">
+        <summary>Réglages avancés</summary>
+        <div class="field">
+          <div class="labrow"><span class="lab" id="modeLab">Méthode</span><button type="button" class="tip" aria-label="Aide : méthode" aria-describedby="tipMode">?</button><span class="tip-text" role="tooltip" id="tipMode">Automatique choisit pour toi : avec 20 photos ou plus, le modèle est reconstruit à partir de toutes les photos ; avec moins, l'IA estime la forme à partir d'une seule photo.</span></div>
+          <div class="seg" id="mode" role="group" aria-labelledby="modeLab">
+            <button type="button" data-v="auto" class="on" aria-pressed="true">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false">Une photo (IA)</button>
+          </div>
+        </div>
+        <div class="field" id="facesField">
+          <div class="labrow"><label for="faces">Facettes : <span id="facesVal">1000</span> triangles</label><button type="button" class="tip" aria-label="Aide : facettes" aria-describedby="tipFaces">?</button><span class="tip-text" role="tooltip" id="tipFaces">Nombre de facettes du style LowPoly. Moins de facettes donne un modèle plus anguleux.</span></div>
+          <input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles">
+        </div>
+        <div class="field">
+          <div class="labrow"><label for="nozzle">Buse de l'imprimante</label><button type="button" class="tip" aria-label="Aide : buse" aria-describedby="tipNozzle">?</button><span class="tip-text" role="tooltip" id="tipNozzle">Diamètre de la buse. L'Ender-3 V3 est livrée avec 0,4 mm. Les parois plus fines que deux fois la buse sont signalées.</span></div>
+          <select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm (d'origine)</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
+        </div>
+        <div class="field">
+          <div class="labrow"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur</label><button type="button" class="tip" aria-label="Aide : socle plat" aria-describedby="tipBase">?</button><span class="tip-text" role="tooltip" id="tipBase">Coupe le bas du modèle à plat pour qu'il tienne debout sur le plateau. 3 % convient à un buste ; 0 garde le modèle entier.</span></div>
+          <input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %">
+        </div>
+        <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label><button type="button" class="tip" aria-label="Aide : pièces détachées" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
+      </details>
+      <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle 3D</button></div>
     </div>
 
     <div class="card">
       <h2>Projets</h2>
-      <ul class="history" id="history"><li class="sub">Aucun projet pour l'instant.</li></ul>
+      <ul class="history" id="history"><li class="sub">Aucun projet pour l'instant. Ils s'afficheront ici.</li></ul>
     </div>
   </section>
 
   <section class="stage">
     <div class="card" id="jobCard">
+      <p class="kick"><span>2</span> Modèle 3D</p>
       <div class="status">
         <h2 style="margin:0" id="jobTitle">Aucun projet ouvert</h2>
         <span class="state hidden" id="jobState"></span>
@@ -207,7 +239,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="alert ok hidden" id="notice" role="status"></div>
 
       <div class="pipeline" style="margin-top:16px">
-        <span class="lab" id="pipeLab">Pipeline LowPoly vers détaillé</span>
+        <div class="labrow"><span class="lab" id="pipeLab">Niveaux de détail</span><button type="button" class="tip" aria-label="Aide : niveaux de détail" aria-describedby="tipPipe">?</button><span class="tip-text" role="tooltip" id="tipPipe">Chaque niveau part des mêmes photos. Vérifie la forme en LowPoly, puis génère plus de détail si elle te convient. Clique un niveau déjà calculé pour l'afficher.</span></div>
         <div class="levels" id="levels" role="group" aria-labelledby="pipeLab"></div>
       </div>
 
@@ -215,9 +247,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="previews hidden" id="previews" style="margin-top:8px"></div>
 
       <div class="actions" style="margin-top:12px" id="rotateBar">
-        <span class="sub" style="align-self:center">Orientation :</span>
-        <button class="ghost" data-rot="x" disabled>X +90°</button><button class="ghost" data-rot="y" disabled>Y +90°</button><button class="ghost" data-rot="z" disabled>Z +90°</button>
-        <button class="ghost" id="rotReset" disabled>Réinitialiser</button>
+        <div class="labrow rot-lab"><span class="lab">Redresser le modèle</span><button type="button" class="tip" aria-label="Aide : redresser le modèle" aria-describedby="tipRot">?</button><span class="tip-text" role="tooltip" id="tipRot">Le modèle est couché ou de travers ? Fais-le tourner d'un quart de tour. Il est recalculé à chaque clic, en quelques secondes en LowPoly.</span></div>
+        <button class="ghost" data-rot="x" disabled>Basculer vers l'avant</button><button class="ghost" data-rot="y" disabled>Pencher à droite</button><button class="ghost" data-rot="z" disabled>Pivoter</button>
+        <button class="ghost" id="rotReset" disabled>Annuler les rotations</button>
       </div>
     </div>
   </section>
@@ -236,27 +268,29 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
     </div>
 
     <div class="card hidden" id="adjustCard">
-      <h2>Ajuster et relancer</h2>
-      <div class="field"><span class="lab" id="aModeLab">Moteur</span>
+      <h2>Ajuster ce modèle</h2>
+      <div class="field"><span class="lab" id="aModeLab">Méthode</span>
         <div class="seg" id="aMode" role="group" aria-labelledby="aModeLab">
-          <button type="button" data-v="auto" aria-pressed="false">Auto</button><button type="button" data-v="photogrammetry" aria-pressed="false">Photogrammétrie</button><button type="button" data-v="ia" aria-pressed="false">IA, 1 photo</button>
+          <button type="button" data-v="auto" aria-pressed="false">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false">Une photo (IA)</button>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
-        <div><label for="aHeight">Hauteur (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
+        <div><label for="aHeight">Hauteur imprimée (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
         <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1" aria-describedby="aBaseErr"><div class="field-err hidden" id="aBaseErr"></div></div>
       </div>
-      <div class="field"><label for="aFaces">Facettes LowPoly : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
-      <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo principale pour l'IA (clique pour changer)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
-      <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Appliquer au niveau affiché</button></div>
-      <details style="margin-top:14px"><summary>Journal</summary><pre id="log"></pre></details>
+      <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
+      <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
+      <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Recalculer avec ces réglages</button></div>
+      <details style="margin-top:14px"><summary>Journal technique</summary><pre id="log"></pre></details>
     </div>
   </section>
 </main>
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
-const LEVELS = { lowpoly: ["LowPoly", "facettes visibles"], medium: ["Moyen", "env. 20 000 triangles"], detailed: ["Détaillé", "qualité maximale"] };
+const LEVELS = { lowpoly: ["LowPoly", "grandes facettes, rapide"], medium: ["Moyen", "plus lisse"], detailed: ["Détaillé", "le plus fidèle, plus long"] };
+const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
+const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
 let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false;
@@ -311,17 +345,22 @@ async function loadStatus() {
     $("finder").textContent = platform === "windows" ? "Afficher dans l'Explorateur" : "Afficher dans le Finder";
     $("orca").classList.toggle("hidden", !tools.orcaslicer);
     $("expStl").className = tools.orcaslicer ? "ghost" : "primary";
-    const items = [["Blender", tools.blender], [tools.photogrammetry_engine, tools.photogrammetry], ["IA TripoSR", tools.ia], ["OrcaSlicer", tools.orcaslicer]];
-    $("tools").innerHTML = items.map(([n, ok]) => `<span class="pill ${ok ? "ok" : "bad"}">${escapeHtml(n)} ${ok ? "prêt" : "absent"}</span>`).join("");
+    // what each tool lets the user do, in plain words; the tool name stays in the tooltip
+    const items = [["Calcul 3D", "Blender", tools.blender], ["Plusieurs photos", tools.photogrammetry_engine, tools.photogrammetry],
+      ["Une photo (IA)", "TripoSR", tools.ia], ["Impression", "OrcaSlicer", tools.orcaslicer]];
+    const missing = items.filter(([, , ok]) => !ok);
+    $("tools").innerHTML = missing.length
+      ? missing.map(([n, t]) => `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé : menu LowPoly3D, Assistant d'installation">${escapeHtml(n)} : à installer</span>`).join("")
+      : `<span class="pill ok" title="${escapeHtml(items.map(([, t]) => t).join(", "))}">Tout est prêt</span>`;
     const comps = (s.setup?.components || []).filter((c) => c.status !== "ready" && c.status !== "skipped");
     $("setupLine").innerHTML = comps.length ? `<div class="infoline">${comps.map((c) => {
       const pct = c.progress != null && c.status === "downloading" ? ` ${Math.round(c.progress * 100)} %` : "";
       const label = { downloading: "téléchargement", installing: "installation", waiting_authorization: "en attente d'autorisation", missing: "absent", error: "erreur", queued: "en file" }[c.status] || c.status;
       return `<span>${escapeHtml(c.name)} : ${label}${pct}</span>`;
-    }).join("")}<span>Menu LowPoly3D, Assistant d'installation pour autoriser ou suivre.</span></div>` : "";
+    }).join("")}<span>Pour suivre ou autoriser : menu LowPoly3D, Assistant d'installation.</span></div>` : "";
     if (comps.some((c) => ["downloading", "installing", "queued"].includes(c.status))) next = 3000;
     updateRoute();
-  } catch { $("tools").innerHTML = `<span class="pill bad">serveur injoignable</span>`; next = 5000; }
+  } catch { $("tools").innerHTML = `<span class="pill bad">Moteur de calcul injoignable</span>`; next = 5000; }
   statusTimer = setTimeout(loadStatus, next);
 }
 
@@ -368,11 +407,11 @@ function renderLocalThumbs() {
 function updateRoute() {
   const n = files.length, mode = modeSeg.get();
   const pgName = tools?.photogrammetry_engine || "photogrammétrie";
-  if (!n) { $("routeHint").textContent = `1 à 19 photos : IA locale (TripoSR) sur la photo principale. 20 photos ou plus : photogrammétrie (${pgName}), 50 ou plus pour un buste fidèle.`; return; }
+  if (!n) { $("routeHint").textContent = "Une photo suffit pour un essai rapide. Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet."; return; }
   const eng = mode === "auto" ? (n >= 20 && tools?.photogrammetry !== false ? "photogrammetry" : "ia") : mode;
   $("routeHint").textContent = eng === "photogrammetry"
-    ? `${n} photo(s) : photogrammétrie ${pgName}.${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`
-    : `${n} photo(s) : IA TripoSR sur la photo principale (encadrée). Forme approximative, l'arrière est deviné.`;
+    ? `${plural(n, "photo")} : le modèle sera reconstruit à partir de toutes les photos (${pgName}).${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`
+    : `${plural(n, "photo")} : l'IA estime la forme à partir de la photo principale (encadrée). L'arrière est deviné.`;
 }
 
 $("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
@@ -393,6 +432,9 @@ function fieldError(id, msg) {
   return !!msg;
 }
 ["height", "aHeight", "aBase"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, null)));
+// Escape hides help bubbles (WCAG 1.4.13); they come back on the next pointer move or focus change
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.body.classList.add("hush"); });
+["pointermove", "focusin"].forEach((ev) => document.addEventListener(ev, () => document.body.classList.remove("hush")));
 
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
@@ -448,7 +490,7 @@ async function loadHistory() {
 function clearModel() {
   loadSeq++;
   if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; }
-  $("viewerEmpty").textContent = "Le modèle s'affichera ici.";
+  $("viewerEmpty").textContent = "Chargement du modèle…";
   $("viewerEmpty").classList.remove("hidden");
   $("previews").classList.add("hidden");
 }
@@ -475,7 +517,7 @@ async function poll(id, gen, failures) {
   catch (e) {
     if (gen !== pollGen) return;
     if (e.status === 404) { showError("Projet introuvable."); return; }
-    showError(`Serveur injoignable, nouvelle tentative... (${e.message})`);
+    showError(`${SERVER_DOWN} Nouvelle tentative…`);
     pollTimer = setTimeout(() => poll(id, gen, failures + 1), Math.min(10000, 1500 * 2 ** failures));
     return;
   }
@@ -498,7 +540,7 @@ function staleReasons(j, level) {
   if (!!a.keep_parts !== !!b.keep_parts) out.push("pièces détachées");
   if (level === "lowpoly" && a.faces !== b.faces) out.push("facettes");
   if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
-  if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("moteur");
+  if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("méthode");
   return out;
 }
 
@@ -515,10 +557,11 @@ function render() {
   const announce = `${j.name} : ${step || STATE_FR[j.state] || j.state}`;
   if ($("live").textContent !== announce) $("live").textContent = announce;
   const nOk = (j.photos || []).filter((p) => !p.error).length;
-  const engineText = j.engine ? (j.engine === "photogrammetry" ? `photogrammétrie ${tools?.photogrammetry_engine || ""}`.trim() : `IA TripoSR sur ${j.main_photo || "la photo la plus nette"}`) : null;
-  $("jobMeta").textContent = [`${nOk || "?"} photo(s)`, engineText, j.settings.rot_seq ? `orientation ${j.settings.rot_seq.toUpperCase().split("").join(" puis ")}` : null].filter(Boolean).join(" · ");
+  const engineText = j.engine ? (j.engine === "photogrammetry" ? "reconstruit à partir de toutes les photos" : `forme estimée par l'IA à partir de ${j.main_photo || "la photo la plus nette"}`) : null;
+  const turns = (j.settings.rot_seq || "").length;
+  $("jobMeta").textContent = [nOk ? plural(nOk, "photo") : null, engineText, turns ? `${plural(turns, "quart")} de tour appliqué${turns > 1 ? "s" : ""}` : null].filter(Boolean).join(" · ");
   if (j.error) showError(j.error);
-  else if (!$("jobError").textContent.startsWith("Serveur")) $("jobError").classList.add("hidden");
+  else if (!$("jobError").textContent.startsWith(SERVER_DOWN)) $("jobError").classList.add("hidden");
 
   if (pendingLevel && !isBusy && j.results[pendingLevel]) { viewLevel = pendingLevel; pendingLevel = null; shownVersion = null; }
   if (!viewLevel || !j.results[viewLevel]) {
@@ -536,10 +579,10 @@ function render() {
     const ls = el.querySelector(".lstate");
     if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
     else {
-      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? " · périmé (" + escapeHtml(stale.join(", ")) + ")" : ""}</span>`);
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? ` · à recalculer (${stale.length > 1 ? "nouveaux réglages" : "nouveau réglage"} : ${escapeHtml(stale.join(", "))})` : ""}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
-        b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Régénérer" : "Générer"; b.disabled = isBusy;
+        b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Recalculer" : "Générer"; b.disabled = isBusy;
         b.setAttribute("aria-label", `${b.textContent} le niveau ${label}`);
         b.onclick = (e) => { e.stopPropagation(); runLevel(k); };
         ls.appendChild(b);
@@ -549,7 +592,7 @@ function render() {
     box.appendChild(el);
   });
 
-  document.querySelectorAll("#rotateBar button").forEach((b) => (b.disabled = isBusy || !viewLevel));
+  document.querySelectorAll("#rotateBar button.ghost").forEach((b) => (b.disabled = isBusy || !viewLevel));
   $("apply").disabled = isBusy;
   renderResult(j);
   renderAdjust(j);
@@ -655,7 +698,7 @@ async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
     const r = await post(`/api/jobs/${encodeURIComponent(current.id)}/export`, { level: viewLevel, kind });
-    showNotice(`Copié dans Téléchargements : ${r.path}`);
+    showNotice(`Fichier enregistré dans Téléchargements : ${r.path}`);
   } catch (e) { showError(e.message); }
 }
 $("expStl").onclick = () => exportFile("stl");
@@ -724,7 +767,7 @@ async function showModel(url, flat) {
   } catch (e) {
     if (seq !== loadSeq) return;
     const missing = /404/.test(String(e?.message || e));
-    $("viewerEmpty").textContent = missing ? "Fichier introuvable : régénère ce niveau." : "Visionneuse 3D indisponible. Aperçus rendus par Blender ci-dessous.";
+    $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau." : "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle.";
     $("viewerEmpty").classList.remove("hidden");
     $("previews").classList.toggle("hidden", missing);
   }
