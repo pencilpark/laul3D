@@ -65,6 +65,14 @@ jobs:
           LOWPOLY_BLENDER: ${{ github.workspace }}\tools\blender\blender.exe
         run: .venv\Scripts\python.exe tests\smoke_test.py --ia --root ci-out --out smoke-ia.json
 
+      - name: AI installer logic
+        run: .venv\Scripts\python.exe tests\setup_ai_test.py
+
+      - name: AI installer real run (accented path, models from the caches filled above)
+        env:
+          LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données IA'
+        run: .venv\Scripts\python.exe tests\setup_ai_test.py --real
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
