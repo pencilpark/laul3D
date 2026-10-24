@@ -270,7 +270,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
     <div class="card" id="jobCard">
       <p class="kick"><span>2</span> Modèle 3D</p>
       <div class="status">
-        <h2 style="margin:0" id="jobTitle">Aucun projet ouvert</h2>
+        <h2 style="margin:0" id="jobTitle" tabindex="-1">Aucun projet ouvert</h2>
         <span class="state hidden" id="jobState"></span>
         <div class="spinner hidden" id="spin"></div>
         <span class="sub" id="jobStep"></span>
@@ -286,7 +286,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       </div>
 
       <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
-        <div class="viewbar" role="toolbar" aria-label="Vues du modèle">
+        <div class="viewbar" role="group" aria-label="Vues du modèle">
           <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button>
         </div>
         <p class="navhelp" aria-hidden="true">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
@@ -354,7 +354,13 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", 
 const busy = (j) => j && ["running", "queued"].includes(j.state);
 // lists are rebuilt on every poll: put keyboard focus back on the element with the same key
 const focusKey = () => document.activeElement?.dataset?.focus || null;
-const restoreFocus = (key) => { if (key && !focusKey()) document.querySelector(`[data-focus="${CSS.escape(key)}"]`)?.focus({ preventScroll: true }); };
+const restoreFocus = (key) => {
+  if (!key || focusKey()) return;
+  const same = document.querySelector(`[data-focus="${CSS.escape(key)}"]`);
+  // a Générer button disappears once its level runs: fall back to that level, then to the project title
+  const fallback = key.startsWith("gen-") ? document.querySelector(`[data-focus="lvl-${CSS.escape(key.slice(4))}"]`) || $("jobTitle") : null;
+  (same || fallback)?.focus({ preventScroll: true });
+};
 
 function seg(id, onChange) {
   const el = $(id);
@@ -432,7 +438,7 @@ function addFiles(list) {
   if (!mainLocal && files.length) mainLocal = files[0].name;
   renderLocalThumbs();
 }
-$("clearFiles").onclick = () => { files = []; mainLocal = null; $("dropNote").classList.add("hidden"); renderLocalThumbs(); };
+$("clearFiles").onclick = () => { files = []; mainLocal = null; $("dropNote").classList.add("hidden"); renderLocalThumbs(); $("file").focus(); };
 
 function renderLocalThumbs() {
   const key = focusKey();
@@ -794,10 +800,14 @@ $("rotApply").onclick = async () => {
   if (!current || !pendingRot || runPending) return;
   $("rotApply").disabled = true;
   // the preview stays pending until the server accepts the run
-  if (await runLevel(viewLevel || "lowpoly", { rot_seq: shownRot() + pendingRot })) { pendingRot = ""; updateRotConfirm(); }
+  if (await runLevel(viewLevel || "lowpoly", { rot_seq: shownRot() + pendingRot })) { pendingRot = ""; updateRotConfirm(); $("jobTitle").focus(); }
   $("rotApply").disabled = busy(current);
 };
-$("rotCancel").onclick = () => { pendingRot = ""; updateRotConfirm(); shownVersion = null; if (current) render(); };
+$("rotCancel").onclick = () => {
+  pendingRot = ""; updateRotConfirm(); shownVersion = null;
+  if (current) render();
+  document.querySelector("#rotateBar [data-rot]").focus();
+};
 $("rotReset").onclick = () => { pendingRot = ""; updateRotConfirm(); if (current) runLevel(viewLevel || "lowpoly", { rot_seq: "" }); };
 $("apply").onclick = () => {
   if (!current) return;
