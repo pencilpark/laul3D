@@ -86,6 +86,7 @@ details.advanced[open] > summary { margin-bottom: 4px; }
 .verdict { display: flex; align-items: center; gap: 10px; }
 .verdict::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--ok); }
 .verdict.bad::before { background: var(--bad); }
+.verdict.warn::before { background: var(--warn); }
 .verdict-sub { margin: -4px 0 12px; color: var(--muted); font-size: 14px; }
 .checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
 .checks li { display: flex; gap: 9px; color: var(--ink); }
@@ -226,11 +227,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 
       <div class="field" style="margin-top:16px"><label for="name">Nom du projet</label><input id="name" type="text" value="buste"></div>
       <div class="field">
-        <div class="labrow"><span class="lab" id="levelLab">Niveau de détail</span><button type="button" class="tip" aria-label="Aide : niveau de détail" aria-describedby="tipLevel">?</button><span class="tip-text" role="tooltip" id="tipLevel">LowPoly : grandes facettes, calculé en quelques secondes. Moyen : plus lisse. Détaillé : le plus fidèle aux photos, calcul plus long. Les autres niveaux se génèrent ensuite en un clic.</span></div>
+        <div class="labrow"><span class="lab" id="levelLab">Niveau de détail</span><button type="button" class="tip" aria-label="Aide : niveau de détail" aria-describedby="tipLevel">?</button><span class="tip-text" role="tooltip" id="tipLevel">LowPoly : grandes facettes, le plus rapide. Moyen : plus lisse. Détaillé : le plus fidèle aux photos, le plus long. La première reconstruction prend d'une à plusieurs minutes selon les photos et l'ordinateur ; les autres niveaux se génèrent ensuite en un clic.</span></div>
         <div class="seg" id="level" role="group" aria-labelledby="levelLab">
           <button type="button" data-v="lowpoly" class="on" aria-pressed="true">LowPoly</button><button type="button" data-v="medium" aria-pressed="false">Moyen</button><button type="button" data-v="detailed" aria-pressed="false">Détaillé</button>
         </div>
-        <div class="hint">Commence en LowPoly pour vérifier la forme en quelques secondes, puis affine.</div>
+        <div class="hint">Commence en LowPoly, le plus rapide, pour vérifier la forme, puis affine.</div>
       </div>
       <div class="field">
         <div class="labrow"><label for="height">Hauteur imprimée (mm)</label><button type="button" class="tip" aria-label="Aide : hauteur imprimée" aria-describedby="tipHeight">?</button><span class="tip-text" role="tooltip" id="tipHeight">Hauteur du modèle une fois imprimé. L'Ender-3 V3 imprime jusqu'à 245 mm de haut.</span></div>
@@ -407,6 +408,7 @@ async function loadStatus() {
     $("finder").textContent = platform === "windows" ? "Afficher dans l'Explorateur" : "Afficher dans le Finder";
     $("orca").classList.toggle("hidden", !tools.orcaslicer);
     $("expStl").className = tools.orcaslicer ? "ghost" : "primary";
+    if (current) renderResult(current);
     // what each tool lets the user do, in plain words; the tool name stays in the tooltip
     const items = [["Calcul 3D", "Blender", tools.blender], ["Plusieurs photos", tools.photogrammetry_engine, tools.photogrammetry],
       ["Une photo (IA)", "TripoSR", tools.ia], ["Impression", "OrcaSlicer", tools.orcaslicer]];
@@ -700,9 +702,13 @@ function renderResult(j) {
   const supports = r.overhang_pct > 5;
   const dims = r.dimensions_mm.map((v) => v.toLocaleString("fr-FR")).join(" × ") + " mm";
   // verdict in plain words first; the measures stay under "Détails techniques"
-  $("resultTitle").textContent = r.printable ? "Prêt à imprimer" : "À vérifier avant d'imprimer";
-  $("resultTitle").classList.toggle("bad", !r.printable);
-  $("verdictSub").textContent = `Niveau ${LEVELS[viewLevel][0]} · ${dims} · environ ${Math.round(r.volume_cm3).toLocaleString("fr-FR")} cm³ de matière`;
+  // the headline follows every check, not only the topology flag behind r.printable
+  const verdict = !r.printable || !closed || r.self_intersections ? "bad" : thinWarn || r.shells > 1 ? "warn" : "ok";
+  $("resultTitle").textContent = { bad: "À vérifier avant d'imprimer", warn: "Imprimable, avec des points à vérifier",
+    ok: supports ? "Prêt à imprimer, avec supports" : "Prêt à imprimer" }[verdict];
+  $("resultTitle").classList.toggle("bad", verdict === "bad");
+  $("resultTitle").classList.toggle("warn", verdict === "warn");
+  $("verdictSub").textContent = `Niveau ${LEVELS[viewLevel][0]} · ${dims} · volume du modèle : environ ${Math.round(r.volume_cm3).toLocaleString("fr-FR")} cm³`;
   const notes = [];
   if (!closed) notes.push(["bad", "Le modèle n'est pas complètement fermé : recalcule ce niveau ou essaie un autre niveau."]);
   if (r.self_intersections) notes.push(["bad", "Des surfaces se croisent : recalcule ce niveau."]);
@@ -723,7 +729,9 @@ function renderResult(j) {
     ["Méthode", r.engine === "photogrammetry" ? `toutes les photos (${tools?.photogrammetry_engine || "photogrammétrie"})` : "IA sur une photo (TripoSR)"],
   ];
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
-  $("slicerHint").textContent = `OrcaSlicer s'ouvre avec ce modèle. Vérifie que l'imprimante choisie est « Creality Ender-3 V3 »${supports ? ", coche « Activer les supports »" : ""}, puis clique « Découper le plateau ».`;
+  $("slicerHint").textContent = tools?.orcaslicer === false
+    ? `Enregistre le fichier STL, puis ouvre-le dans ton logiciel de découpe avec l'imprimante « Creality Ender-3 V3 »${supports ? " et les supports activés" : ""}.`
+    : `OrcaSlicer s'ouvre avec ce modèle. Vérifie que l'imprimante choisie est « Creality Ender-3 V3 »${supports ? ", coche « Activer les supports »" : ""}, puis clique « Découper le plateau ».`;
   const pv = $("previews");
   pv.replaceChildren(...(r.previews || []).map((p) => { const img = document.createElement("img"); img.alt = ""; img.src = fileUrl(p, r.version); return img; }));
   if (shownVersion !== `${viewLevel}:${r.version}`) {
@@ -990,7 +998,7 @@ async function showModel(url, flat) {
     const views = $("previews").children.length;
     $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau."
       : views ? "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle."
-      : "L'aperçu 3D n'est pas disponible sur cet ordinateur. Le modèle est prêt : tu peux l'ouvrir dans OrcaSlicer.";
+      : `L'aperçu 3D n'est pas disponible sur cet ordinateur. Le modèle est prêt : ${tools?.orcaslicer === false ? "enregistre le fichier STL" : "tu peux l'ouvrir dans OrcaSlicer"}.`;
     $("viewerEmpty").classList.remove("hidden");
     $("previews").classList.toggle("hidden", missing || !views);
   }
