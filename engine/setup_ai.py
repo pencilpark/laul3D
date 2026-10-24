@@ -4,7 +4,6 @@ Started from the app (POST /api/setup/ai); models land in DATA/models, where pip
 """
 import functools
 import glob
-import hashlib
 import importlib
 import os
 import platform
@@ -14,9 +13,10 @@ import subprocess
 import sys
 import threading
 import urllib.error
-import urllib.request
 
+import fetch
 import pipeline as pl
+import setup_tools
 
 TRIPOSR_REV = "5b521936b01fbe1890f6f9baed0254ab6351c04a"
 DINO_REV = "f205d5d8e640a89a2b8ef0369670dfc37cc07fc2"
@@ -116,6 +116,7 @@ def _install():
         _libraries()
         for folder, name, url, size, sha256, md5 in MODELS:
             _model(folder, name, url, size, sha256, md5)
+        setup_tools.ensure_vcredist(lambda text: _set(step=text))  # torch loads the Visual C++ runtime on Windows
         _verify()
         importlib.invalidate_caches()
         if not pl.tools_status()["ia"]:
@@ -211,30 +212,7 @@ def _hf_cache(folder, name, size):
 
 
 def _download(url, tmp, size):
-    have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
-    if have > size:
-        os.remove(tmp)
-        have = 0
-    _advance(have)
-    if have == size:
-        return
-    headers = {"User-Agent": "BerriaCraft", **({"Range": f"bytes={have}-"} if have else {})}
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
-        resumed = have and r.status == 206
-        if have and not resumed:  # server ignored the range: start over
-            _advance(-have)
-            have = 0
-        with open(tmp, "ab" if resumed else "wb") as f:
-            while chunk := r.read(1 << 20):
-                f.write(chunk)
-                _advance(len(chunk))
+    fetch.download(url, tmp, size, _advance)
 
 
-def _digest_ok(path, sha256, md5):
-    if not (sha256 or md5):
-        return True
-    h = hashlib.sha256() if sha256 else hashlib.md5()
-    with open(path, "rb") as f:
-        while chunk := f.read(1 << 22):
-            h.update(chunk)
-    return h.hexdigest() == (sha256 or md5)
+_digest_ok = fetch.digest_ok
