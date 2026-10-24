@@ -159,7 +159,7 @@ def process(job, level, log):
     with LOCK:
         job["engine"] = engine
     if engine == "photogrammetry" and n_ok < pl.MIN_PHOTOGRAMMETRY:
-        log(f"attention : {n_ok} photos seulement, 50 ou plus sont conseillées")
+        log(f"attention : {n_ok} photo{'s' if n_ok > 1 else ''} seulement, 50 ou plus sont conseillées")
     safe_save(job, log)
 
     main_photo = None
