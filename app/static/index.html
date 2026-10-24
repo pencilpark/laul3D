@@ -227,8 +227,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <h2 id="resultTitle">Résultat</h2>
       <table id="report"></table>
       <div class="actions" style="margin-top:14px">
+        <button class="primary" id="orca">Préparer l'impression dans OrcaSlicer</button>
         <button class="ghost" id="expStl">Exporter le STL</button>
-        <button class="ghost" id="orca">Ouvrir dans OrcaSlicer</button>
         <button class="ghost" id="finder">Afficher dans le Finder</button>
         <button class="ghost" id="expBlend">Exporter le .blend</button>
       </div>
@@ -309,6 +309,8 @@ async function loadStatus() {
     tools = s.tools;
     platform = tools.platform;
     $("finder").textContent = platform === "windows" ? "Afficher dans l'Explorateur" : "Afficher dans le Finder";
+    $("orca").classList.toggle("hidden", !tools.orcaslicer);
+    $("expStl").className = tools.orcaslicer ? "ghost" : "primary";
     const items = [["Blender", tools.blender], [tools.photogrammetry_engine, tools.photogrammetry], ["IA TripoSR", tools.ia], ["OrcaSlicer", tools.orcaslicer]];
     $("tools").innerHTML = items.map(([n, ok]) => `<span class="pill ${ok ? "ok" : "bad"}">${escapeHtml(n)} ${ok ? "prêt" : "absent"}</span>`).join("");
     const comps = (s.setup?.components || []).filter((c) => c.status !== "ready" && c.status !== "skipped");
