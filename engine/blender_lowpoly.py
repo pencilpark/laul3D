@@ -43,6 +43,9 @@ def parse_args():
     ap.add_argument("--force-closing", action="store_true", help="skip plain voxel remesh, always use morphological closing")
     ap.add_argument("--save-blend", action="store_true")
     ap.add_argument("--previews", action="store_true", help="render 4 PNG views of the result")
+    ap.add_argument("--previews-only", action="store_true", help="only render the 4 views of --input (an STL)")
+    ap.add_argument("--preview-engine", choices=["workbench", "cycles"], default="workbench",
+                    help="cycles renders on the CPU and needs no OpenGL context")
     return ap.parse_args(argv)
 
 
@@ -315,17 +318,44 @@ def print_checks(bm, min_wall):
     }
 
 
-def render_previews(obj, outdir, name):
+def render_previews(obj, outdir, name, engine="workbench"):
     sc = bpy.context.scene
+    extra = []
     try:
-        sc.render.engine = "BLENDER_WORKBENCH"
+        sc.render.engine = "CYCLES" if engine == "cycles" else "BLENDER_WORKBENCH"
     except TypeError:
         return []
-    shading = sc.display.shading
-    shading.light = "STUDIO"
-    shading.color_type = "SINGLE"
-    shading.single_color = (0.82, 0.80, 0.76)
-    shading.show_cavity = True
+    if engine == "cycles":
+        sc.cycles.device = "CPU"
+        sc.cycles.samples = 24
+        sc.cycles.use_denoising = False
+        try:
+            sc.view_settings.view_transform = "Standard"
+        except TypeError:
+            pass
+        mat = bpy.data.materials.new("preview")
+        if mat.node_tree is None:
+            mat.use_nodes = True
+        bsdf = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        bsdf.inputs[0].default_value = (0.82, 0.80, 0.76, 1.0)
+        obj.data.materials.clear()
+        obj.data.materials.append(mat)
+        sc.world = sc.world or bpy.data.worlds.new("preview")
+        if sc.world.node_tree is None:
+            sc.world.use_nodes = True
+        bg = next(n for n in sc.world.node_tree.nodes if n.type == "BACKGROUND")
+        bg.inputs[0].default_value = (0.18, 0.18, 0.18, 1.0)
+        sun = bpy.data.objects.new("preview_sun", bpy.data.lights.new("preview_sun", "SUN"))
+        sun.data.energy = 4.0
+        sun.rotation_euler = (math.radians(55), 0.0, math.radians(35))
+        sc.collection.objects.link(sun)
+        extra.append(sun)
+    else:
+        shading = sc.display.shading
+        shading.light = "STUDIO"
+        shading.color_type = "SINGLE"
+        shading.single_color = (0.82, 0.80, 0.76)
+        shading.show_cavity = True
     sc.render.film_transparent = True
     sc.render.resolution_x = sc.render.resolution_y = 480
     sc.render.image_settings.file_format = "PNG"
@@ -347,7 +377,8 @@ def render_previews(obj, outdir, name):
         sc.render.filepath = os.path.join(outdir, f"{name}_{label}.png")
         bpy.ops.render.render(write_still=True)
         paths.append(sc.render.filepath)
-    bpy.data.objects.remove(cam, do_unlink=True)
+    for o in [cam] + extra:
+        bpy.data.objects.remove(o, do_unlink=True)
     return paths
 
 
@@ -356,6 +387,12 @@ def main():
     t0 = time.time()
     os.makedirs(a.outdir, exist_ok=True)
     clear_scene()
+
+    if a.previews_only:
+        bpy.ops.wm.stl_import(filepath=a.input)
+        obj = next(o for o in bpy.data.objects if o.type == "MESH")
+        print("PREVIEWS " + json.dumps(render_previews(obj, a.outdir, a.name, a.preview_engine)), flush=True)
+        return
 
     meshes = import_any(a.input)
     bm = merge_to_bmesh(meshes)
@@ -442,8 +479,6 @@ def main():
     if written != report["triangles"]:
         raise SystemExit(f"export STL incomplet : {written} triangles écrits sur {report['triangles']}")
 
-    previews = render_previews(work, a.outdir, a.name) if a.previews else []
-
     if a.save_blend:
         us = bpy.context.scene.unit_settings
         us.system, us.scale_length, us.length_unit = "METRIC", 0.001, "MILLIMETERS"
@@ -451,17 +486,27 @@ def main():
 
     report.update({
         "stl": stl,
-        "previews": previews,
+        "previews": [],
         "dimensions_mm": [round(v, 1) for v in (hi - lo)],
         "printable": report["non_manifold_edges"] == 0 and report["self_intersections"] == 0 and report["shells"] >= 1,
         "watertight_method": method,
         "level": a.level,
         "seconds": round(time.time() - t0, 1),
     })
-    with open(os.path.join(a.outdir, f"{a.name}.json"), "w") as f:
-        json.dump(report, f, indent=2)
+
+    def write_report():
+        with open(os.path.join(a.outdir, f"{a.name}.json"), "w") as f:
+            json.dump(report, f, indent=2)
+
+    write_report()
     log(f"export {stl}")
     print("REPORT " + json.dumps(report), flush=True)
+
+    if a.previews:
+        # without OpenGL Blender can crash right here: the STL and the report are already out
+        report["previews"] = render_previews(work, a.outdir, a.name, a.preview_engine)
+        write_report()
+        print("PREVIEWS " + json.dumps(report["previews"]), flush=True)
 
 
 if __name__ == "__main__":
