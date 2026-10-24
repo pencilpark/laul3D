@@ -259,7 +259,7 @@ const $ = (id) => document.getElementById(id);
 const LEVELS = { lowpoly: ["LowPoly", "facettes visibles"], medium: ["Moyen", "env. 20 000 triangles"], detailed: ["Détaillé", "qualité maximale"] };
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null;
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
@@ -359,7 +359,7 @@ function renderLocalThumbs() {
     box.appendChild(d);
   });
   restoreFocus(key);
-  $("go").disabled = files.length === 0;
+  $("go").disabled = files.length === 0 || uploading;
   updateRoute();
 }
 
@@ -395,10 +395,12 @@ function fieldError(id, msg) {
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
   if (fieldError("height", Number.isFinite(height) && height >= 10 && height <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
+  uploading = true;
   $("go").disabled = true;
-  $("go").textContent = "Envoi des photos...";
+  $("go").textContent = "Envoi des photos…";
+  const sent = files.slice();
   const fd = new FormData();
-  files.forEach((f) => fd.append("files", f, f.name));
+  sent.forEach((f) => fd.append("files", f, f.name));
   fd.append("name", $("name").value || "modele");
   fd.append("mode", modeSeg.get());
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
@@ -406,12 +408,15 @@ $("go").onclick = async () => {
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
-    files = []; mainLocal = null; renderLocalThumbs();
+    // photos dropped during the upload stay for the next model
+    files = files.filter((f) => !sent.includes(f));
+    if (!files.some((f) => f.name === mainLocal)) mainLocal = files[0]?.name ?? null;
     openJob(job.id);
     loadHistory();
   } catch (e) { showError(e.message); }
+  uploading = false;
   $("go").textContent = "Créer le modèle";
-  $("go").disabled = files.length === 0;
+  renderLocalThumbs();
 };
 
 async function loadHistory() {
@@ -452,6 +457,11 @@ function openJob(id) {
   openId = id;
   document.querySelectorAll("#history .proj").forEach((b) => (b.dataset.focus === "proj-" + id ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current")));
   viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null;
+  // until the new project arrives, nothing may act on the previous one
+  current = null;
+  $("jobTitle").textContent = "Ouverture du projet…";
+  $("levels").replaceChildren();
+  $("resultCard").classList.add("hidden"); $("adjustCard").classList.add("hidden");
   clearModel();
   $("jobError").classList.add("hidden"); $("notice").classList.add("hidden");
   poll(id, gen, 0);
@@ -614,7 +624,8 @@ function renderAdjust(j) {
 }
 
 async function runLevel(level, settings = {}, extra = {}) {
-  if (!current) return;
+  if (!current || runPending) return;
+  runPending = true;
   try {
     const job = await post(`/api/jobs/${encodeURIComponent(current.id)}/run`, { level, settings, ...extra });
     pendingLevel = level;
@@ -623,6 +634,7 @@ async function runLevel(level, settings = {}, extra = {}) {
     const gen = ++pollGen;
     pollTimer = setTimeout(() => poll(current.id, gen, 0), 800);
   } catch (e) { showError(e.message); }
+  runPending = false;
 }
 
 document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.onclick = () => {
