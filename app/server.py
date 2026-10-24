@@ -1,4 +1,4 @@
-"""Local LowPoly3D server: drop photos, get a printable STL. Started by the desktop app (or start.command)."""
+"""Local Berria Craft server: drop photos, get a printable STL. Started by the desktop app (or start.command)."""
 import copy
 import itertools
 import json

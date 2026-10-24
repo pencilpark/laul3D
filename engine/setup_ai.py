@@ -132,7 +132,7 @@ def _install():
 def _libraries():
     uv = os.environ.get("LOWPOLY_UV") or shutil.which("uv")
     if not uv:
-        raise RuntimeError("l'outil d'installation uv est introuvable ; réinstalle LowPoly3D")
+        raise RuntimeError("l'outil d'installation uv est introuvable ; réinstalle Berria Craft")
     backend, budget = torch_backend(), libs_bytes()
     _set(step="Téléchargement des bibliothèques" + (", version pour carte NVIDIA" if backend else ""))
     # the core pins act as constraints, so nothing the running app has loaded gets replaced (Windows locks loaded DLLs);
@@ -218,7 +218,7 @@ def _download(url, tmp, size):
     _advance(have)
     if have == size:
         return
-    headers = {"User-Agent": "LowPoly3D", **({"Range": f"bytes={have}-"} if have else {})}
+    headers = {"User-Agent": "BerriaCraft", **({"Range": f"bytes={have}-"} if have else {})}
     with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as r:
         resumed = have and r.status == 206
         if have and not resumed:  # server ignored the range: start over
