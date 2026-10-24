@@ -28,7 +28,7 @@ STATIC = os.path.join(ROOT, "app", "static")
 LEVELS = ("lowpoly", "medium", "detailed")
 MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
-            "rot_seq": "", "keep_parts": False, "nozzle": 0.4}
+            "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 app = FastAPI()
@@ -79,6 +79,7 @@ def clean_settings(raw, base=None):
     s["base_cut"] = num("base_cut", 0.0, 20.0)
     s["faces"] = num("faces", 100, 20000, int)
     s["nozzle"] = num("nozzle", 0.2, 1.0)
+    s["smooth"] = num("smooth", 0, 3, int)
     s["rot_seq"] = canonical_rot(s["rot_seq"])
     s["keep_parts"] = bool(s["keep_parts"])
     if s["level"] not in LEVELS:
@@ -187,6 +188,7 @@ def process(job, level, log):
     rel = lambda p: os.path.relpath(os.path.join(out, os.path.basename(p)), d).replace(os.sep, "/")
     report["stl"] = rel(report["stl"])
     report["previews"] = [rel(p) for p in report.get("previews", [])]
+    report["colors"] = rel(report["colors"]) if report.get("colors") else None
     report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
     with LOCK:
         job["results"][level] = report
