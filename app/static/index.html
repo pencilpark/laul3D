@@ -83,6 +83,20 @@ details.advanced { margin-top: 14px; }
 details.advanced > summary, details.howto > summary { padding: 8px 0; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
 details.advanced[open] > summary { margin-bottom: 4px; }
 .rot-lab { flex-basis: 100%; }
+.pill.pillbtn { min-height: 32px; padding: 0 12px; border: 0; background: var(--chip); color: var(--ink); font-family: inherit; cursor: pointer; transition: background .18s; }
+.pillbtn::before { background: var(--bad); }
+.pillbtn:hover { background: var(--chip-hover); }
+.aibar { margin: 4px 24px 8px; padding: 10px 14px; background: var(--panel); }
+.aibar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.aibar-track { height: 4px; margin-top: 8px; background: var(--chip); }
+.aibar-fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.aibar.done .aibar-fill { background: var(--ok); }
+.aibar.error .aibar-fill { background: var(--bad); }
+#routeInstall { margin-top: 10px; }
+dialog#aiDialog { max-width: 470px; padding: 22px 24px; border: 0; background: var(--panel); color: var(--ink); }
+dialog#aiDialog::backdrop { background: rgba(0,0,0,.65); }
+dialog#aiDialog p { margin: 0 0 10px; }
+dialog#aiDialog .tips { color: var(--ink); }
 .verdict { display: flex; align-items: center; gap: 10px; }
 .verdict::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--ok); }
 .verdict.bad::before { background: var(--bad); }
@@ -205,6 +219,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
   <div class="tools" id="tools"></div>
 </header>
 <div id="setupLine"></div>
+<div class="aibar hidden" id="aiBar" role="status">
+  <div class="aibar-row"><span id="aiText"></span><button type="button" class="ghost hidden" id="aiRetry">Réessayer</button></div>
+  <div class="aibar-track"><div class="aibar-fill" id="aiFill"></div></div>
+</div>
 
 <main>
   <section class="stack side">
@@ -221,6 +239,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="photo-row hidden" id="photoTools"><span class="sub" id="photoCount"></span><button type="button" class="linkbtn" id="clearFiles">Retirer les photos</button></div>
       <div class="dropnote hidden" id="dropNote" role="status"></div>
       <div class="hint" id="routeHint"></div>
+      <button type="button" class="primary inline hidden" id="routeInstall">Installer le module IA</button>
       <details class="howto">
         <summary>Comment prendre de bonnes photos ?</summary>
         <ul class="tips">
@@ -350,6 +369,18 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
   </section>
 </main>
 
+<dialog id="aiDialog" aria-labelledby="aiDialogTitle">
+  <p class="kick">Module complémentaire</p>
+  <h2 id="aiDialogTitle">Installer le module « Une photo (IA) »</h2>
+  <p>Il crée un modèle 3D à partir d'une seule photo, quand il n'y en a pas assez pour une reconstruction complète.</p>
+  <ul class="tips">
+    <li id="aiSize">Téléchargement d'environ 2,2 Go, une seule fois : bibliothèques Python et modèle d'IA TripoSR.</li>
+    <li>De quelques minutes à une demi-heure selon la connexion. L'app reste utilisable pendant ce temps.</li>
+    <li>Tout s'installe sur cet ordinateur ; les photos ne partent pas en ligne.</li>
+  </ul>
+  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="aiInstall">Installer maintenant</button><button type="button" class="ghost" id="aiLater">Plus tard</button></div>
+</dialog>
+
 <script type="module">
 const $ = (id) => document.getElementById(id);
 const LEVELS = { lowpoly: ["LowPoly", "grandes facettes, rapide"], medium: ["Moyen", "plus lisse"], detailed: ["Détaillé", "le plus fidèle, plus long"] };
@@ -357,7 +388,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false;
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, aiDoneAt = 0;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
@@ -420,9 +451,18 @@ async function loadStatus() {
     const items = [["Calcul 3D", "Blender", tools.blender], ["Plusieurs photos", tools.photogrammetry_engine, tools.photogrammetry],
       ["Une photo (IA)", "TripoSR", tools.ia], ["Impression", "OrcaSlicer", tools.orcaslicer]];
     const missing = items.filter(([, , ok]) => !ok);
+    aiState = s.ai_install;
+    const aiBusy = aiState?.status === "running";
+    // the AI module installs from here; the other tools come with the installer
     $("tools").innerHTML = missing.length
-      ? missing.map(([n, t]) => `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé : menu LowPoly3D, Assistant d'installation">${escapeHtml(n)} : à installer</span>`).join("")
+      ? missing.map(([n, t]) => t === "TripoSR"
+        ? (aiState?.unsupported ? `<span class="pill bad" title="Le module IA ne peut pas fonctionner sur cet ordinateur : ${escapeHtml(aiState.unsupported)}.">${escapeHtml(n)} : non disponible</span>`
+          : aiBusy ? `<span class="pill busy">${escapeHtml(n)} : installation…</span>`
+          : `<button type="button" class="pill bad pillbtn" data-install="ai">${escapeHtml(n)} : installer</button>`)
+        : `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé : menu LowPoly3D, Assistant d'installation">${escapeHtml(n)} : à installer</span>`).join("")
       : `<span class="pill ok" title="${escapeHtml(items.map(([, t]) => t).join(", "))}">Tout est prêt</span>`;
+    renderAiBar(aiState);
+    if (aiBusy) next = 1500;
     const comps = (s.setup?.components || []).filter((c) => c.status !== "ready" && c.status !== "skipped");
     $("setupLine").innerHTML = comps.length ? `<div class="infoline">${comps.map((c) => {
       const pct = c.progress != null && c.status === "downloading" ? ` ${Math.round(c.progress * 100)} %` : "";
@@ -434,6 +474,36 @@ async function loadStatus() {
   } catch { $("tools").innerHTML = `<span class="pill bad">Moteur de calcul injoignable</span>`; next = 5000; }
   statusTimer = setTimeout(loadStatus, next);
 }
+
+const bytes = (n) => n >= 1e9 ? `${(n / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Go` : `${Math.round(n / 1e6).toLocaleString("fr-FR")} Mo`;
+function renderAiBar(st) {
+  if (st?.status === "done" && !aiDoneAt) aiDoneAt = Date.now();
+  const show = st && st.status !== "idle" && !(st.status === "done" && Date.now() - aiDoneAt > 8000);
+  $("aiBar").classList.toggle("hidden", !show);
+  if (!show) return;
+  $("aiBar").classList.toggle("done", st.status === "done");
+  $("aiBar").classList.toggle("error", st.status === "error");
+  $("aiFill").style.width = `${st.status === "done" ? 100 : Math.min(100, Math.round(100 * st.done / (st.total || 1)))}%`;
+  $("aiText").textContent = st.status === "error" ? `Installation du module IA interrompue : ${st.error}.`
+    : st.status === "done" ? "Module IA installé : tu peux créer un modèle à partir d'une seule photo."
+    : `Installation du module IA : ${st.step}${st.done ? ` (${bytes(st.done)} sur ${bytes(st.total)})` : ""}`;
+  $("aiRetry").classList.toggle("hidden", st.status !== "error");
+}
+
+function askInstallAi() {
+  if (aiState?.total) $("aiSize").textContent = `Téléchargement d'environ ${bytes(aiState.total)}, une seule fois : bibliothèques Python et modèle d'IA TripoSR${aiState.gpu ? ", en version adaptée à ta carte graphique NVIDIA" : ""}.`;
+  $("aiDialog").showModal(); $("aiInstall").focus();
+}
+async function installAi() {
+  if ($("aiDialog").open) $("aiDialog").close();
+  try { await post("/api/setup/ai", {}); } catch (e) { showError(e.message); }
+  loadStatus();
+}
+$("aiInstall").onclick = installAi;
+$("aiLater").onclick = () => $("aiDialog").close();
+$("aiRetry").onclick = installAi;
+$("routeInstall").onclick = askInstallAi;
+$("tools").addEventListener("click", (e) => { if (e.target.closest("[data-install='ai']")) askInstallAi(); });
 
 function addFiles(list) {
   const rejected = [];
@@ -485,12 +555,27 @@ function updateRoute() {
   const n = files.length, mode = modeSeg.get();
   const pgName = tools?.photogrammetry_engine || "photogrammétrie";
   $("go").disabled = !n || uploading;
-  if (!n) { $("routeHint").textContent = "Une photo suffit pour un essai rapide. Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet."; return; }
+  $("routeInstall").classList.add("hidden");
+  if (!n) {
+    const noAi = tools?.ia === false, cannot = aiState?.unsupported, busyAi = aiState?.status === "running";
+    $("routeHint").textContent = !noAi ? "Une photo suffit pour un essai rapide. Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet."
+      : cannot ? "Prends au moins 20 photos, et 50 ou plus pour un buste ressemblant, en tournant autour du sujet."
+      : busyAi ? "Le module « Une photo (IA) » s'installe (barre en haut). En attendant, une reconstruction demande au moins 20 photos, et 50 ou plus pour un buste ressemblant."
+      : "Pour un essai avec une seule photo, installe d'abord le module « Une photo (IA) ». Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet.";
+    $("routeInstall").classList.toggle("hidden", !noAi || !!cannot || busyAi);
+    return;
+  }
   const eng = mode === "auto" ? (n >= 20 && tools?.photogrammetry !== false ? "photogrammetry" : "ia") : mode;
-  // same rule as pipeline.choose_engine: block a run that can only fail
+  // same rule as pipeline.choose_engine: block a run that can only fail, and offer the install right here
   if (eng === "ia" && tools?.ia === false) {
     $("go").disabled = true;
-    $("routeHint").textContent = `${plural(n, "photo")} : il faut le module « Une photo (IA) », pas encore installé (menu LowPoly3D, Assistant d'installation). Sinon, ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`;
+    const busyAi = aiState?.status === "running", cannot = aiState?.unsupported;
+    $("routeHint").textContent = cannot
+      ? `${plural(n, "photo")} : la création à partir d'une seule photo n'est pas disponible sur cet ordinateur (${cannot}). Ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`
+      : busyAi
+      ? `${plural(n, "photo")} : installation du module IA en cours, tu pourras créer le modèle dès qu'elle sera terminée.`
+      : `${plural(n, "photo")} : il faut le module « Une photo (IA) », pas encore installé. Sinon, ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`;
+    $("routeInstall").classList.toggle("hidden", busyAi || !!cannot);
     return;
   }
   $("routeHint").textContent = eng === "photogrammetry"
