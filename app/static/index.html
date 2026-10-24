@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LowPoly3D</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23c2531b' d='M32 4 58 19v26L32 60 6 45V19z'/%3E%3Cpath fill='%23e88a52' d='M32 4 58 19 32 33 6 19z'/%3E%3C/svg%3E">
+<script type="importmap">
+{"imports": {"three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/"}}
+</script>
+<style>
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e2ded6;
+  --accent: #c2531b; --accent-ink: #ffffff; --ok: #2f7d4f; --warn: #a86a00; --bad: #b3261e;
+  --chip: #efebe4; --drop: #fbfaf7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161514; --panel: #201f1d; --ink: #ecebe8; --muted: #a39e95; --line: #34322e;
+    --accent: #e0723a; --accent-ink: #161514; --ok: #5cbf86; --warn: #e0a83a; --bad: #ef6b62;
+    --chip: #2b2926; --drop: #1b1a18;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161514; --panel: #201f1d; --ink: #ecebe8; --muted: #a39e95; --line: #34322e;
+  --accent: #e0723a; --accent-ink: #161514; --ok: #5cbf86; --warn: #e0a83a; --bad: #ef6b62;
+  --chip: #2b2926; --drop: #1b1a18;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { padding: 20px 24px 8px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; justify-content: space-between; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 12px; }
+.sub { color: var(--muted); font-size: 13px; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.pill { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--chip); color: var(--muted); }
+.pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.busy { color: var(--warn); }
+#setupLine { padding: 0 24px; }
+#setupLine:empty { display: none; }
+.infoline { margin: 4px 0 4px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; padding: 8px 24px 32px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 8px 16px 24px; } header { padding: 16px 16px 8px; } #setupLine { padding: 0 16px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.stack > * + * { margin-top: 16px; }
+#drop { border: 2px dashed var(--line); border-radius: 10px; background: var(--drop); padding: 22px 14px; text-align: center; cursor: pointer; transition: border-color .15s; }
+#drop.over { border-color: var(--accent); }
+#drop p { margin: 4px 0; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 12px; }
+.thumb { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--chip); border: 2px solid transparent; cursor: pointer; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb span { position: absolute; inset: auto 0 0 0; font-size: 10px; padding: 2px 4px; background: rgba(0,0,0,.55); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb.main { border-color: var(--accent); }
+.thumb .noimg { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; color: var(--muted); padding: 4px; text-align: center; word-break: break-all; }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field + .field, .row + .field, .field + .row, .row + .row { margin-top: 12px; }
+input[type=text], input[type=number], select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--drop); color: var(--ink); font: inherit; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: transparent; color: var(--ink); padding: 8px 6px; font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.check { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 14px; margin-top: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+button.primary { display: inline-block; width: 100%; padding: 11px 14px; border: 0; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; text-align: center; }
+button.primary:disabled { opacity: .45; cursor: default; }
+button.ghost { padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; font-size: 14px; }
+button.ghost:disabled { opacity: .45; cursor: default; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.state { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--chip); }
+.state.done { color: var(--ok); } .state.error { color: var(--bad); } .state.running, .state.queued { color: var(--warn); }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+.notice { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); padding: 10px 12px; border-radius: 8px; margin-top: 12px; word-break: break-all; }
+.levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 560px) { .levels { grid-template-columns: 1fr; } }
+.level { border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; background: var(--drop); }
+.level.sel { border-color: var(--accent); }
+.level b { display: block; font-size: 14px; }
+.level small { color: var(--muted); font-size: 12px; display: block; }
+.level .lstate { margin-top: 6px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.arrow { color: var(--muted); }
+#viewer { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; background: var(--drop); border: 1px solid var(--line); overflow: hidden; }
+#viewer canvas { display: block; width: 100%; height: 100%; }
+#viewer .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); text-align: center; padding: 16px; }
+.previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.previews img { width: 100%; background: var(--drop); border-radius: 6px; border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.good { color: var(--ok); } .warn { color: var(--warn); } .badc { color: var(--bad); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+pre { max-height: 260px; overflow: auto; background: var(--drop); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
+.history { list-style: none; padding: 0; margin: 0; }
+.history li { padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.history li:hover b { color: var(--accent); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Photos vers impression 3D</h1>
+    <div class="sub">Creality Ender-3 V3, plateau 220 × 220 × 250 mm. Tout le calcul tourne sur cet ordinateur.</div>
+  </div>
+  <div class="tools" id="tools"></div>
+</header>
+<div id="setupLine"></div>
+
+<main>
+  <section class="stack">
+    <div class="card">
+      <h2>Nouveau modèle</h2>
+      <div id="drop">
+        <p><b>Dépose tes photos ici</b></p>
+        <p class="sub">ou clique pour choisir (JPG, HEIC, PNG)</p>
+        <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="hidden">
+      </div>
+      <div class="thumbs" id="localThumbs"></div>
+      <div class="hint" id="routeHint"></div>
+
+      <div class="field" style="margin-top:16px"><label for="name">Nom</label><input id="name" type="text" value="buste"></div>
+      <div class="field"><label>Moteur</label>
+        <div class="seg" id="mode">
+          <button data-v="auto" class="on">Auto</button><button data-v="photogrammetry">Photogrammétrie</button><button data-v="ia">IA, 1 photo</button>
+        </div>
+      </div>
+      <div class="field"><label>Niveau de départ</label>
+        <div class="seg" id="level">
+          <button data-v="lowpoly" class="on">LowPoly</button><button data-v="medium">Moyen</button><button data-v="detailed">Détaillé</button>
+        </div>
+        <div class="hint">Commence en LowPoly pour valider la forme et l'orientation en quelques secondes, puis affine.</div>
+      </div>
+      <div class="field" id="facesField"><label for="faces">Facettes LowPoly : <span id="facesVal">1000</span> triangles</label><input id="faces" type="range" min="200" max="5000" step="100" value="1000"></div>
+      <div class="row">
+        <div><label for="height">Hauteur (mm)</label><input id="height" type="number" min="10" max="245" step="1" value="80"></div>
+        <div><label for="nozzle">Buse</label><select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select></div>
+      </div>
+      <div class="field"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur coupés</label><input id="base" type="range" min="0" max="15" step="1" value="3"></div>
+      <label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label>
+      <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Projets</h2>
+      <ul class="history" id="history"><li class="sub">Aucun projet pour l'instant.</li></ul>
+    </div>
+  </section>
+
+  <section class="stack">
+    <div class="card" id="jobCard">
+      <div class="status">
+        <h2 style="margin:0" id="jobTitle">Aucun projet ouvert</h2>
+        <span class="state hidden" id="jobState"></span>
+        <div class="spinner hidden" id="spin"></div>
+        <span class="sub" id="jobStep"></span>
+      </div>
+      <div class="sub" id="jobMeta" style="margin-top:6px"></div>
+      <div class="error hidden" id="jobError"></div>
+      <div class="notice hidden" id="notice"></div>
+
+      <div style="margin-top:16px">
+        <label>Pipeline LowPoly vers détaillé</label>
+        <div class="levels" id="levels"></div>
+      </div>
+
+      <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Le modèle s'affichera ici.</div></div>
+      <div class="previews hidden" id="previews" style="margin-top:8px"></div>
+
+      <div class="actions" style="margin-top:12px" id="rotateBar">
+        <span class="sub" style="align-self:center">Orientation :</span>
+        <button class="ghost" data-rot="x" disabled>X +90°</button><button class="ghost" data-rot="y" disabled>Y +90°</button><button class="ghost" data-rot="z" disabled>Z +90°</button>
+        <button class="ghost" id="rotReset" disabled>Réinitialiser</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="resultCard">
+      <h2 id="resultTitle">Résultat</h2>
+      <table id="report"></table>
+      <div class="actions" style="margin-top:14px">
+        <button class="ghost" id="expStl">Exporter le STL</button>
+        <button class="ghost" id="orca">Ouvrir dans OrcaSlicer</button>
+        <button class="ghost" id="finder">Afficher dans le Finder</button>
+        <button class="ghost" id="expBlend">Exporter le .blend</button>
+      </div>
+      <div class="hint" id="slicerHint"></div>
+    </div>
+
+    <div class="card hidden" id="adjustCard">
+      <h2>Ajuster et relancer</h2>
+      <div class="field"><label>Moteur</label>
+        <div class="seg" id="aMode">
+          <button data-v="auto">Auto</button><button data-v="photogrammetry">Photogrammétrie</button><button data-v="ia">IA, 1 photo</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label for="aHeight">Hauteur (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1"></div>
+        <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1"></div>
+      </div>
+      <div class="field"><label for="aFaces">Facettes LowPoly : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
+      <div class="field hidden" id="mainPick"><label>Photo principale pour l'IA (clique pour changer)</label><div class="thumbs" id="serverThumbs"></div></div>
+      <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Appliquer au niveau affiché</button></div>
+      <details style="margin-top:14px"><summary>Journal</summary><pre id="log"></pre></details>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const LEVELS = { lowpoly: ["LowPoly", "facettes visibles"], medium: ["Moyen", "env. 20 000 triangles"], detailed: ["Détaillé", "qualité maximale"] };
+const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
+let files = [], mainLocal = null, current = null, viewLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null;
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const busy = (j) => j && ["running", "queued"].includes(j.state);
+
+function seg(id, onChange) {
+  const el = $(id);
+  el.addEventListener("click", (e) => {
+    if (e.target.tagName !== "BUTTON") return;
+    el.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
+    onChange?.(e.target.dataset.v);
+  });
+  return {
+    get: () => el.querySelector("button.on")?.dataset.v,
+    set: (v) => el.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v)),
+  };
+}
+const modeSeg = seg("mode", updateRoute);
+const levelSeg = seg("level", (v) => $("facesField").classList.toggle("hidden", v !== "lowpoly"));
+const aModeSeg = seg("aMode", (v) => (adjustMode = v));
+
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (opts.method && opts.method !== "GET") headers["X-LowPoly"] = "1";
+  const r = await fetch(path, { ...opts, headers });
+  if (!r.ok) {
+    let msg = `${r.status} ${r.statusText}`;
+    try { msg = (await r.json()).detail || msg; } catch {}
+    const err = new Error(msg); err.status = r.status; throw err;
+  }
+  return r.json();
+}
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+function showError(msg) { $("notice").classList.add("hidden"); $("jobError").textContent = msg; $("jobError").classList.remove("hidden"); }
+function showNotice(msg) { $("jobError").classList.add("hidden"); $("notice").textContent = msg; $("notice").classList.remove("hidden"); }
+
+async function loadStatus() {
+  clearTimeout(statusTimer);
+  let next = 30000;
+  try {
+    const s = await api("/api/status");
+    tools = s.tools;
+    platform = tools.platform;
+    $("finder").textContent = platform === "windows" ? "Afficher dans l'Explorateur" : "Afficher dans le Finder";
+    const items = [["Blender", tools.blender], [tools.photogrammetry_engine, tools.photogrammetry], ["IA TripoSR", tools.ia], ["OrcaSlicer", tools.orcaslicer]];
+    $("tools").innerHTML = items.map(([n, ok]) => `<span class="pill ${ok ? "ok" : "bad"}">${escapeHtml(n)} ${ok ? "prêt" : "absent"}</span>`).join("");
+    const comps = (s.setup?.components || []).filter((c) => c.status !== "ready" && c.status !== "skipped");
+    $("setupLine").innerHTML = comps.length ? `<div class="infoline">${comps.map((c) => {
+      const pct = c.progress != null && c.status === "downloading" ? ` ${Math.round(c.progress * 100)} %` : "";
+      const label = { downloading: "téléchargement", installing: "installation", waiting_authorization: "en attente d'autorisation", missing: "absent", error: "erreur", queued: "en file" }[c.status] || c.status;
+      return `<span>${escapeHtml(c.name)} : ${label}${pct}</span>`;
+    }).join("")}<span>Menu LowPoly3D, Assistant d'installation pour autoriser ou suivre.</span></div>` : "";
+    if (comps.some((c) => ["downloading", "installing", "queued"].includes(c.status))) next = 3000;
+    updateRoute();
+  } catch { $("tools").innerHTML = `<span class="pill bad">serveur injoignable</span>`; next = 5000; }
+  statusTimer = setTimeout(loadStatus, next);
+}
+
+function addFiles(list) {
+  for (const f of list) {
+    if (!/\.(jpe?g|png|heic|heif|webp|tiff?|bmp)$/i.test(f.name)) continue;
+    if (files.some((x) => x.name === f.name && x.size === f.size)) continue;
+    files.push(f);
+  }
+  if (!mainLocal && files.length) mainLocal = files[0].name;
+  renderLocalThumbs();
+}
+
+function renderLocalThumbs() {
+  const box = $("localThumbs");
+  box.replaceChildren();
+  files.forEach((f) => {
+    const d = document.createElement("div");
+    d.className = "thumb" + (f.name === mainLocal ? " main" : "");
+    d.title = f.name;
+    if (/\.(heic|heif|tiff?)$/i.test(f.name)) {
+      const n = document.createElement("div");
+      n.className = "noimg"; n.textContent = f.name; d.appendChild(n);
+    } else {
+      const img = document.createElement("img");
+      img.alt = ""; img.src = URL.createObjectURL(f);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      d.appendChild(img);
+    }
+    if (f.name === mainLocal) { const s = document.createElement("span"); s.textContent = "principale"; d.appendChild(s); }
+    d.onclick = () => { mainLocal = f.name; renderLocalThumbs(); };
+    box.appendChild(d);
+  });
+  $("go").disabled = files.length === 0;
+  updateRoute();
+}
+
+function updateRoute() {
+  const n = files.length, mode = modeSeg.get();
+  const pgName = tools?.photogrammetry_engine || "photogrammétrie";
+  if (!n) { $("routeHint").textContent = `1 à 19 photos : IA locale (TripoSR) sur la photo principale. 20 photos ou plus : photogrammétrie (${pgName}), 50 ou plus pour un buste fidèle.`; return; }
+  const eng = mode === "auto" ? (n >= 20 && tools?.photogrammetry !== false ? "photogrammetry" : "ia") : mode;
+  $("routeHint").textContent = eng === "photogrammetry"
+    ? `${n} photo(s) : photogrammétrie ${pgName}.${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`
+    : `${n} photo(s) : IA TripoSR sur la photo principale (encadrée). Forme approximative, l'arrière est deviné.`;
+}
+
+$("drop").onclick = () => $("file").click();
+$("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
+["dragenter", "dragover"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => { e.preventDefault(); if (!e.target.closest("#drop")) addFiles(e.dataTransfer.files); });
+$("faces").oninput = () => ($("facesVal").textContent = $("faces").value);
+$("base").oninput = () => ($("baseVal").textContent = $("base").value);
+$("aFaces").oninput = () => ($("aFacesVal").textContent = $("aFaces").value);
+
+$("go").onclick = async () => {
+  const height = $("height").valueAsNumber;
+  if (!Number.isFinite(height) || height < 10 || height > 245) { showError("Hauteur invalide : entre 10 et 245 mm."); return; }
+  $("go").disabled = true;
+  $("go").textContent = "Envoi des photos...";
+  const fd = new FormData();
+  files.forEach((f) => fd.append("files", f, f.name));
+  fd.append("name", $("name").value || "modele");
+  fd.append("mode", modeSeg.get());
+  fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
+    nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, rot_seq: "" }));
+  if (mainLocal) fd.append("main_photo", mainLocal);
+  try {
+    const job = await api("/api/jobs", { method: "POST", body: fd });
+    files = []; mainLocal = null; renderLocalThumbs();
+    openJob(job.id);
+    loadHistory();
+  } catch (e) { showError(e.message); }
+  $("go").textContent = "Créer le modèle";
+  $("go").disabled = files.length === 0;
+};
+
+async function loadHistory() {
+  try {
+    const jobs = await api("/api/jobs");
+    if (!jobs.length) return;
+    const box = $("history");
+    box.replaceChildren();
+    for (const j of jobs) {
+      const li = document.createElement("li");
+      const lv = Object.keys(j.results || {}).map((l) => LEVELS[l][0]).join(", ") || "aucun résultat";
+      li.innerHTML = `<b></b><span class="sub"></span>`;
+      li.querySelector("b").textContent = j.name;
+      li.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
+      li.onclick = () => openJob(j.id);
+      box.appendChild(li);
+    }
+  } catch {}
+}
+
+function clearModel() {
+  loadSeq++;
+  if (viewer?.mesh) { viewer.scene.remove(viewer.mesh); viewer.mesh.geometry.dispose(); viewer.mesh = null; }
+  $("viewerEmpty").textContent = "Le modèle s'affichera ici.";
+  $("viewerEmpty").classList.remove("hidden");
+  $("previews").classList.add("hidden");
+}
+
+function openJob(id) {
+  clearTimeout(pollTimer);
+  const gen = ++pollGen;
+  viewLevel = null; shownVersion = null; adjustMode = null;
+  clearModel();
+  $("jobError").classList.add("hidden"); $("notice").classList.add("hidden");
+  poll(id, gen, 0);
+}
+
+async function poll(id, gen, failures) {
+  let job;
+  try { job = await api(`/api/jobs/${encodeURIComponent(id)}`); }
+  catch (e) {
+    if (gen !== pollGen) return;
+    if (e.status === 404) { showError("Projet introuvable."); return; }
+    showError(`Serveur injoignable, nouvelle tentative... (${e.message})`);
+    pollTimer = setTimeout(() => poll(id, gen, failures + 1), Math.min(10000, 1500 * 2 ** failures));
+    return;
+  }
+  if (gen !== pollGen) return;
+  if (failures) $("jobError").classList.add("hidden");
+  current = job;
+  render();
+  if (busy(job)) pollTimer = setTimeout(() => poll(id, gen, 0), 1500);
+  else loadHistory();
+}
+
+function staleReasons(j, level) {
+  const r = j.results[level];
+  if (!r) return [];
+  const a = r.settings || {}, b = j.settings, out = [];
+  if ((a.rot_seq || "") !== (b.rot_seq || "")) out.push("orientation");
+  if (Math.round(a.height_mm) !== Math.round(b.height_mm)) out.push("hauteur");
+  if (a.base_cut !== b.base_cut) out.push("socle");
+  if (a.nozzle !== b.nozzle) out.push("buse");
+  if (!!a.keep_parts !== !!b.keep_parts) out.push("pièces détachées");
+  if (level === "lowpoly" && a.faces !== b.faces) out.push("facettes");
+  if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
+  if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("moteur");
+  return out;
+}
+
+function render() {
+  const j = current, isBusy = busy(j);
+  $("jobTitle").textContent = j.name;
+  const st = $("jobState");
+  st.className = "state " + j.state;
+  st.textContent = STATE_FR[j.state] || j.state;
+  $("spin").classList.toggle("hidden", !isBusy);
+  const elapsed = isBusy && j.started ? ` · ${Math.round(Date.now() / 1000 - j.started)} s` : "";
+  $("jobStep").textContent = isBusy ? `${j.step}${j.running_level ? " · " + LEVELS[j.running_level][0] : ""}${elapsed}` : "";
+  const nOk = (j.photos || []).filter((p) => !p.error).length;
+  const engineText = j.engine ? (j.engine === "photogrammetry" ? `photogrammétrie ${tools?.photogrammetry_engine || ""}`.trim() : `IA TripoSR sur ${j.main_photo || "la photo la plus nette"}`) : null;
+  $("jobMeta").textContent = [`${nOk || "?"} photo(s)`, engineText, j.settings.rot_seq ? `orientation ${j.settings.rot_seq.toUpperCase().split("").join(" puis ")}` : null].filter(Boolean).join(" · ");
+  if (j.error) showError(j.error);
+  else if (!$("jobError").textContent.startsWith("Serveur")) $("jobError").classList.add("hidden");
+
+  const box = $("levels");
+  box.replaceChildren();
+  Object.entries(LEVELS).forEach(([k, [label, sub]], i) => {
+    const r = j.results[k], running = isBusy && j.running_level === k, stale = staleReasons(j, k);
+    const el = document.createElement("div");
+    el.className = "level" + (viewLevel === k ? " sel" : "");
+    el.innerHTML = `<b>${i ? '<span class="arrow">→ </span>' : ""}${label}</b><small>${sub}</small><div class="lstate"></div>`;
+    const ls = el.querySelector(".lstate");
+    if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
+    else {
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}">${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? " · périmé (" + escapeHtml(stale.join(", ")) + ")" : ""}</span>`);
+      if (!r || stale.length) {
+        const b = document.createElement("button");
+        b.className = "ghost"; b.textContent = r ? "Régénérer" : "Générer"; b.disabled = isBusy;
+        b.onclick = (e) => { e.stopPropagation(); runLevel(k); };
+        ls.appendChild(b);
+      }
+    }
+    el.onclick = () => { if (j.results[k]) { viewLevel = k; shownVersion = null; render(); } };
+    box.appendChild(el);
+  });
+
+  if (!viewLevel || !j.results[viewLevel]) {
+    const done = Object.keys(LEVELS).filter((k) => j.results[k]);
+    viewLevel = done.length ? done[done.length - 1] : null;
+  }
+  document.querySelectorAll("#rotateBar button").forEach((b) => (b.disabled = isBusy || !viewLevel));
+  $("apply").disabled = isBusy;
+  renderResult(j);
+  renderAdjust(j);
+  $("log").textContent = (j.log || []).join("\n");
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+function fileUrl(rel, v) {
+  return `/files/${encodeURIComponent(current.id)}/${rel.split("/").map(encodeURIComponent).join("/")}?v=${v}`;
+}
+
+function renderResult(j) {
+  const r = viewLevel && j.results[viewLevel];
+  $("resultCard").classList.toggle("hidden", !r);
+  if (!r) return;
+  $("resultTitle").textContent = `Résultat ${LEVELS[viewLevel][0]}`;
+  const yes = (ok, t, f) => `<span class="${ok ? "good" : "badc"}">${ok ? t : f}</span>`;
+  const thinWarn = r.thin_faces > Math.max(5, r.triangles * 0.01);
+  const fr = (v) => String(v).replace(".", ",");
+  const rows = [
+    ["Dimensions", r.dimensions_mm.map((v) => v.toLocaleString("fr-FR")).join(" × ") + " mm"],
+    ["Triangles", r.triangles.toLocaleString("fr-FR")],
+    ["Volume", r.volume_cm3.toLocaleString("fr-FR") + " cm³"],
+    ["Étanche (manifold)", yes(r.non_manifold_edges === 0 && r.boundary_edges === 0, "oui", `non (${r.non_manifold_edges} arêtes)`)],
+    ["Auto-intersections", yes(r.self_intersections === 0, "aucune", r.self_intersections)],
+    ["Coques", yes(r.shells === 1, "1", r.shells)],
+    [`Parois sous ${fr(r.min_wall_mm)} mm`, `<span class="${thinWarn ? "warn" : "good"}">${r.thin_faces} face(s)</span>`],
+    ["Surplombs > 45°", `<span class="${r.overhang_pct > 5 ? "warn" : "good"}">${fr(r.overhang_pct)} % de la surface</span>`],
+    ["Moteur", r.engine === "photogrammetry" ? (tools?.photogrammetry_engine || "photogrammétrie") : "IA TripoSR"],
+  ];
+  $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+  $("slicerHint").textContent = `Dans OrcaSlicer : profil Creality Ender-3 V3, ${r.overhang_pct > 5 ? "supports arborescents (menton, nez, oreilles), " : ""}socle à plat sur le plateau.${thinWarn ? " Des parois sont plus fines que 2 × la buse : agrandis le modèle ou passe en niveau moins détaillé." : ""}`;
+  const pv = $("previews");
+  pv.replaceChildren(...(r.previews || []).map((p) => { const img = document.createElement("img"); img.alt = ""; img.src = fileUrl(p, r.version); return img; }));
+  if (shownVersion !== `${viewLevel}:${r.version}`) {
+    shownVersion = `${viewLevel}:${r.version}`;
+    showModel(fileUrl(r.stl, r.version), viewLevel === "lowpoly");
+  }
+}
+
+function renderAdjust(j) {
+  $("adjustCard").classList.remove("hidden");
+  const s = j.settings;
+  if (!document.activeElement?.closest?.("#adjustCard")) {
+    $("aHeight").value = Math.round(s.height_mm);
+    $("aBase").value = s.base_cut;
+    $("aFaces").value = s.faces;
+    $("aFacesVal").textContent = s.faces;
+  }
+  aModeSeg.set(adjustMode || j.mode);
+  const ia = j.engine === "ia";
+  $("mainPick").classList.toggle("hidden", !ia);
+  if (ia) {
+    const box = $("serverThumbs");
+    box.replaceChildren();
+    (j.photos || []).filter((p) => !p.error).forEach((p) => {
+      const t = document.createElement("div");
+      t.className = "thumb" + (p.name === j.main_photo ? " main" : "");
+      t.title = p.name;
+      const img = document.createElement("img"); img.alt = ""; img.src = fileUrl("thumbs/" + p.thumb, 1);
+      t.appendChild(img);
+      if (p.name === j.main_photo) { const s2 = document.createElement("span"); s2.textContent = "principale"; t.appendChild(s2); }
+      t.onclick = () => { if (!busy(current)) runLevel(viewLevel || "lowpoly", {}, { main_photo: p.name }); };
+      box.appendChild(t);
+    });
+  }
+}
+
+async function runLevel(level, settings = {}, extra = {}) {
+  if (!current) return;
+  try {
+    const job = await post(`/api/jobs/${encodeURIComponent(current.id)}/run`, { level, settings, ...extra });
+    viewLevel = level; shownVersion = null;
+    current = job; render();
+    clearTimeout(pollTimer);
+    const gen = ++pollGen;
+    pollTimer = setTimeout(() => poll(current.id, gen, 0), 800);
+  } catch (e) { showError(e.message); }
+}
+
+document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.onclick = () => {
+  if (!current) return;
+  runLevel(viewLevel || "lowpoly", { rot_seq: (current.settings.rot_seq || "") + b.dataset.rot });
+}));
+$("rotReset").onclick = () => { if (current) runLevel(viewLevel || "lowpoly", { rot_seq: "" }); };
+$("apply").onclick = () => {
+  if (!current) return;
+  const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
+  if (!Number.isFinite(h) || h < 10 || h > 245) { showError("Hauteur invalide : entre 10 et 245 mm."); return; }
+  if (!Number.isFinite(base) || base < 0 || base > 20) { showError("Socle invalide : entre 0 et 20 %."); return; }
+  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value }, adjustMode ? { mode: adjustMode } : {});
+};
+async function exportFile(kind) {
+  if (!current || !viewLevel) return;
+  try {
+    const r = await post(`/api/jobs/${encodeURIComponent(current.id)}/export`, { level: viewLevel, kind });
+    showNotice(`Copié dans Téléchargements : ${r.path}`);
+  } catch (e) { showError(e.message); }
+}
+$("expStl").onclick = () => exportFile("stl");
+$("expBlend").onclick = () => exportFile("blend");
+$("orca").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel }).catch((e) => showError(e.message));
+$("finder").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/reveal`, { level: viewLevel }).catch((e) => showError(e.message));
+
+async function initViewer() {
+  if (viewer) return viewer;
+  const THREE = await import("three");
+  const { STLLoader } = await import("three/addons/loaders/STLLoader.js");
+  const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+  const box = $("viewer");
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  box.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, 4 / 3, 1, 5000);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5550, 1.6));
+  const key = new THREE.DirectionalLight(0xffffff, 1.8);
+  key.position.set(150, 300, 220);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+  fill.position.set(-200, 100, -150);
+  scene.add(fill);
+  const grid = new THREE.GridHelper(220, 22, 0x9a948a, 0x9a948a);
+  grid.material.opacity = 0.35; grid.material.transparent = true;
+  scene.add(grid);
+  const vol = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(220, 250, 220)), new THREE.LineBasicMaterial({ color: 0x9a948a, transparent: true, opacity: 0.25 }));
+  vol.position.y = 125;
+  scene.add(vol);
+  function resize() {
+    const w = box.clientWidth, h = box.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(box);
+  resize();
+  (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+  viewer = { THREE, scene, camera, controls, loader: new STLLoader(), mesh: null };
+  return viewer;
+}
+
+async function showModel(url, flat) {
+  const seq = ++loadSeq;
+  try {
+    const v = await initViewer();
+    const geom = await v.loader.loadAsync(url);
+    if (seq !== loadSeq) { geom.dispose(); return; }
+    geom.rotateX(-Math.PI / 2);
+    geom.computeVertexNormals();
+    if (v.mesh) { v.scene.remove(v.mesh); v.mesh.geometry.dispose(); }
+    const mat = new v.THREE.MeshStandardMaterial({ color: 0xd8cfc2, roughness: 0.75, metalness: 0, flatShading: flat });
+    v.mesh = new v.THREE.Mesh(geom, mat);
+    v.scene.add(v.mesh);
+    geom.computeBoundingBox();
+    const b = geom.boundingBox, size = new v.THREE.Vector3(), c = new v.THREE.Vector3();
+    b.getSize(size); b.getCenter(c);
+    const d = Math.max(size.x, size.y, size.z) * 2.2 + 40;
+    v.controls.target.copy(c);
+    v.camera.position.set(c.x + d * 0.55, c.y + d * 0.35, c.z + d * 0.8);
+    $("viewerEmpty").classList.add("hidden");
+    $("previews").classList.add("hidden");
+  } catch (e) {
+    if (seq !== loadSeq) return;
+    const missing = /404/.test(String(e?.message || e));
+    $("viewerEmpty").textContent = missing ? "Fichier introuvable : régénère ce niveau." : "Visionneuse 3D indisponible. Aperçus rendus par Blender ci-dessous.";
+    $("viewerEmpty").classList.remove("hidden");
+    $("previews").classList.toggle("hidden", missing);
+  }
+}
+
+loadStatus();
+loadHistory();
+</script>
+</body>
+</html>
