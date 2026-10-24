@@ -91,6 +91,14 @@ details.advanced[open] > summary { margin-bottom: 4px; }
 .checks li::before { content: ""; flex: none; width: 7px; height: 7px; margin-top: 7px; background: var(--ok); }
 .checks li.warn::before { background: var(--warn); }
 .checks li.bad::before { background: var(--bad); }
+.photo-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.linkbtn { padding: 4px 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 14px; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; cursor: pointer; }
+.linkbtn:hover { color: #fff; }
+.dropnote { display: flex; gap: 9px; margin-top: 8px; font-size: 14px; }
+.dropnote::before { content: ""; flex: none; width: 7px; height: 7px; margin-top: 7px; background: var(--warn); }
+details.howto { margin-top: 6px; }
+.tips { margin: 2px 0 4px; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.tips li + li { margin-top: 4px; }
 details.tech { margin-top: 14px; }
 details.tech > summary { padding: 6px 0; font-size: 14px; color: var(--muted); cursor: pointer; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -190,7 +198,19 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="vh">
       </label>
       <div class="thumbs" id="localThumbs" role="group" aria-label="Photos ajoutées"></div>
+      <div class="photo-row hidden" id="photoTools"><span class="sub" id="photoCount"></span><button type="button" class="linkbtn" id="clearFiles">Retirer les photos</button></div>
+      <div class="dropnote hidden" id="dropNote" role="status"></div>
       <div class="hint" id="routeHint"></div>
+      <details class="howto">
+        <summary>Comment prendre de bonnes photos ?</summary>
+        <ul class="tips">
+          <li>Garde le sujet immobile, sous une lumière douce et égale, sans flash.</li>
+          <li>Tourne autour du sujet en prenant une photo tous les quelques pas, sans laisser de trou dans le tour.</li>
+          <li>Refais un tour plus haut et un tour plus bas pour montrer le dessus et le dessous.</li>
+          <li>Le sujet entier doit être net et visible sur chaque photo.</li>
+          <li>50 photos ou plus pour un buste fidèle ; une seule photo donne une forme approximative.</li>
+        </ul>
+      </details>
 
       <div class="field" style="margin-top:16px"><label for="name">Nom du projet</label><input id="name" type="text" value="buste"></div>
       <div class="field">
@@ -382,14 +402,19 @@ async function loadStatus() {
 }
 
 function addFiles(list) {
+  const rejected = [];
   for (const f of list) {
-    if (!/\.(jpe?g|png|heic|heif|webp|tiff?|bmp)$/i.test(f.name)) continue;
+    if (!/\.(jpe?g|png|heic|heif|webp|tiff?|bmp)$/i.test(f.name)) { rejected.push(f.name); continue; }
     if (files.some((x) => x.name === f.name && x.size === f.size)) continue;
     files.push(f);
   }
+  const n = rejected.length;
+  $("dropNote").textContent = n ? `${plural(n, "fichier")} ignoré${n > 1 ? "s" : ""}, format non pris en charge : ${rejected.slice(0, 3).join(", ")}${n > 3 ? "…" : ""}` : "";
+  $("dropNote").classList.toggle("hidden", !n);
   if (!mainLocal && files.length) mainLocal = files[0].name;
   renderLocalThumbs();
 }
+$("clearFiles").onclick = () => { files = []; mainLocal = null; $("dropNote").classList.add("hidden"); renderLocalThumbs(); };
 
 function renderLocalThumbs() {
   const key = focusKey();
@@ -417,6 +442,8 @@ function renderLocalThumbs() {
     box.appendChild(d);
   });
   restoreFocus(key);
+  $("photoTools").classList.toggle("hidden", !files.length);
+  $("photoCount").textContent = plural(files.length, "photo");
   $("go").disabled = files.length === 0 || uploading;
   updateRoute();
 }
