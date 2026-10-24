@@ -215,16 +215,13 @@ def _install_vcredist(step):
         shutil.copyfileobj(r, f)
     quoted = exe.replace("'", "''")
     # the link moves with each release, so the file is checked by its Microsoft signature rather than a pinned hash
-    sig = subprocess.run(["powershell", "-NoProfile", "-Command",
-                          f"$s = Get-AuthenticodeSignature -LiteralPath '{quoted}'; $s.Status.ToString() + '|' + $s.SignerCertificate.Subject"],
-                         capture_output=True, text=True, creationflags=pl.NO_WINDOW).stdout.strip()
+    sig = pl.powershell(f"$s = Get-AuthenticodeSignature -LiteralPath '{quoted}'; "
+                        "$s.Status.ToString() + '|' + $s.SignerCertificate.Subject").stdout.strip()
     if not sig.startswith("Valid|") or "O=Microsoft Corporation" not in sig:
         os.remove(exe)
         raise RuntimeError("le programme d'installation Microsoft n'a pas une signature valide ; réessaie plus tard")
-    r = subprocess.run(["powershell", "-NoProfile", "-Command",
-                        f"try {{ $p = Start-Process -FilePath '{quoted}' -ArgumentList '/install','/quiet','/norestart' "
-                        f"-Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1223 }}"],
-                       capture_output=True, creationflags=pl.NO_WINDOW)
+    r = pl.powershell(f"try {{ $p = Start-Process -FilePath '{quoted}' -ArgumentList '/install','/quiet','/norestart' "
+                      f"-Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1223 }}")
     os.remove(exe)
     if r.returncode == 1223:
         raise RuntimeError("Windows n'a pas reçu ton accord pour les composants Microsoft ; clique « Réessayer » et réponds Oui")
