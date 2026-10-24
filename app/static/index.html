@@ -12,7 +12,7 @@
 /* Pencil Park palette (revamp.pencil-park.com, assets/css/base.css): dark only, like the site */
 :root {
   --bg: #111111; --panel: #1e1e1e; --ink: #ffffff; --muted: rgba(255,255,255,.66); --line: rgba(255,255,255,.14);
-  --accent: #cf1149; --accent-hover: #a30d39; --accent-ink: #ffffff; --accent-text: #e84e77; --ok: #5cbf86; --warn: #e0a83a; --bad: #e84e77;
+  --accent: #cf1149; --accent-hover: #a30d39; --accent-ink: #ffffff; --accent-text: #e84e77; --accent-tint: rgba(207,17,73,.2); --ok: #5cbf86; --warn: #e0a83a; --bad: #e84e77;
   --chip: #2a2a2a; --chip-hover: #3a3a3a; --drop: #111111; --frame: #080808;
   --field-line: rgba(255,255,255,.32); --field-line-hover: rgba(255,255,255,.55);
   color-scheme: dark;
@@ -35,9 +35,12 @@ main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px
 @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 8px 16px 24px; } header { padding: 16px 16px 8px; } #setupLine { padding: 0 16px; } }
 .card { background: var(--panel); padding: 16px; }
 .stack > * + * { margin-top: 16px; }
-#drop { border: 1.5px dashed var(--line); background: var(--drop); padding: 22px 14px; text-align: center; cursor: pointer; transition: border-color .15s; }
-#drop.over { border-color: var(--accent); }
+#drop { border: 1.5px dashed rgba(255,255,255,.28); background: var(--drop); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+#drop:hover { border-color: var(--accent-text); background: rgba(207,17,73,.06); }
+#drop.over { border-style: solid; border-color: var(--accent); background: rgba(207,17,73,.12); }
 #drop p { margin: 4px 0; }
+#drop b { font-size: 17px; font-weight: 500; }
+.dz-icon { display: block; width: 28px; height: 28px; margin: 0 auto 8px; color: var(--accent-text); }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 12px; }
 .thumb { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--chip); border: 2px solid transparent; cursor: pointer; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -54,7 +57,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .seg { display: flex; gap: 2px; }
 .seg button { flex: 1; border: 0; background: var(--chip); color: var(--ink); padding: 8px 6px; font: inherit; cursor: pointer; transition: background .18s, color .18s; }
 .seg button:hover { background: var(--chip-hover); }
-.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.seg button.on { background: var(--accent-tint); color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
 .check { display: flex; gap: 10px; align-items: center; color: var(--ink); font-size: 14px; font-weight: 400; margin-top: 12px; cursor: pointer; }
 .check input { appearance: none; flex: none; width: 16px; height: 16px; margin: 0; box-shadow: inset 0 0 0 1.5px currentColor; cursor: pointer; transition: background .15s, box-shadow .15s; }
 .check:hover input { box-shadow: inset 0 0 0 1.5px var(--accent-text); }
@@ -62,7 +65,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .hint { font-size: 14px; color: var(--muted); margin-top: 6px; }
 button.primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; padding: 0 18px; border: 0; background: var(--accent); color: var(--accent-ink); font-family: inherit; font-size: 15px; font-weight: 500; line-height: 1.2; cursor: pointer; text-align: center; transition: background .18s; }
 button.primary:hover:not(:disabled) { background: var(--accent-hover); }
-button.primary:disabled { opacity: .45; cursor: not-allowed; }
+button.primary:disabled { background: var(--chip); color: var(--muted); cursor: not-allowed; }
 button.ghost { min-height: 38px; padding: 0 14px; border: 0; background: var(--chip); color: var(--ink); font: inherit; cursor: pointer; font-size: 14px; transition: background .18s; }
 button.ghost:hover:not(:disabled) { background: var(--chip-hover); }
 button.ghost:disabled { opacity: .45; cursor: not-allowed; }
@@ -114,6 +117,7 @@ pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px;
     <div class="card">
       <h2>Nouveau modèle</h2>
       <div id="drop">
+        <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         <p><b>Dépose tes photos ici</b></p>
         <p class="sub">ou clique pour choisir (JPG, HEIC, PNG)</p>
         <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="hidden">
