@@ -348,7 +348,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null;
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false;
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const busy = (j) => j && ["running", "queued"].includes(j.state);
@@ -570,7 +570,7 @@ function openJob(id) {
   const gen = ++pollGen;
   openId = id;
   document.querySelectorAll("#history .proj").forEach((b) => (b.dataset.focus === "proj-" + id ? b.setAttribute("aria-current", "true") : b.removeAttribute("aria-current")));
-  viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null;
+  viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null; adjustDirty = false;
   // until the new project arrives, nothing may act on the previous one
   current = null;
   $("jobTitle").textContent = "Ouverture du projet…";
@@ -722,7 +722,8 @@ function renderResult(j) {
 function renderAdjust(j) {
   $("adjustCard").classList.remove("hidden");
   const s = j.settings;
-  if (!document.activeElement?.closest?.("#adjustCard")) {
+  // values being edited survive polls and level switches until applied or the project changes
+  if (!adjustDirty && !document.activeElement?.closest?.("#adjustCard")) {
     $("aHeight").value = Math.round(s.height_mm);
     $("aBase").value = s.base_cut;
     $("aFaces").value = s.faces;
@@ -803,8 +804,10 @@ $("apply").onclick = () => {
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
   if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
-  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value }, adjustMode ? { mode: adjustMode } : {});
+  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value }, adjustMode ? { mode: adjustMode } : {})
+    .then((ok) => { if (ok) adjustDirty = false; });
 };
+["aHeight", "aBase", "aFaces"].forEach((id) => $(id).addEventListener("input", () => (adjustDirty = true)));
 async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
