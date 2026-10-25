@@ -64,10 +64,13 @@ def run_cli(photos, out, extra):
 
 
 def check_color_files(summary):
-    """The 3MF for multi-filament printers and the textured OBJ zip for color print services."""
+    """The painted 3MF and colored OBJ for multi-filament printers, the textured OBJ zip for color print services."""
     assert summary.get("filaments") and 1 <= len(summary.get("palette") or []) <= 4, summary
     with zipfile.ZipFile(summary["filaments"]) as z:
         assert "3D/3dmodel.model" in z.namelist(), z.namelist()
+    assert summary.get("obj_colors") and os.path.isfile(summary["obj_colors"][:-4] + ".mtl"), summary
+    with open(summary["obj_colors"], encoding="utf-8") as f:
+        assert sum(ln.startswith("usemtl ") for ln in f) == len(summary["palette"])
     assert summary.get("texture"), summary
     with zipfile.ZipFile(summary["texture"]) as z:
         names = z.namelist()

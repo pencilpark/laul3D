@@ -58,7 +58,9 @@ def parse_args():
                     help="cycles renders on the CPU and needs no OpenGL context")
     ap.add_argument("--smooth", type=int, choices=sorted(SMOOTH) + [0], default=0, help="extra smoothing: 0 none to 3 strong")
     ap.add_argument("--colors", action="store_true", help="also write NAME_couleurs.glb, the scan's colors on the result")
-    ap.add_argument("--filaments", type=int, default=4, help="with --colors: filament colors of the 3MF, 0 = no 3MF")
+    ap.add_argument("--filaments", type=int, default=4, help="with --colors: filament colors of the 3MF and colored OBJ")
+    ap.add_argument("--color-files", default="3mf,obj,texture",
+                    help="with --colors: comma list among 3mf, obj (colored, for OrcaSlicer), texture; '-' for none")
     ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
     ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
     return ap.parse_args(argv)
@@ -428,8 +430,8 @@ def export_colors(obj, outdir, name):
     return path
 
 
-def export_filaments(obj, outdir, name, count, min_island_area):
-    """The colors reduced to a few filaments, one per triangle, in a 3MF that OrcaSlicer opens painted."""
+def split_filaments(obj, count, min_island_area):
+    """The colors reduced to a few filaments, one per triangle of the fan triangulation the STL export makes."""
     me = obj.data
     n = len(me.polygons)
     start, total, areas = np.zeros(n, dtype=np.int64), np.zeros(n, dtype=np.int64), np.zeros(n)
@@ -451,9 +453,7 @@ def export_filaments(obj, outdir, name, count, min_island_area):
     owner = np.array(owner)
     labels, palette = couleurs.filaments(face_colors[owner], areas[owner] / (total[owner] - 2), tris, count,
                                          min_island_area)
-    path = os.path.join(outdir, f"{name}_filaments.3mf")
-    couleurs.write_3mf(path, verts.reshape(-1, 3), tris, labels, palette)
-    return path, palette
+    return verts.reshape(-1, 3), tris, labels, palette
 
 
 def bake_texture(target, sources, reach, size, path):
@@ -718,7 +718,8 @@ def main():
     report.update(print_checks(bm, 2 * a.nozzle))
     bm.to_mesh(work.data)
     bm.free()
-    report.update(colors=None, filaments=None, palette=None, texture=None)
+    report.update(colors=None, filaments=None, obj_colors=None, palette=None, texture=None)
+    wanted = set(a.color_files.split(",")) - {"-", ""}
     if sources:
         for o, mw in zip(sources, placed):
             o.matrix_world = refit @ fit @ turn @ mw
@@ -732,20 +733,26 @@ def main():
                     flatten_face_colors(work)
                 report["colors"] = export_colors(work, a.outdir, a.name)
                 log("couleurs du scan projetées")
-                if a.filaments:
-                    report["filaments"], report["palette"] = export_filaments(work, a.outdir, a.name, a.filaments,
-                                                                              (4 * a.nozzle) ** 2)
+                if wanted & {"3mf", "obj"}:
+                    verts, tris, labels, report["palette"] = split_filaments(work, a.filaments, (4 * a.nozzle) ** 2)
                     log(f"couleurs réduites à {len(report['palette'])} filament(s) : "
                         + ", ".join("#%02X%02X%02X" % c for c in report["palette"]))
-                try:
-                    png = os.path.join(a.outdir, f"{a.name}_couleurs.png")
-                    t1 = time.time()
-                    bake_texture(work, sources, 0.03 * height, TEXTURE_SIZE[a.level], png)
-                    report["texture"] = export_textured(work, a.outdir, a.name, png)
-                    log(f"texture {TEXTURE_SIZE[a.level]} px pour les services d'impression couleur, "
-                        f"{time.time() - t1:.1f} s")
-                except (RuntimeError, OSError) as e:
-                    log(f"texture pour les services d'impression indisponible : {e}")
+                    if "3mf" in wanted:
+                        report["filaments"] = os.path.join(a.outdir, f"{a.name}_filaments.3mf")
+                        couleurs.write_3mf(report["filaments"], verts, tris, labels, report["palette"])
+                    if "obj" in wanted:
+                        report["obj_colors"] = os.path.join(a.outdir, f"{a.name}_couleurs_orca.obj")
+                        couleurs.write_obj(report["obj_colors"], verts, tris, labels, report["palette"])
+                if "texture" in wanted:
+                    try:
+                        png = os.path.join(a.outdir, f"{a.name}_couleurs.png")
+                        t1 = time.time()
+                        bake_texture(work, sources, 0.03 * height, TEXTURE_SIZE[a.level], png)
+                        report["texture"] = export_textured(work, a.outdir, a.name, png)
+                        log(f"texture {TEXTURE_SIZE[a.level]} px pour les services d'impression couleur, "
+                            f"{time.time() - t1:.1f} s")
+                    except (RuntimeError, OSError) as e:
+                        log(f"texture pour les services d'impression indisponible : {e}")
     for o in list(bpy.data.objects):
         if o is not work:
             bpy.data.objects.remove(o, do_unlink=True)
