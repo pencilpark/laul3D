@@ -18,6 +18,7 @@ from PIL import Image, ImageOps
 
 import i18n
 import pipeline as pl
+import sysmem
 
 COLMAP_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
 ORIENTATION, MAKE, MODEL, EXIF_IFD, FOCAL, FOCAL_35MM = 0x0112, 0x010F, 0x0110, 0x8769, 0x920A, 0xA405
@@ -27,10 +28,17 @@ SCAN_VERSION = 2  # raised when the same photos give a different scan: older cac
 # 352 bytes per pixel of the scaled photo, plus a margin for the rest of the extractor
 SIFT_BYTES_PER_PIXEL = 400
 MEMORY_RESERVE = 1.5 * 2 ** 30  # left to Windows and the open apps
-# CPU time grows fast with image size: the levels follow Object Capture's preview / medium / full
-LEVELS = {"lowpoly": {"max_image": 1600, "resolution_level": 2},
-          "medium": {"max_image": 2000, "resolution_level": 1},
-          "detailed": {"max_image": 3200, "resolution_level": 1}}
+# CPU time grows fast with image size: low, mid and high follow Object Capture's preview / medium / full;
+# max keeps the photos' full size as far as the free memory allows (_max_config)
+RESOLUTIONS = {"low": {"max_image": 1600, "resolution_level": 2, "texture": 4096},
+               "mid": {"max_image": 2000, "resolution_level": 1, "texture": 4096},
+               "high": {"max_image": 3200, "resolution_level": 1, "texture": 4096}}
+# low, mid and high keep the folder names of the level each one fed before the choice existed: no scan redone
+CACHE_NAMES = {"low": "lowpoly", "mid": "medium", "high": "detailed", "max": "max"}
+OPENMVS_MIN_RESOLUTION = 640  # OpenMVS's default --min-resolution
+# peak bytes of DensifyPointCloud, ReconstructMesh and TextureMesh (8192 texture) at resolution level 0:
+# base + a * pixels of the largest photo + b * pixels of all photos, measured with OpenMVS 2.4.0
+MEMORY_MODEL = {"densify": (128 * 2 ** 20, 0, 50), "mesh": (64 * 2 ** 20, 0, 64), "texture": (512 * 2 ** 20, 0, 48)}
 
 
 def colmap():
@@ -54,9 +62,9 @@ def _short_path(path):
         return None
 
 
-def _ascii_workspace(work_dir, level):
+def _ascii_workspace(work_dir, name):
     """COLMAP and OpenMVS read their arguments in the Windows code page: the workspace needs a plain ASCII path."""
-    name = f"colmap_{level}"
+    name = f"colmap_{name}"
     if work_dir.isascii():
         return os.path.join(work_dir, name)
     short = _short_path(work_dir)
@@ -88,22 +96,23 @@ def _private_dir(path):
         raise RuntimeError(i18n.tr("srv.pgw_protect_failed", code=r.returncode))
 
 
-def _free_memory():
-    """Physical memory available now, in bytes, or None when unknown."""
-    try:
-        if pl.IS_WIN:
-            import ctypes
+_free_memory = sysmem.free_memory
 
-            class Status(ctypes.Structure):
-                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + \
-                           [(n, ctypes.c_ulonglong) for n in ("total", "avail", "page_total", "page_avail",
-                                                              "virt_total", "virt_avail", "ext_avail")]
-            s = Status()
-            s.length = ctypes.sizeof(s)
-            return s.avail if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(s)) else None
-        return os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
-    except (AttributeError, OSError, ValueError):
-        return None
+
+def _photo_sizes(photo_dir, photos):
+    sizes = []
+    for p in photos:
+        try:
+            with Image.open(os.path.join(photo_dir, p["name"])) as im:
+                sizes.append(im.size)
+        except Exception:  # noqa: BLE001  an unreadable photo is reported by COLMAP itself
+            continue
+    return sizes
+
+
+def _largest_scaled(sizes, max_image):
+    """Pixels of the largest photo once COLMAP has scaled it down to max_image."""
+    return max((w * h * min(1.0, max_image / max(w, h)) ** 2 for w, h in sizes), default=max_image * max_image * 0.75)
 
 
 def _sift_threads(photo_dir, photos, max_image):
@@ -116,17 +125,40 @@ def _sift_threads(photo_dir, photos, max_image):
     free = _free_memory()
     if not free:
         return None, None
-    pixels = 0.0
-    for p in photos:
-        try:
-            with Image.open(os.path.join(photo_dir, p["name"])) as im:
-                w, h = im.size
-        except Exception:  # noqa: BLE001  an unreadable photo is reported by COLMAP itself
-            continue
-        scale = min(1.0, max_image / max(w, h))
-        pixels = max(pixels, w * h * scale * scale)
-    per_thread = SIFT_BYTES_PER_PIXEL * (pixels or max_image * max_image * 0.75)
+    per_thread = SIFT_BYTES_PER_PIXEL * _largest_scaled(_photo_sizes(photo_dir, photos), max_image)
     return max(1, min(os.cpu_count() or 1, int((free - MEMORY_RESERVE) // per_thread))), free
+
+
+def _dense_side(side, level, max_resolution):
+    """Largest side OpenMVS works at: the photo halved level times, not under 640 px, not over max_resolution."""
+    while level and side >> level < OPENMVS_MIN_RESOLUTION:
+        level -= 1
+    return min(side >> level, max_resolution)
+
+
+def _peak_memory(side, aspect, n):
+    """Bytes the busiest step needs with n photos of this largest side, SIFT on one thread."""
+    px = side * side * aspect
+    sift = SIFT_BYTES_PER_PIXEL * px if side > RESOLUTIONS["high"]["max_image"] else 0  # up to there, as high
+    return max([sift] + [base + a * px + b * n * px for base, a, b in MEMORY_MODEL.values()])
+
+
+def _max_config(sizes, free):
+    """Max: the photos' own size, lowered until every step fits in free memory. None when that is no more than high."""
+    if not sizes:
+        return None
+    w, h = max(sizes, key=lambda s: s[0] * s[1])
+    side, aspect = max(w, h), min(w, h) / max(w, h)
+    high = RESOLUTIONS["high"]
+    floor = _dense_side(min(side, high["max_image"]), high["resolution_level"], 2560)
+    if free:
+        while side > floor and _peak_memory(side, aspect, len(sizes)) > free - MEMORY_RESERVE:
+            side = int(side * 0.9)
+    if side <= floor:
+        return None
+    # cameras found on photos at least as large as high's, depth and colors at this size
+    return {"sift": max(side, min(max(w, h), high["max_image"])), "max_image": side, "resolution_level": 0,
+            "max_resolution": side, "texture": 8192}
 
 
 def _natural(name):
@@ -214,9 +246,9 @@ def orientation(images_txt):
     return np.stack([np.cross(y, z), y, z]).tolist()
 
 
-def _cached(work_dir, level):
+def _cached(work_dir, name):
     # the folder only appears complete (see _publish): mesh, its textures and its orientation together
-    folder = os.path.join(work_dir, f"scan_{level}")
+    folder = os.path.join(work_dir, f"scan_{name}")
     found = glob.glob(os.path.join(folder, "*.obj")) + glob.glob(os.path.join(folder, "*.ply"))
     if not found:
         return None
@@ -228,9 +260,22 @@ def _cached(work_dir, level):
     return found[0] if current else None
 
 
-def _publish(work_dir, level, files, orient):
-    """Moves the result into scan_<level> in one step, so an interruption never leaves a partial cache."""
-    final = os.path.join(work_dir, f"scan_{level}")
+def _scan_px(mesh):
+    try:
+        with open(mesh + ".orient.json", encoding="utf-8") as f:
+            return json.load(f).get("px")
+    except (OSError, ValueError):
+        return None
+
+
+def _dense_px(sizes, cfg):
+    side = min(max((max(s) for s in sizes), default=cfg["max_image"]), cfg["max_image"])
+    return _dense_side(side, cfg["resolution_level"], cfg.get("max_resolution", 2560))
+
+
+def _publish(work_dir, name, files, orient, px=None):
+    """Moves the result into scan_<name> in one step, so an interruption never leaves a partial cache."""
+    final = os.path.join(work_dir, f"scan_{name}")
     staged = final + ".partial"
     shutil.rmtree(staged, ignore_errors=True)
     os.makedirs(staged)
@@ -238,30 +283,43 @@ def _publish(work_dir, level, files, orient):
         shutil.move(p, staged)
     mesh = next(p for p in glob.glob(os.path.join(staged, "*")) if p.endswith((".obj", ".ply")))
     with open(mesh + ".orient.json", "w", encoding="utf-8") as f:  # read by blender_prep: COLMAP axes, then this rotation
-        json.dump({"matrix": orient, "raw_axes": True, "version": SCAN_VERSION}, f)
+        json.dump({"matrix": orient, "raw_axes": True, "version": SCAN_VERSION, "px": px}, f)
     shutil.rmtree(final, ignore_errors=True)
     os.replace(staged, final)
     return os.path.join(final, os.path.basename(mesh))
 
 
-def reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls):
+def reconstruct(photo_dir, photos, work_dir, res, log, run, error_cls):
+    """The scan at resolution res (low, mid, high or max), with what it used: (mesh, {"res", "px"})."""
     if not available():
         raise error_cls(i18n.tr("srv.pgw_missing"))
-    cached = _cached(work_dir, level)
+    sizes = _photo_sizes(photo_dir, photos)
+    cfg = RESOLUTIONS.get(res)
+    if res == "max" and not _cached(work_dir, CACHE_NAMES[res]):
+        free = _free_memory()
+        cfg = _max_config(sizes, free)
+        gb = f"{free / 2 ** 30:.1f}" if free else "?"
+        if cfg is None:  # the same scan as high: its cache serves
+            res, cfg = "high", RESOLUTIONS["high"]
+            log(i18n.tr("srv.pgw_max_as_high", gb=gb))
+        else:
+            log(i18n.tr("srv.pgw_max", px=cfg["max_image"], native=max(max(s) for s in sizes), gb=gb))
+    name = CACHE_NAMES[res]
+    cached = _cached(work_dir, name)
     if cached:
-        log(i18n.tr("srv.pg_cached", detail=level))
-        return cached
-    w = _ascii_workspace(work_dir, level)
+        log(i18n.tr("srv.pg_cached", detail=res))
+        return cached, {"res": res, "px": _scan_px(cached) or (_dense_px(sizes, cfg) if cfg else None)}
+    w = _ascii_workspace(work_dir, name)
     root = None if w else _public_root()
-    w = w or os.path.join(root, f"colmap_{level}")
+    w = w or os.path.join(root, f"colmap_{name}")
     try:
-        return _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w)
+        px = _dense_px(sizes, cfg)
+        return _reconstruct(photo_dir, photos, work_dir, name, cfg, px, log, run, error_cls, w), {"res": res, "px": px}
     finally:  # converted photos and depth maps: several hundred MB, and private
         shutil.rmtree(root or w, ignore_errors=True)
 
 
-def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
-    cfg = LEVELS[level]
+def _reconstruct(photo_dir, photos, work_dir, name, cfg, px, log, run, error_cls, w):
     shutil.rmtree(w, ignore_errors=True)
     images, sparse, dense = (os.path.join(w, d) for d in ("images", "sparse", "dense"))
     os.makedirs(sparse)  # the mapper needs it to exist
@@ -284,14 +342,15 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
             tool_log(os.path.splitext(os.path.basename(cmd[0]))[0])
             raise error_cls(i18n.tr("srv.pgw_step_failed", step=what, advice=_advice(len(photos))))
 
-    log(i18n.tr("srv.pgw_start", n=len(photos), cameras=cameras, level=level))
-    threads, free = _sift_threads(photo_dir, photos, cfg["max_image"])
+    log(i18n.tr("srv.pgw_start", n=len(photos), cameras=cameras, px=px))
+    sift = cfg.get("sift", cfg["max_image"])
+    threads, free = _sift_threads(photo_dir, photos, sift)
     if threads:
         log(i18n.tr("srv.pgw_threads", n=threads, cores=os.cpu_count(), gb=f"{free / 2 ** 30:.1f}"))
     step(i18n.tr("srv.pgw_step_features"),
          [colmap(), "feature_extractor", "--database_path", db, "--image_path", images,
           "--ImageReader.single_camera_per_folder", "1", "--FeatureExtraction.use_gpu", "0",
-          "--FeatureExtraction.max_image_size", str(cfg["max_image"]),
+          "--FeatureExtraction.max_image_size", str(sift),
           *(["--FeatureExtraction.num_threads", str(threads)] if threads else [])])
     step(i18n.tr("srv.pgw_step_matching"),
          [colmap(), "exhaustive_matcher", "--database_path", db, "--FeatureMatching.use_gpu", "0"])
@@ -313,7 +372,7 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     step(i18n.tr("srv.pgw_step_import"), [openmvs("InterfaceCOLMAP"), "-w", w, "-i", dense, "-o", scene])
     step(i18n.tr("srv.pgw_step_densify"),
          [openmvs("DensifyPointCloud"), "-w", w, "-i", scene, "--resolution-level", str(cfg["resolution_level"]),
-          "--max-resolution", "2560", "--tower-mode", "0"])
+          "--max-resolution", str(cfg.get("max_resolution", 2560)), "--tower-mode", "0"])
     step(i18n.tr("srv.pgw_step_mesh"),
          [openmvs("ReconstructMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"),
           "-p", os.path.join(w, "scene_dense.ply")])
@@ -326,7 +385,7 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     # fixed on develop only). The colors end on the vertices of the printable mesh, where seams barely show.
     code, _ = run([openmvs("TextureMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"), "-m", mesh,
                    "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj", "--empty-color", str(UNSEEN),
-                   "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096",
+                   "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", str(cfg["texture"]),
                    "--global-seam-leveling", "0", "--local-seam-leveling", "0"],
                   log, cwd=w, env=env, low_priority=True)
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
@@ -335,7 +394,7 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
         log(i18n.tr("srv.pgw_no_texture", code=code))
         textured = [mesh]
     # OpenMVS's own logs stay with the scan, for a diagnosis after the workspace is gone
-    out = _publish(work_dir, level, textured + glob.glob(os.path.join(w, "*.log")), orient)
+    out = _publish(work_dir, name, textured + glob.glob(os.path.join(w, "*.log")), orient, px)
     log(i18n.tr("srv.pg_done", s=f"{time.time() - t0:.0f}"))
     return out
 
