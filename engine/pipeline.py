@@ -42,7 +42,7 @@ class PipelineError(Exception):
 def slug(text):
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     s = re.sub(r"[^A-Za-z0-9_-]+", "_", text.strip())[:40].strip("_")
-    return s or "modele"
+    return s or "model"
 
 
 def _first_existing(paths):

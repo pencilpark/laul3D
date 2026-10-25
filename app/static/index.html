@@ -475,6 +475,8 @@ const tr = (key, vars = {}) => {
   return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 };
 const num = (v, opts) => Number(v).toLocaleString(LANG, opts);
+// "a, b" in English, "a、b" in Chinese: the separator of a plain list follows the language
+const list = (items) => new Intl.ListFormat(LANG, { style: "narrow", type: "conjunction" }).format(items);
 function applyI18n(root = document) {
   root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = tr(el.dataset.i18n); });
   root.querySelectorAll("[data-i18n-attr]").forEach((el) => el.dataset.i18nAttr.split(";").forEach((pair) => {
@@ -622,7 +624,7 @@ async function loadStatus() {
         : `<span class="pill bad" title="${escapeHtml(tr("ui.tool_not_installed", { tool: t }))}">${escapeHtml(tr("ui.pill_missing", { name: n }))}</span>`;
     };
     $("tools").innerHTML = missing.length ? missing.map(pill).join("")
-      : `<span class="pill ok" title="${escapeHtml(items.map(([, t]) => t).join(", "))}">${escapeHtml(tr("ui.all_ready"))}</span>`;
+      : `<span class="pill ok" title="${escapeHtml(list(items.map(([, t]) => t)))}">${escapeHtml(tr("ui.all_ready"))}</span>`;
     renderBar("tools", toolsState, { step: "ui.tools_bar_step", progress: "ui.tools_bar_progress", error: "ui.tools_bar_error", done: "ui.tools_bar_done" });
     renderBar("ai", aiState, { step: "ui.ai_bar_step", progress: "ui.ai_bar_progress", error: "ui.ai_bar_error", done: "ui.ai_bar_done" });
     if (aiBusy || toolsBusy) next = 1500;
@@ -718,7 +720,7 @@ function addFiles(list) {
 }
 function renderDropNote() {
   const n = rejectedNames.length;
-  $("dropNote").textContent = n ? tr("ui.files_ignored", { n, names: rejectedNames.slice(0, 3).join(", ") + (n > 3 ? "…" : "") }) : "";
+  $("dropNote").textContent = n ? tr("ui.files_ignored", { n, names: list(rejectedNames.slice(0, 3)) + (n > 3 ? "…" : "") }) : "";
   $("dropNote").classList.toggle("hidden", !n);
 }
 $("clearFiles").onclick = () => { files = []; mainLocal = null; rejectedNames = []; renderDropNote(); renderLocalThumbs(); $("file").focus(); };
@@ -855,7 +857,7 @@ async function loadHistory() {
       const b = document.createElement("button");
       b.type = "button"; b.className = "proj"; b.dataset.focus = "proj-" + j.id;
       if (j.id === openId) b.setAttribute("aria-current", "true");
-      const lv = Object.keys(j.results || {}).map((l) => levelName(l)).join(", ") || tr("ui.no_result");
+      const lv = list(Object.keys(j.results || {}).map((l) => levelName(l))) || tr("ui.no_result");
       b.innerHTML = `<b></b><span class="sub"></span>`;
       b.querySelector("b").textContent = j.name;
       b.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString(LANG, { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
@@ -1025,7 +1027,7 @@ function render() {
     const ls = el.querySelector(".lstate");
     if (running) ls.innerHTML = `<span class="warn">${escapeHtml(tr("ui.level_running"))}</span>`;
     else {
-      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}"${stale.length ? ` title="${escapeHtml(tr("ui.stale_title", { list: stale.join(", ") }))}"` : ""}>${escapeHtml(tr(stale.length ? "ui.n_triangles_stale" : "ui.n_triangles", { v: num(r.triangles) }))}</span>`);
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}"${stale.length ? ` title="${escapeHtml(tr("ui.stale_title", { list: list(stale) }))}"` : ""}>${escapeHtml(tr(stale.length ? "ui.n_triangles_stale" : "ui.n_triangles", { v: num(r.triangles) }))}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
         b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = tr(r ? "ui.recompute" : "ui.generate"); b.disabled = isBusy;

@@ -45,7 +45,7 @@ body.failed #error { display: block; }
 <script>
 // Own dictionary: this page shows before the server, which serves the app's language files, has started.
 const STRINGS = {
-  en: {
+  "en": {
     "splash.engine_stopped": "the computing engine stopped during startup",
     "splash.error_hint": "Quit Berria Craft ({shortcut} or close the window), then open it again. If the message comes back, keep it: it tells you the cause.",
     "splash.error_title": "The computing engine did not start",
@@ -54,7 +54,7 @@ const STRINGS = {
     "splash.starting": "Starting the computing engine…",
     "splash.tagline": "Photos to 3D print",
   },
-  fr: {
+  "fr": {
     "splash.engine_stopped": "le moteur de calcul s'est arrêté au démarrage",
     "splash.error_hint": "Quitte Berria Craft ({shortcut} ou fermeture de la fenêtre) puis rouvre-le. Si le message revient, garde-le : il indique la cause.",
     "splash.error_title": "Le moteur de calcul n'a pas démarré",
@@ -63,7 +63,51 @@ const STRINGS = {
     "splash.starting": "Démarrage du moteur de calcul…",
     "splash.tagline": "Photos vers impression 3D",
   },
-  // TRANSLATIONS: es, de, pt-BR, zh-CN, ja go here, with the same "splash." keys as en.
+  "es": {
+    "splash.engine_stopped": "el motor de cálculo se detuvo al iniciarse",
+    "splash.error_hint": "Sal de Berria Craft ({shortcut} o cierra la ventana) y vuelve a abrirlo. Si el mensaje vuelve a aparecer, guárdalo: indica la causa.",
+    "splash.error_title": "El motor de cálculo no se inició",
+    "splash.first_launch": "El primer inicio prepara el entorno de cálculo en este equipo: un minuto como máximo.",
+    "splash.launch_failed": "no se pudo iniciar el motor de cálculo: {detail}",
+    "splash.starting": "Iniciando el motor de cálculo…",
+    "splash.tagline": "De fotos a impresión 3D",
+  },
+  "de": {
+    "splash.engine_stopped": "die Rechen-Engine hat sich beim Start beendet",
+    "splash.error_hint": "Beende Berria Craft ({shortcut} oder Fenster schließen) und öffne es dann wieder. Wenn die Meldung wiederkommt, behalte sie: Sie nennt die Ursache.",
+    "splash.error_title": "Die Rechen-Engine ist nicht gestartet",
+    "splash.first_launch": "Beim ersten Start wird die Rechenumgebung auf diesem Computer eingerichtet: höchstens eine Minute.",
+    "splash.launch_failed": "die Rechen-Engine konnte nicht gestartet werden: {detail}",
+    "splash.starting": "Rechen-Engine wird gestartet…",
+    "splash.tagline": "Fotos zum 3D-Druck",
+  },
+  "pt-BR": {
+    "splash.engine_stopped": "o motor de cálculo parou durante a inicialização",
+    "splash.error_hint": "Saia do Berria Craft ({shortcut} ou fechando a janela) e abra-o de novo. Se a mensagem voltar, guarde-a: ela indica a causa.",
+    "splash.error_title": "O motor de cálculo não iniciou",
+    "splash.first_launch": "A primeira execução prepara o ambiente de cálculo neste computador: um minuto no máximo.",
+    "splash.launch_failed": "não foi possível iniciar o motor de cálculo: {detail}",
+    "splash.starting": "Iniciando o motor de cálculo…",
+    "splash.tagline": "Fotos para impressão 3D",
+  },
+  "zh-CN": {
+    "splash.engine_stopped": "计算引擎在启动时停止了",
+    "splash.error_hint": "退出 Berria Craft（{shortcut} 或关闭窗口），然后重新打开。如果这条消息再次出现，请记下它：它说明了原因。",
+    "splash.error_title": "计算引擎没有启动",
+    "splash.first_launch": "首次启动会在这台电脑上准备计算环境：最多一分钟。",
+    "splash.launch_failed": "无法启动计算引擎：{detail}",
+    "splash.starting": "正在启动计算引擎…",
+    "splash.tagline": "从照片到 3D 打印",
+  },
+  "ja": {
+    "splash.engine_stopped": "計算エンジンが起動中に停止しました",
+    "splash.error_hint": "Berria Craftを終了し（{shortcut}またはウィンドウを閉じる）、もう一度開いてください。このメッセージが再び表示される場合は、内容を控えておいてください。原因が書かれています。",
+    "splash.error_title": "計算エンジンが起動しませんでした",
+    "splash.first_launch": "初回起動時は、このコンピューターに計算環境を準備します（長くても1分ほど）。",
+    "splash.launch_failed": "計算エンジンを起動できません：{detail}",
+    "splash.starting": "計算エンジンを起動中…",
+    "splash.tagline": "写真から3Dプリントへ",
+  },
 };
 const LANGS = ["en", "fr", "es", "de", "pt-BR", "zh-CN", "ja"];
 // error codes sent by the app (main.rs), the text after ":" is the detail
