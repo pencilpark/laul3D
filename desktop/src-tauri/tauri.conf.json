@@ -39,7 +39,7 @@
       "resources/": ""
     },
     "copyright": "Pencil Park",
-    "shortDescription": "Photos vers impression 3D",
+    "shortDescription": "Photos to 3D print",
     "macOS": {
       "minimumSystemVersion": "14.0",
       "signingIdentity": "-",
@@ -52,7 +52,8 @@
     "windows": {
       "webviewInstallMode": { "type": "embedBootstrapper" },
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["English", "French", "Spanish", "German", "PortugueseBR", "SimpChinese", "Japanese"]
       }
     }
   }

@@ -47,9 +47,9 @@ async def local_only(request: Request, call_next):
     # Host check blocks DNS rebinding; the custom header blocks cross-site form posts.
     host = (request.headers.get("host") or "").rsplit(":", 1)[0]
     if host not in ALLOWED_HOSTS:
-        return JSONResponse(status_code=403, content={"detail": "hôte refusé"})
+        return JSONResponse(status_code=403, content={"detail": i18n.tr("srv.host_refused")})
     if request.method not in ("GET", "HEAD") and request.headers.get("x-lowpoly") != "1":
-        return JSONResponse(status_code=403, content={"detail": "requête refusée"})
+        return JSONResponse(status_code=403, content={"detail": i18n.tr("srv.request_refused")})
     return await call_next(request)
 
 
@@ -125,7 +125,7 @@ def safe_save(job, log=None):
     try:
         save(job)
     except Exception:
-        (log or print)("sauvegarde du projet impossible :\n" + traceback.format_exc())
+        (log or print)(i18n.tr("srv.save_failed") + "\n" + traceback.format_exc())
 
 
 def logger(job):
@@ -159,31 +159,31 @@ def process(job, level, log):
     work = os.path.join(d, "work")
     os.makedirs(work, exist_ok=True)
     if not job.get("photos"):
-        set_step(job, "Analyse des photos")
+        set_step(job, i18n.tr("srv.step_photos"))
         photos = pl.scan_photos(os.path.join(d, "photos"), os.path.join(d, "thumbs"))
         with LOCK:
             job["photos"] = photos
     n_ok = sum(1 for p in job["photos"] if "error" not in p)
     if n_ok == 0:
-        raise pl.PipelineError("aucune photo lisible")
+        raise pl.PipelineError(i18n.tr("srv.no_readable_photo"))
     engine = pl.choose_engine(job["mode"], n_ok, tools_now())
     with LOCK:
         job["engine"] = engine
     if engine == "photogrammetry" and n_ok < pl.MIN_PHOTOGRAMMETRY:
-        log(f"attention : {n_ok} photo{'s' if n_ok > 1 else ''} seulement, 50 ou plus sont conseillées")
+        log(i18n.tr("srv.few_photos", n=n_ok))
     safe_save(job, log)
 
     main_photo = None
     if engine == "photogrammetry":
-        set_step(job, "Reconstruction 3D (photogrammétrie)")
+        set_step(job, i18n.tr("srv.step_photogrammetry"))
         raw = pl.photogrammetry(os.path.join(d, "photos"), job["photos"], work, level, log)
     else:
-        set_step(job, "Reconstruction 3D (IA, photo unique)")
+        set_step(job, i18n.tr("srv.step_ai"))
         raw, main_photo = pl.triposr(os.path.join(d, "photos"), job["photos"], job.get("main_photo"), work, log)
         with LOCK:
             job["main_photo"] = main_photo
 
-    set_step(job, "Préparation impression (Blender)")
+    set_step(job, i18n.tr("srv.step_blender"))
     with LOCK:
         s = dict(job["settings"])
     version = int(time.time() * 1000)
@@ -202,11 +202,11 @@ def process(job, level, log):
     report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
     with LOCK:
         job["results"][level] = report
-        job.update(state="done", step="Terminé", running_level=None)
+        job.update(state="done", step=i18n.tr("srv.step_done"), running_level=None)
     for old in os.listdir(os.path.join(d, "export", level)):
         if old != str(version):
             shutil.rmtree(os.path.join(d, "export", level, old), ignore_errors=True)
-    log(f"STL prêt : {report['stl']} ({report['dimensions_mm']} mm, {report['triangles']} triangles)")
+    log(i18n.tr("srv.stl_ready", path=report["stl"], dims=report["dimensions_mm"], triangles=report["triangles"]))
 
 
 def worker():
@@ -221,10 +221,10 @@ def worker():
         except pl.PipelineError as e:
             with LOCK:
                 job.update(state="error", error=str(e), running_level=None)
-            log(f"ERREUR : {e}")
+            log(i18n.tr("srv.error_line", error=e))
         except Exception as e:
             with LOCK:
-                job.update(state="error", error=f"erreur inattendue : {e}", running_level=None)
+                job.update(state="error", error=i18n.tr("srv.unexpected_error", error=e), running_level=None)
             log(traceback.format_exc())
         finally:
             if JOBS.get(jid) is job:
@@ -259,10 +259,10 @@ def load_projects():
             with open(p, encoding="utf-8") as f:
                 job = migrate(json.load(f))
         except Exception:
-            print(f"projet illisible ignoré : {p}\n{traceback.format_exc()}")
+            print(i18n.tr("srv.project_unreadable", path=p) + "\n" + traceback.format_exc())
             continue
         if job.get("state") in ("running", "queued"):
-            job.update(state="error", error="interrompu (application fermée pendant le calcul)", running_level=None)
+            job.update(state="error", error=i18n.tr("srv.interrupted"), running_level=None)
         JOBS[jid] = job
 
 
@@ -330,7 +330,7 @@ async def create_job(files: List[UploadFile] = File(...), name: str = Form("mode
     try:
         raw_settings = json.loads(settings or "{}")
     except ValueError:
-        raise HTTPException(400, "réglages illisibles")
+        raise HTTPException(400, i18n.tr("srv.bad_settings"))
     with LOCK:
         base = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + slug(name)
         jid, i = base, 2
@@ -355,11 +355,11 @@ async def create_job(files: List[UploadFile] = File(...), name: str = Form("mode
             chosen = fname
     if not saved:
         shutil.rmtree(job_dir(jid), ignore_errors=True)
-        raise HTTPException(400, "aucune image reconnue (JPG, HEIC, PNG, WEBP, TIFF)")
+        raise HTTPException(400, i18n.tr("srv.no_image"))
     s = clean_settings(raw_settings)
     job = {"id": jid, "name": name.strip() or "modele", "created": time.time(),
            "mode": mode if mode in MODES else "auto", "main_photo": chosen, "engine": None,
-           "settings": s, "photos": [], "results": {}, "state": "queued", "step": "En attente",
+           "settings": s, "photos": [], "results": {}, "state": "queued", "step": i18n.tr("srv.step_waiting"),
            "error": None, "running_level": s["level"], "log": []}
     with LOCK:
         JOBS[jid] = job
@@ -383,7 +383,7 @@ def delete_job(jid: str):
         if job is None:
             raise HTTPException(404)
         if job["state"] == "running":
-            raise HTTPException(409, "Calcul en cours : attends la fin pour supprimer ce projet.")
+            raise HTTPException(409, i18n.tr("srv.delete_running"))
         del JOBS[jid]
         SAVED.pop(jid, None)
         trash = job_dir(jid) + TRASH
@@ -394,8 +394,7 @@ def delete_job(jid: str):
                 os.replace(job_dir(jid), trash)
         except OSError:
             JOBS[jid] = job
-            raise HTTPException(409, "Un fichier de ce projet est ouvert dans un autre programme (OrcaSlicer ?) : "
-                                     "ferme-le, puis supprime à nouveau.")
+            raise HTTPException(409, i18n.tr("srv.delete_locked"))
     shutil.rmtree(trash, ignore_errors=True)
     return {"ok": True}
 
@@ -407,16 +406,16 @@ def rerun(jid: str, body: dict = Body(...)):
         if job is None:
             raise HTTPException(404)
         if job["state"] in ("running", "queued"):
-            raise HTTPException(409, "un calcul est déjà en cours pour ce projet")
+            raise HTTPException(409, i18n.tr("srv.already_running"))
         level = body.get("level") or job["settings"]["level"]
         if level not in LEVELS:
-            raise HTTPException(400, "niveau inconnu")
+            raise HTTPException(400, i18n.tr("srv.unknown_level"))
         job["settings"] = clean_settings(body.get("settings"), job["settings"])
         if body.get("mode") in MODES:
             job["mode"] = body["mode"]
         if body.get("main_photo") and any(p.get("name") == body["main_photo"] for p in job["photos"]):
             job["main_photo"] = body["main_photo"]
-        job.update(state="queued", step="En attente", running_level=level, error=None)
+        job.update(state="queued", step=i18n.tr("srv.step_waiting"), running_level=level, error=None)
         TASKS.put((jid, level))
         snapshot = public(job)
     safe_save(job)
@@ -430,16 +429,16 @@ def result_path(jid, level, kind="stl"):
     with LOCK:
         job = JOBS.get(jid)
         if job is None or level not in job["results"]:
-            raise HTTPException(404, "pas de résultat pour ce niveau")
+            raise HTTPException(404, i18n.tr("srv.no_result"))
         r = job["results"][level]
         rel = {"stl": r["stl"], "blend": r["stl"][:-4] + ".blend", "3mf": r.get("filaments"),
                "obj": r.get("obj_colors"), "zip": r.get("texture"), "software": r.get("export_software"),
                "game": r.get("export_game"), "web": r.get("export_web")}[kind]
     if not rel:
-        raise HTTPException(404, "ce fichier n'a pas été calculé pour ce niveau : coche-le et recalcule")
+        raise HTTPException(404, i18n.tr("srv.not_computed"))
     path = os.path.join(job_dir(jid), *rel.split("/"))
     if not os.path.isfile(path):
-        raise HTTPException(404, "fichier introuvable, régénère ce niveau")
+        raise HTTPException(404, i18n.tr("srv.file_missing"))
     return path
 
 

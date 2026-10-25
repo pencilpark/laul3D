@@ -1,7 +1,7 @@
 """Desktop launcher, run by the Python bundled in the app.
 
 Prepares a private environment in the user's application data (once), starts the local server, prints
-STEP / ERROR / READY lines for the window, and stops the server when the app closes its stdin.
+LANG / STEP / ERROR / READY lines for the window, and stops the server when the app closes its stdin.
 
 python boot.py --port 8642
 """
@@ -29,6 +29,10 @@ GROUP = {"creationflags": NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if IS
 # what runs right now, for the stdin watcher: a setup command, then the server
 CHILDREN = {"setup": None, "server": None}
 LOCK = threading.Lock()
+
+# APP/engine in the installed app (Resources/app/desktop/boot.py), the repository's engine folder in a checkout
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "engine"))
+import i18n  # noqa: E402
 
 
 def say(kind, text=""):
@@ -64,7 +68,7 @@ def runtime():
     dest = os.path.join(HOME, "runtime", sys.version.split()[0])
     python = os.path.join(dest, "python.exe") if IS_WIN else os.path.join(dest, "bin", "python3.11")
     if not os.path.exists(python):
-        say("STEP", "Première ouverture : copie de Python")
+        say("STEP", i18n.tr("boot.step_copy_python"))
         shutil.rmtree(dest + ".partial", ignore_errors=True)
         shutil.copytree(os.path.join(RES, "python"), dest + ".partial", symlinks=True)
         os.replace(dest + ".partial", dest)
@@ -80,7 +84,7 @@ def venv(rt_dir, rt_python):
     except OSError:
         current = False
     if not (current and os.path.exists(python)):
-        say("STEP", "Première ouverture : création de l'environnement")
+        say("STEP", i18n.tr("boot.step_create_env"))
         shutil.rmtree(v, ignore_errors=True)
         run([UV, "venv", "--python", rt_python, v])
     return python
@@ -94,16 +98,28 @@ def core(python):
     stamp = os.path.join(HOME, "venv", "lowpoly-core.txt")
     if os.path.exists(stamp) and open(stamp, encoding="utf-8").read() == want:
         return
-    say("STEP", "Première ouverture : installation du moteur de calcul")
+    say("STEP", i18n.tr("boot.step_install_engine"))
     run([UV, "pip", "install", "--python", python, "--offline", "--no-index", "--find-links", "wheels",
          "-r", os.path.join("app", "requirements-core.txt")], cwd=RES)
     with open(stamp, "w", encoding="utf-8") as f:
         f.write(want)
 
 
+def projects():
+    """HOME/Projects. The folder of the versions before 0.5, HOME/Projets, is renamed once; it stays in use for this
+    run when it cannot be renamed (a file of it open in another program)."""
+    new, old = os.path.join(HOME, "Projects"), os.path.join(HOME, "Projets")
+    if os.path.isdir(old) and not os.path.exists(new):
+        try:
+            os.replace(old, new)
+        except OSError:
+            return old
+    return new
+
+
 def serve(python, port):
-    env = {**os.environ, "LOWPOLY_DATA": os.path.join(HOME, "data"), "LOWPOLY_PROJECTS": os.path.join(HOME, "Projets"),
-           "LOWPOLY_UV": UV, "PYTHONPYCACHEPREFIX": os.path.join(HOME, "cache", "pyc"), "PYTHONUTF8": "1"}
+    env = {**os.environ, "LOWPOLY_DATA": os.path.join(HOME, "data"), "LOWPOLY_PROJECTS": projects(), "LOWPOLY_UV": UV,
+           "PYTHONPYCACHEPREFIX": os.path.join(HOME, "cache", "pyc"), "PYTHONUTF8": "1"}
     helper = os.path.join(RES, "bin", "HelloPhotogrammetry")
     if os.path.exists(helper):
         env["LOWPOLY_PHOTOGRAMMETRY"] = helper
@@ -122,14 +138,14 @@ def wait_ready(proc, port, timeout=180):
     end = time.time() + timeout
     while time.time() < end:
         if proc.poll() is not None:
-            raise RuntimeError(f"le moteur s'est arrêté au démarrage (journal : {os.path.join(HOME, 'logs', 'serveur.log')})")
+            raise RuntimeError(i18n.tr("boot.engine_stopped", log=os.path.join(HOME, "logs", "serveur.log")))
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=2) as r:
                 if r.status == 200:
                     return
         except OSError:
             time.sleep(0.3)
-    raise RuntimeError("le moteur ne répond pas")
+    raise RuntimeError(i18n.tr("boot.engine_no_answer"))
 
 
 def stop(proc):
@@ -148,6 +164,8 @@ def stop(proc):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # the app reads UTF-8 whatever the Windows code page
+    # the saved choice (prefs.json, written by the server) or the system's; in LOWPOLY_LANG for the server too
+    say("LANG", i18n.startup_language(os.path.join(HOME, "data")))
     port = int(sys.argv[sys.argv.index("--port") + 1])
     threading.Thread(target=watch_stdin, daemon=True).start()
     proc = None
@@ -156,7 +174,7 @@ def main():
         rt_dir, rt_python = runtime()
         python = venv(rt_dir, rt_python)
         core(python)
-        say("STEP", "Démarrage du moteur de calcul")
+        say("STEP", i18n.tr("boot.step_start_engine"))
         proc = serve(python, port)
         wait_ready(proc, port)
     except Exception as e:  # noqa: BLE001
