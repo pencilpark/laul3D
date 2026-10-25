@@ -29,7 +29,8 @@ LEVELS = ("lowpoly", "medium", "detailed")
 MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
             "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0, "filaments": 4,
-            "color_3mf": True, "color_obj": True, "color_texture": True}
+            "color_3mf": True, "color_obj": True, "color_texture": True,
+            "export_software": False, "export_game": False, "export_web": False}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 app = FastAPI()
@@ -83,7 +84,8 @@ def clean_settings(raw, base=None):
     s["smooth"] = num("smooth", 0, 3, int)
     s["filaments"] = num("filaments", 2, 8, int)
     s["rot_seq"] = canonical_rot(s["rot_seq"])
-    for key in ("keep_parts", "color_3mf", "color_obj", "color_texture"):
+    for key in ("keep_parts", "color_3mf", "color_obj", "color_texture", "export_software", "export_game",
+                "export_web"):
         s[key] = bool(s[key])
     if s["level"] not in LEVELS:
         s["level"] = "lowpoly"
@@ -193,7 +195,7 @@ def process(job, level, log):
     rel = lambda p: os.path.relpath(os.path.join(out, os.path.basename(p)), d).replace(os.sep, "/")
     report["stl"] = rel(report["stl"])
     report["previews"] = [rel(p) for p in report.get("previews", [])]
-    for key in ("colors", "filaments", "obj_colors", "texture"):
+    for key in ("colors", "filaments", "obj_colors", "texture", "export_software", "export_game", "export_web"):
         report[key] = rel(report[key]) if report.get(key) else None
     report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
     with LOCK:
@@ -404,7 +406,7 @@ def rerun(jid: str, body: dict = Body(...)):
     return snapshot
 
 
-EXPORT_KINDS = ("stl", "blend", "3mf", "obj", "zip")
+EXPORT_KINDS = ("stl", "blend", "3mf", "obj", "zip", "software", "game", "web")
 
 
 def result_path(jid, level, kind="stl"):
@@ -414,9 +416,10 @@ def result_path(jid, level, kind="stl"):
             raise HTTPException(404, "pas de résultat pour ce niveau")
         r = job["results"][level]
         rel = {"stl": r["stl"], "blend": r["stl"][:-4] + ".blend", "3mf": r.get("filaments"),
-               "obj": r.get("obj_colors"), "zip": r.get("texture")}[kind]
+               "obj": r.get("obj_colors"), "zip": r.get("texture"), "software": r.get("export_software"),
+               "game": r.get("export_game"), "web": r.get("export_web")}[kind]
     if not rel:
-        raise HTTPException(404, "pas de fichier couleur pour ce niveau : recalcule-le")
+        raise HTTPException(404, "ce fichier n'a pas été calculé pour ce niveau : coche-le et recalcule")
     path = os.path.join(job_dir(jid), *rel.split("/"))
     if not os.path.isfile(path):
         raise HTTPException(404, "fichier introuvable, régénère ce niveau")
