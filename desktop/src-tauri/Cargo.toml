@@ -1,6 +1,6 @@
 [package]
 name = "berria-craft"
-version = "0.1.0"
+version = "0.2.0"
 description = "Photos vers impression 3D"
 edition = "2021"
 
