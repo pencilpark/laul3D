@@ -325,7 +325,7 @@ def list_jobs():
 
 
 @app.post("/api/jobs")
-async def create_job(files: List[UploadFile] = File(...), name: str = Form("modele"),
+async def create_job(files: List[UploadFile] = File(...), name: str = Form("model"),
                      mode: str = Form("auto"), settings: str = Form("{}"), main_photo: Optional[str] = Form(None)):
     try:
         raw_settings = json.loads(settings or "{}")
@@ -357,7 +357,7 @@ async def create_job(files: List[UploadFile] = File(...), name: str = Form("mode
         shutil.rmtree(job_dir(jid), ignore_errors=True)
         raise HTTPException(400, i18n.tr("srv.no_image"))
     s = clean_settings(raw_settings)
-    job = {"id": jid, "name": name.strip() or "modele", "created": time.time(),
+    job = {"id": jid, "name": name.strip() or "model", "created": time.time(),
            "mode": mode if mode in MODES else "auto", "main_photo": chosen, "engine": None,
            "settings": s, "photos": [], "results": {}, "state": "queued", "step": i18n.tr("srv.step_waiting"),
            "error": None, "running_level": s["level"], "log": []}

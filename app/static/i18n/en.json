@@ -13,7 +13,7 @@
  "splash.starting": "Starting the computing engine…",
  "splash.tagline": "Photos to 3D print",
  "srv.ai_cached": "AI reconstruction of {name} already cached",
- "srv.ai_missing": "The \"Single photo (AI)\" module is not installed yet: click \"Single photo (AI): install\" at the top of the window.",
+ "srv.ai_missing": "The \"One photo (AI)\" module is not installed yet: click \"One photo (AI): install\" at the top of the window.",
  "srv.ai_run": "TripoSR AI on {name}",
  "srv.ai_run_first_download": "TripoSR AI on {name} (first run: downloading the weights from Hugging Face)",
  "srv.ai_setup_copy_config": "Copying the model configuration",
@@ -29,14 +29,14 @@
  "srv.ai_setup_installing_libs": "Installing the libraries",
  "srv.ai_setup_libs_failed": "could not install the libraries: {detail}",
  "srv.ai_setup_needs_apple_silicon": "it needs a Mac with Apple silicon (M1 or later)",
- "srv.ai_setup_needs_macos14": "it needs macOS 14 Sonoma or later, this Mac has macOS {version}",
+ "srv.ai_setup_needs_macos14": "it needs macOS 14 Sonoma or later, but this Mac has macOS {version}",
  "srv.ai_setup_needs_win64": "it needs a 64-bit Windows PC with an Intel or AMD processor",
  "srv.ai_setup_no_uv": "the uv installer was not found; reinstall Berria Craft",
  "srv.ai_setup_not_found": "the libraries are installed but the module still cannot be found; restart the app",
- "srv.ai_setup_start_failed": "the AI module does not start: {detail}",
+ "srv.ai_setup_start_failed": "the AI module won't start: {detail}",
  "srv.ai_setup_unsupported": "this module cannot run on this computer: {reason}",
  "srv.ai_setup_verifying": "Final check of the module, about one minute",
- "srv.already_running": "processing is already under way for this project",
+ "srv.already_running": "a computation is already running for this project",
  "srv.bad_settings": "unreadable settings",
  "srv.bl_attempt": "attempt {attempt}: target {target} triangles -> {topo}",
  "srv.bl_colors_bad_texture": "unreadable texture",
@@ -86,8 +86,8 @@
   "other": "smoothing {level}: volume blur over {mm} mm, {n} passes, {faces} faces, {s} s"
  },
  "srv.bl_stl_incomplete": "incomplete STL export: {written} triangles written out of {total}",
- "srv.bl_texture_done": "{size} px texture for color print services, {s} s",
- "srv.bl_texture_failed": "texture for print services unavailable: {error}",
+ "srv.bl_texture_done": "{size} px texture for color printing services, {s} s",
+ "srv.bl_texture_failed": "texture for printing services unavailable: {error}",
  "srv.bl_voxel_inconsistent": "inconsistent voxel result (size {size}, volume {volume} mm3), morphological closing",
  "srv.bl_watertight_closing": {
   "one": "watertight: morphological closing, {n} boundary edge filled, voxel {voxel} mm, {faces} faces",
@@ -98,7 +98,7 @@
   "other": "watertight: voxel, {n} boundary edges filled, voxel {voxel} mm, {faces} faces"
  },
  "srv.blender_failed": "Blender failed: {detail}",
- "srv.blender_missing": "Blender 5 or later was not found: click \"3D processing: install\" at the top of the window.",
+ "srv.blender_missing": "Blender 5 or later was not found: click \"3D computing: install\" at the top of the window.",
  "srv.blurry_dropped": {
   "one": "{n} blurry photo set aside: {names}",
   "other": "{n} blurry photos set aside: {names}"
@@ -110,7 +110,7 @@
  "srv.cli_help_faces": "target triangle count in LowPoly",
  "srv.cli_help_height": "final height in mm",
  "srv.cli_help_main_photo": "photo used by the AI",
- "srv.cli_help_output": "output folder (default: lowpoly3d inside the photos folder)",
+ "srv.cli_help_output": "output folder (default: lowpoly3d inside the photo folder)",
  "srv.cli_help_photos": "photo folder",
  "srv.cli_help_rotation": "quarter turns around the axes, in order, e.g. zx",
  "srv.cli_no_readable_photo": "no readable photo in this folder",
@@ -119,8 +119,8 @@
   "other": "{n} photos, engine: {engine}"
  },
  "srv.delete_locked": "A file from this project is open in another program (OrcaSlicer?): close it, then delete again.",
- "srv.delete_running": "Processing in progress: wait until it finishes to delete this project.",
- "srv.engine_missing": "{engine} is not installed: open the setup assistant or switch to AI mode.",
+ "srv.delete_running": "Computation in progress: wait until it finishes to delete this project.",
+ "srv.engine_missing": "{engine} is not installed: open the setup assistant or switch to \"One photo (AI)\".",
  "srv.error_line": "ERROR: {error}",
  "srv.exit_code": "code {code}",
  "srv.few_photos": {
@@ -129,12 +129,12 @@
  },
  "srv.file_missing": "file not found, generate this level again",
  "srv.host_refused": "host refused",
- "srv.interrupted": "interrupted (the app was closed during processing)",
+ "srv.interrupted": "interrupted (the app was closed during the computation)",
  "srv.no_engine": "No reconstruction engine is installed: open the setup assistant.",
  "srv.no_image": "no recognized image (JPG, HEIC, PNG, WEBP, TIFF)",
  "srv.no_readable_photo": "no readable photo",
  "srv.no_result": "no result for this level",
- "srv.not_computed": "this file was not generated for this level: tick it and run again",
+ "srv.not_computed": "this file was not computed for this level: check it and recompute",
  "srv.object_capture_run": {
   "one": "Object Capture: {n} photo, detail {detail}, sensitivity {sensitivity}",
   "other": "Object Capture: {n} photos, detail {detail}, sensitivity {sensitivity}"
@@ -143,13 +143,13 @@
  "srv.pg_attempt_failed": "failed (code {code})",
  "srv.pg_cached": "{detail} reconstruction already cached",
  "srv.pg_done": "reconstruction finished in {s} s",
- "srv.pg_failed": "Photogrammetry could not reconstruct the object. Add photos (50 or more, a full circle, about 70% overlap, two or three heights, a still subject, even light) or switch the engine to AI (a single photo).",
+ "srv.pg_failed": "Photogrammetry could not reconstruct the object. Add photos (50 or more, a full circle, about 70% overlap, two or three heights, a still subject, even light) or switch to \"One photo (AI)\".",
  "srv.pgw_advice": {
-  "one": "With {n} photo, aim for 50 or more: a full circle, about 70% overlap, two or three heights, a still subject, even light. Or switch the engine to AI (a single photo).",
-  "other": "With {n} photos, aim for 50 or more: a full circle, about 70% overlap, two or three heights, a still subject, even light. Or switch the engine to AI (a single photo)."
+  "one": "With {n} photo, aim for 50 or more: a full circle, about 70% overlap, two or three heights, a still subject, even light. Or switch to \"One photo (AI)\".",
+  "other": "With {n} photos, aim for 50 or more: a full circle, about 70% overlap, two or three heights, a still subject, even light. Or switch to \"One photo (AI)\"."
  },
- "srv.pgw_missing": "Photogrammetry is not installed yet: click \"Several photos: install\" at the top of the window, or switch the engine to AI (a single photo).",
- "srv.pgw_no_account": "Windows account not found, the work folder cannot be protected",
+ "srv.pgw_missing": "Photogrammetry is not installed yet: click \"Several photos: install\" at the top of the window, or switch to \"One photo (AI)\".",
+ "srv.pgw_no_account": "no Windows account found to protect the work folder",
  "srv.pgw_no_mesh": "Photogrammetry produced no mesh. {advice}",
  "srv.pgw_no_texture": "photo texture unavailable (code {code}): the model stays without colors",
  "srv.pgw_not_placed": "Photogrammetry could not place the photos. {advice}",
@@ -187,15 +187,15 @@
  "srv.setup_net_error": "cannot connect to the Internet; check the connection, then click \"Try again\"",
  "srv.setup_preparing": "Preparing",
  "srv.step_ai": "3D reconstruction (AI, single photo)",
- "srv.step_blender": "Preparing for print (Blender)",
+ "srv.step_blender": "Preparing for printing (Blender)",
  "srv.step_done": "Done",
  "srv.step_photogrammetry": "3D reconstruction (photogrammetry)",
  "srv.step_photos": "Analyzing photos",
  "srv.step_waiting": "Waiting",
  "srv.stl_ready": "STL ready: {path} ({dims} mm, {triangles} triangles)",
  "srv.too_few_for_photogrammetry": {
-  "one": "With {n} photo, you need the \"Single photo (AI)\" module, not installed yet: click \"Single photo (AI): install\" at the top of the window. Otherwise, add photos: at least {min}, and 50 or more for a faithful bust.",
-  "other": "With {n} photos, you need the \"Single photo (AI)\" module, not installed yet: click \"Single photo (AI): install\" at the top of the window. Otherwise, add photos: at least {min}, and 50 or more for a faithful bust."
+  "one": "With {n} photo, you need the \"One photo (AI)\" module, not installed yet: click \"One photo (AI): install\" at the top of the window. Otherwise, add photos: at least {min}, and 50 or more for a faithful bust.",
+  "other": "With {n} photos, you need the \"One photo (AI)\" module, not installed yet: click \"One photo (AI): install\" at the top of the window. Otherwise, add photos: at least {min}, and 50 or more for a faithful bust."
  },
  "srv.tools_done": "Tools installed",
  "srv.tools_download_corrupt": "the {name} download is incomplete or damaged; try again",
@@ -228,7 +228,7 @@
  "ui.ai_title": "Install the \"One photo (AI)\" module",
  "ui.ai_tool_row": "AI module (One photo), {size}",
  "ui.ai_unsupported_title": "The AI module cannot run on this computer: {reason}.",
- "ui.all_ready": "All ready",
+ "ui.all_ready": "Everything is ready",
  "ui.apply": "Recompute with these settings",
  "ui.base_error": "Between 0 and 20%.",
  "ui.base_label": "Flat base: {v}% of the height",
@@ -241,7 +241,7 @@
  "ui.create_model": "Create the 3D model",
  "ui.default_name": "bust",
  "ui.delete": "Delete",
- "ui.delete_busy": "Computing: you can delete it once it finishes",
+ "ui.delete_busy": "Computation in progress: you can delete it once it finishes",
  "ui.delete_project": "Delete the project",
  "ui.delete_project_named": "Delete the project {name}",
  "ui.delete_text": "\"{name}\": its photos, models and computation files will be erased from this computer. Files already saved in Downloads stay.",
@@ -250,7 +250,7 @@
  "ui.drop_title": "Drop your photos here",
  "ui.engine_unreachable": "Computing engine unreachable",
  "ui.exports_3d": "3D exports",
- "ui.exports_label": "3D exports for other uses",
+ "ui.exports_label": "3D exports beyond printing",
  "ui.faces_label": "Facets: {v} triangles",
  "ui.faces_label_adjust": "Facets (LowPoly): {v} triangles",
  "ui.fallback_name": "model",
@@ -326,7 +326,7 @@
   "other": "{n} photos"
  },
  "ui.n_triangles": "{v} triangles",
- "ui.n_triangles_stale": "{v} triangles · to recompute",
+ "ui.n_triangles_stale": "{v} triangles · needs recomputing",
  "ui.nav_help": "Drag: rotate · Wheel: zoom · Right-click: pan",
  "ui.new_model_title": "New 3D model",
  "ui.no_project_open": "No project open",
@@ -401,8 +401,8 @@
   "other": "{n} photos: the AI estimates the shape from the main photo (framed). The back is guessed."
  },
  "ui.route_ia_installing": {
-  "one": "{n} photo: the AI module is installing, you can create the model as soon as it finishes.",
-  "other": "{n} photos: the AI module is installing, you can create the model as soon as it finishes."
+  "one": "{n} photo: the AI module is installing; you can create the model as soon as it finishes.",
+  "other": "{n} photos: the AI module is installing; you can create the model as soon as it finishes."
  },
  "ui.route_ia_missing": {
   "one": "{n} photo: this needs the \"One photo (AI)\" module, not installed yet. Otherwise, add photos: at least 20, and 50 or more for a faithful bust.",
@@ -492,7 +492,7 @@
  "ui.tech_log": "Technical log",
  "ui.thumb_label": "{name}, main photo",
  "ui.tip_base": "Cuts the bottom of the model flat so it stands up on the bed. 3% suits a bust; 0 keeps the whole model.",
- "ui.tip_color": "The first two files need a printer with several spools; the Ender-3 V3 on its own has only one. Painted 3MF: each face gets a filament number, not a color; in OrcaSlicer, first set up as many filaments as the palette has, in this order and with these colors, then open it. File > Import adds the missing filaments, with colors to fix. Colored OBJ: OrcaSlicer (2.1 or newer) opens a window that adds these colors as filaments, give or take a few units; keep the .mtl next to the .obj. Textured OBJ: all the photo colors, for a color printing service (Sculpteo, i.materialise…). The colors come from the photos, shadows included.",
+ "ui.tip_color": "The first two files need a printer with several spools; the Ender-3 V3 on its own has only one. Painted 3MF: each face gets a filament number, not a color; in OrcaSlicer, first set up as many filaments as the palette has, in this order and with these colors, then open it. File > Import adds the missing filaments, but their colors need fixing. Colored OBJ: OrcaSlicer (2.1 or newer) opens a window that adds these colors as filaments, give or take a few units; keep the .mtl next to the .obj. Textured OBJ: all the photo colors, for a color printing service (Sculpteo, i.materialise…). The colors come from the photos, shadows included.",
  "ui.tip_color_files": "Computed on top of the STL when the photos provide colors. Only the checked files are computed; the texture of the textured OBJ adds a few seconds to a minute.",
  "ui.tip_export_box": "Real size in meters, Y up, base centered on the origin. 3D software: quads, 4096 textures, .blend, FBX and OBJ files; to animate a character, a manual retopology is still useful. Games: triangles in 3 levels of detail (100, 50 and 25%), 2048 textures, FBX and GLB. Web: a GLB of a few MB, plus a Draco-compressed version when this Blender produces one. Textures: the photo colors, shadows included, and a normal map for fine relief.",
  "ui.tip_exports": "The model cleaned up for uses other than printing, at its real size in meters, on top of the print files. One zip per checked profile. Each one makes the computation longer: about 15 s for Web or Games and over a minute for 3D software on a simple model, more on a detailed scan.",
@@ -520,7 +520,7 @@
  "ui.tool_print": "Printing",
  "ui.tool_row": "{label} ({role}), {size}",
  "ui.tools_bar_done": "Tools installed: everything is ready to create a model.",
- "ui.tools_bar_error": "Tools installation interrupted: {error}.",
+ "ui.tools_bar_error": "Tool installation interrupted: {error}.",
  "ui.tools_bar_progress": "Installing the tools: {step} ({done} of {total})",
  "ui.tools_bar_step": "Installing the tools: {step}",
  "ui.tools_intro": "Berria Craft relies on free software. Check the ones to install: they come from their official sites and stay on this computer.",
