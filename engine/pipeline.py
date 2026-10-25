@@ -372,6 +372,18 @@ def blender_prep(raw, out_dir, name, level, s, log):
         if not previews:
             log("Aperçus indisponibles : le modèle reste utilisable.")
     report["previews"] = previews or []
+    report.update(export_software=None, export_game=None, export_web=None, profiles={})
+    profiles = [k for k in ("software", "game", "web") if s.get("export_" + k)]
+    if profiles:
+        # a second Blender: a failed profile never costs the printable model
+        cmd = [c for c in cmd if c not in ("--previews", "--save-blend")] + ["--profiles-only", ",".join(profiles)]
+        code, lines = run(cmd, log)
+        done = next((json.loads(l[9:]) for l in lines if l.startswith("PROFILES ")), None) or {}
+        for k, v in done.items():
+            report["export_" + k] = v.pop("path")
+            report["profiles"][k] = v
+        if len(done) < len(profiles):
+            log("Certains exports 3D n'ont pas pu être produits : le modèle pour l'impression reste utilisable.")
     return report
 
 

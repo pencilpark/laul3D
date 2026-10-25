@@ -77,6 +77,29 @@ def check_color_files(summary):
     assert sorted(os.path.splitext(n)[1] for n in names) == [".mtl", ".obj", ".png"] and not any("/" in n for n in names), names
 
 
+def check_export_files(summary):
+    """The three profiles outside printing: one zip each, real size in meters with Y up in the GLB."""
+    expected = {"software": {".blend", ".fbx", ".obj", ".mtl", ".png"}, "game": {".glb", ".fbx", ".jpg", ".png"},
+                "web": {".glb"}}
+    for p, exts in expected.items():
+        assert summary.get("export_" + p), (p, summary.get("profiles"))
+        with zipfile.ZipFile(summary["export_" + p]) as z:
+            names = z.namelist()
+            assert {os.path.splitext(n)[1] for n in names} == exts and not any("/" in n for n in names), (p, names)
+            glb = next((n for n in names if n.endswith(("_web.glb", "_LOD0.glb"))), None)
+            if glb:
+                data = z.read(glb)
+                doc = json.loads(data[20:20 + int.from_bytes(data[12:16], "little")])
+                top = doc["accessors"][doc["meshes"][0]["primitives"][0]["attributes"]["POSITION"]]["max"][1]
+                assert abs(top - 0.06) < 0.003, (p, top)  # 60 mm tall, Y up, in meters
+    assert sum(n.endswith("_LOD1.glb") or n.endswith("_LOD2.glb")
+               for n in zipfile.ZipFile(summary["export_game"]).namelist()) == 2
+    assert summary["profiles"]["software"]["quads"], summary["profiles"]
+    # Draco depends on the library shipped with Blender: reported, not required
+    summary["draco"] = any(n.endswith("_draco.glb") for n in zipfile.ZipFile(summary["export_web"]).namelist())
+    print(f"profils d'export : {summary['profiles']}, Draco {'oui' if summary['draco'] else 'non'}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--photogrammetry", action="store_true")
@@ -95,12 +118,14 @@ def main():
         photos = os.path.join(base, "photos multi")
         shutil.copytree(FIXTURES, photos)
         pg = run_cli(photos, os.path.join(base, "sortie pg"),
-                     ["--niveau", "lowpoly", "--moteur", "photogrammetry", "--facettes", "500", "--hauteur", "60"])
+                     ["--niveau", "lowpoly", "--moteur", "photogrammetry", "--facettes", "500", "--hauteur", "60",
+                      "--exports", "software,game,web"])
         results["photogrammetry"] = pg
         # black: OpenMVS 2.4.0 seam leveling; grey: faces without photos. The fixture's cells average to about 0.12
         assert pg.get("colors"), "photogrammétrie sans aperçu en couleurs"
         assert pg["colors_stats"]["black"] < 0.3 and pg["colors_stats"]["saturation"] > 0.06, pg["colors_stats"]
         check_color_files(pg)
+        check_export_files(pg)
     if a.ia:
         photo = os.path.join(base, "photo unique")
         os.makedirs(photo)

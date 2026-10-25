@@ -24,6 +24,7 @@ def main(argv=None):
     ap.add_argument("--rotation", default="", help="quarts de tour autour des axes, dans l'ordre, ex. zx")
     ap.add_argument("--photo-principale", default=None, help="photo utilisée par l'IA")
     ap.add_argument("--sortie", default=None, help="dossier de sortie (défaut : <photos>/lowpoly3d)")
+    ap.add_argument("--exports", default="", help="profils hors impression, parmi software, game, web, ex. game,web")
     a = ap.parse_args(argv)
 
     photos_dir = os.path.abspath(a.photos)
@@ -49,14 +50,16 @@ def main(argv=None):
         else:
             raw, _ = pl.triposr(photos_dir, photos, a.photo_principale, work, log)
         settings = {"height_mm": a.hauteur, "base_cut": a.socle, "rot_seq": a.rotation, "nozzle": a.buse,
-                    "faces": a.facettes, "keep_parts": False}
+                    "faces": a.facettes, "keep_parts": False,
+                    **{"export_" + k: True for k in a.exports.split(",") if k in ("software", "game", "web")}}
         name = f"{pl.slug(os.path.basename(photos_dir))}_{a.niveau}_{int(round(a.hauteur))}mm"
         report = pl.blender_prep(raw, out_dir, name, a.niveau, settings, log)
     except pl.PipelineError as e:
         print(f"ERREUR : {e}", file=sys.stderr)
         return 1
     print(json.dumps({**{k: report[k] for k in ("stl", "dimensions_mm", "triangles", "printable", "volume_cm3")},
-                      **{k: report.get(k) for k in ("colors", "filaments", "obj_colors", "palette", "texture")}}, ensure_ascii=False))
+                      **{k: report.get(k) for k in ("colors", "filaments", "obj_colors", "palette", "texture", "export_software",
+                                                    "export_game", "export_web", "profiles")}}, ensure_ascii=False))
     return 0
 
 
