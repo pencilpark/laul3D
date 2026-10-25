@@ -41,6 +41,9 @@ jobs:
       - name: Project deletion (open file refused, queued job dropped)
         run: .venv\Scripts\python.exe tests\delete_project_test.py
 
+      - name: Colors reduced to filaments, multi-filament 3MF
+        run: .venv\Scripts\python.exe tests\couleurs_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:
@@ -111,5 +114,7 @@ jobs:
             ci-out/**/*.json
             ci-out/**/*.log
             ci-out/**/*.glb
+            ci-out/**/*.3mf
+            ci-out/**/*.zip
             ci-out/**/scan_*/*
           if-no-files-found: warn
