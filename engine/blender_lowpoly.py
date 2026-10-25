@@ -21,6 +21,7 @@ from mathutils.bvhtree import BVHTree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import couleurs  # noqa: E402
 import i18n  # noqa: E402
+import sysmem  # noqa: E402
 
 
 # LowPoly -> detailed: (default triangles, voxels along the largest side, smoothing passes)
@@ -34,6 +35,12 @@ LEVELS = {
 SMOOTH = {1: (2, 1), 2: (3, 1), 3: (4, 2)}
 # texture for the color print services, per level: the facets of LowPoly need less
 TEXTURE_SIZE = {"lowpoly": 2048, "medium": 4096, "detailed": 4096}
+# photos at Max resolution: the textured OBJ and the 3D software profile get the largest of these textures whose bake
+# fits in free memory. Per pixel, from Blender 5's bake code: two BakePixel arrays (72 B), the float result and mask,
+# Cycles' primitive, differential and output passes (about 52 B), the image
+HIRES_TEXTURES = (8192, 6144)
+BAKE_BYTES_PER_PIXEL = 150
+MEMORY_RESERVE = 1.5 * 2 ** 30
 # export profiles outside printing: (faces, quads, texture px, extra levels of detail as fractions of the faces).
 # software comes last: it empties the scene to save its .blend
 PROFILES = {
@@ -74,11 +81,22 @@ def parse_args():
                     "profiles (meters, Y up, base at the origin), no print files")
     ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
     ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
+    ap.add_argument("--photo-res", default="", help="resolution of the photos behind the scan: max enlarges the textures")
     return ap.parse_args(argv)
 
 
 def log(msg):
     print(f"[blender] {msg}", flush=True)
+
+
+def texture_size(a, size):
+    if a.photo_res != "max" or size < 4096:  # LowPoly's facets keep their 2048
+        return size
+    free = sysmem.free_memory()
+    fit = next((t for t in HIRES_TEXTURES if free is None or t * t * BAKE_BYTES_PER_PIXEL + MEMORY_RESERVE <= free), size)
+    if fit != HIRES_TEXTURES[0]:
+        log(i18n.tr("srv.bl_texture_memory", size=max(fit, size), gb=f"{free / 2 ** 30:.1f}"))
+    return max(fit, size)
 
 
 def clear_scene():
@@ -696,8 +714,8 @@ def profile_material(obj, images):
     return mat, bsdf, texs
 
 
-def export_profile(p, high, sources, colors, reach, workdir, name):
-    faces, quads, size, lods = PROFILES[p]
+def export_profile(p, high, sources, colors, reach, workdir, name, size):
+    faces, quads, _, lods = PROFILES[p]
     t1 = time.time()
     low = high.copy()
     low.data = high.data.copy()
@@ -821,7 +839,8 @@ def export_profiles(a, high, sources, placed, fit, turn, height):
         workdir = os.path.join(a.outdir, f"{a.name}_{p}")
         os.makedirs(workdir, exist_ok=True)
         try:
-            levels, quads, count = export_profile(p, high, sources, colors, reach, workdir, a.name)
+            size = texture_size(a, PROFILES[p][2]) if p == "software" else PROFILES[p][2]
+            levels, quads, count = export_profile(p, high, sources, colors, reach, workdir, a.name, size)
             files = write_profile_files(p, levels, workdir, a.name)
             path = os.path.join(a.outdir, f"{a.name}_{p}.zip")
             with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -995,10 +1014,10 @@ def main():
                 if "texture" in wanted:
                     try:
                         png = os.path.join(a.outdir, f"{a.name}_colors.png")
-                        t1 = time.time()
-                        bake_texture(work, sources, 0.03 * height, TEXTURE_SIZE[a.level], png)
+                        t1, size = time.time(), texture_size(a, TEXTURE_SIZE[a.level])
+                        bake_texture(work, sources, 0.03 * height, size, png)
                         report["texture"] = export_textured(work, a.outdir, a.name, png)
-                        log(i18n.tr("srv.bl_texture_done", size=TEXTURE_SIZE[a.level], s=f"{time.time() - t1:.1f}"))
+                        log(i18n.tr("srv.bl_texture_done", size=size, s=f"{time.time() - t1:.1f}"))
                     except (RuntimeError, OSError) as e:
                         log(i18n.tr("srv.bl_texture_failed", error=e))
     for o in list(bpy.data.objects):
