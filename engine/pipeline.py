@@ -1,6 +1,7 @@
 """Photos -> raw mesh (Object Capture / COLMAP+OpenMVS / TripoSR) -> printable STL (headless Blender)."""
 import glob
 import importlib.util
+import io
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import time
 import unicodedata
+import zipfile
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -30,8 +32,12 @@ DATA = os.environ.get("LOWPOLY_DATA", os.path.join(ROOT, "data"))
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".tif", ".tiff", ".bmp"}
 OBJECT_CAPTURE_EXT = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
 MIN_PHOTOGRAMMETRY = 20
-# LowPoly -> detailed: Object Capture detail used to feed each level
-PG_DETAIL = {"lowpoly": "preview", "medium": "medium", "detailed": "full"}
+# photo resolution fed to the scan; auto follows the level, as before this choice existed
+PHOTO_RES = ("auto", "low", "mid", "high", "max")
+AUTO_RES = {"lowpoly": "low", "medium": "mid", "detailed": "high"}
+# Object Capture detail per resolution: raw is built from the photos' full resolution (up to 30M triangles)
+PG_DETAIL = {"low": "preview", "mid": "medium", "high": "full", "max": "raw"}
+DETAIL_RES = {v: k for k, v in PG_DETAIL.items()}
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if IS_WIN else 0
 
 
@@ -243,42 +249,60 @@ def stage_photos(photo_dir, photos, dest, allowed_ext):
             ImageOps.exif_transpose(im).convert("RGB").save(os.path.join(dest, name), quality=95)
 
 
-def object_capture(photo_dir, photos, work_dir, level, log):
-    detail = PG_DETAIL[level]
-    out = os.path.join(work_dir, f"scan_{detail}.usdz")
+def photo_res(level, res):
+    return res if res in PG_DETAIL else AUTO_RES[level]
+
+
+def object_capture(photo_dir, photos, work_dir, res, log):
+    """Max asks for raw, then full when this Mac could not build raw: macOS gives no way to know beforehand. After a
+    raw that failed beside a full that worked, this project goes straight to full (scan_raw.failed)."""
+    details = [PG_DETAIL[res]]
+    raw_failed = os.path.join(work_dir, "scan_raw.failed")
+    if res == "max":
+        details = ["raw", "full"]
+        if os.path.exists(raw_failed) and not os.path.exists(os.path.join(work_dir, "scan_raw.usdz")):
+            log(i18n.tr("srv.pg_raw_skipped"))
+            details = ["full"]
+    used = lambda detail: {"res": DETAIL_RES[detail], "detail": detail}  # noqa: E731
+    out = os.path.join(work_dir, f"scan_{details[0]}.usdz")
     if os.path.exists(out):
-        log(i18n.tr("srv.pg_cached", detail=detail))
-        return out
+        log(i18n.tr("srv.pg_cached", detail=details[0]))
+        return out, used(details[0])
     keep, dropped = select_sharp(photos)
     if dropped:
         log(i18n.tr("srv.blurry_dropped", n=len(dropped), names=", ".join(dropped)))
     src = os.path.join(work_dir, "pg_input")
     stage_photos(photo_dir, keep, src, OBJECT_CAPTURE_EXT)
-    tmp = os.path.join(work_dir, f"scan_{detail}.partial.usdz")
     for sensitivity in ("normal", "high"):
-        log(i18n.tr("srv.object_capture_run", n=len(keep), detail=detail, sensitivity=sensitivity))
-        t0 = time.time()
-        if os.path.exists(tmp):
-            os.remove(tmp)
-        code, _ = run([object_capture_path(), src, tmp, "-d", detail, "-f", sensitivity], log)
-        if code == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 0:
-            os.replace(tmp, out)
-            log(i18n.tr("srv.pg_done", s=f"{time.time() - t0:.0f}"))
-            return out
-        log(i18n.tr("srv.pg_attempt_failed", code=code))
-    if os.path.exists(tmp):
-        os.remove(tmp)
+        for detail in details:
+            tmp, out = (os.path.join(work_dir, f"scan_{detail}{x}.usdz") for x in (".partial", ""))
+            log(i18n.tr("srv.object_capture_run", n=len(keep), detail=detail, sensitivity=sensitivity))
+            t0 = time.time()
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            code, _ = run([object_capture_path(), src, tmp, "-d", detail, "-f", sensitivity], log)
+            if code == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 0:
+                os.replace(tmp, out)
+                log(i18n.tr("srv.pg_done", s=f"{time.time() - t0:.0f}"))
+                if detail != details[0]:
+                    log(i18n.tr("srv.pg_raw_fallback"))
+                    open(raw_failed, "w").close()
+                return out, used(detail)
+            log(i18n.tr("srv.pg_attempt_failed", code=code))
+            if os.path.exists(tmp):
+                os.remove(tmp)
     raise PipelineError(i18n.tr("srv.pg_failed"))
 
 
-def photogrammetry(photo_dir, photos, work_dir, level, log):
+def photogrammetry(photo_dir, photos, work_dir, res, log):
+    """The scan for resolution res (low, mid, high, max) and what it used: (path, {"res", "detail" or "px"})."""
     if IS_MAC:
-        return object_capture(photo_dir, photos, work_dir, level, log)
+        return object_capture(photo_dir, photos, work_dir, res, log)
     import photogrammetry_win
     keep, dropped = select_sharp(photos)
     if dropped:
         log(i18n.tr("srv.blurry_dropped", n=len(dropped), names=", ".join(dropped)))
-    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, PipelineError)
+    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, res, log, run, PipelineError)
 
 
 def prepare_main_image(photo_dir, name, work_dir):
@@ -321,7 +345,7 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
     return out, name
 
 
-def blender_prep(raw, out_dir, name, level, s, log):
+def blender_prep(raw, out_dir, name, level, s, log, res=None):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
         raise PipelineError(i18n.tr("srv.blender_missing"))
@@ -336,6 +360,8 @@ def blender_prep(raw, out_dir, name, level, s, log):
                   "--color-files", ",".join(k for k in ("3mf", "obj", "texture") if s.get("color_" + k, True)) or "-"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
+    if res:
+        cmd += ["--photo-res", res]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
     try:  # photogrammetry_win: the scan stays in COLMAP's frame, this rotation stands it up
@@ -400,6 +426,39 @@ def free_download_path(stem, ext):
 def export_copy(path):
     dest = free_download_path(*os.path.splitext(os.path.basename(path)))
     shutil.copy2(path, dest)
+    return dest
+
+
+def export_scan(path, stem):
+    """The photogrammetry scan as it came out, for Blender: the .usdz of Object Capture, or OpenMVS's OBJ with its MTL
+    and textures in a zip, stood up (the rotation of the printable model) and Y up as OBJ readers expect."""
+    if not path.endswith(".obj"):
+        dest = free_download_path(stem, os.path.splitext(path)[1])
+        shutil.copy2(path, dest)
+        return dest
+    try:
+        with open(path + ".orient.json", encoding="utf-8") as f:
+            m = np.array(json.load(f).get("matrix") or np.eye(3))
+    except (OSError, ValueError):
+        m = np.eye(3)
+    m = (np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]]) @ m).tolist()  # Blender's Z up to OBJ's Y up
+    folder, dest = os.path.dirname(path), free_download_path(stem, ".zip")
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
+        for f in sorted(os.listdir(folder)):
+            if f.endswith((".log", ".json")):
+                continue
+            if f.endswith(".obj"):
+                with open(os.path.join(folder, f), encoding="utf-8", errors="replace") as src, \
+                        io.TextIOWrapper(z.open(f, "w", force_zip64=True), encoding="utf-8", newline="\n") as out:
+                    for line in src:
+                        if line.startswith(("v ", "vn ")):
+                            tag, *v = line.split()
+                            p = [float(c) for c in v[:3]]
+                            turned = (f"{r[0] * p[0] + r[1] * p[1] + r[2] * p[2]:.6g}" for r in m)
+                            line = " ".join([tag, *turned, *v[3:]]) + "\n"
+                        out.write(line)
+            else:
+                z.write(os.path.join(folder, f), f)
     return dest
 
 

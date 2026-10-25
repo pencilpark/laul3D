@@ -6,9 +6,9 @@ Application de bureau pour Mac et Windows : on glisse des photos et on récupèr
 
 Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt), où GitHub remplace l'espace du nom par un point (`Berria.Craft_…`).
 
-Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.5.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.5.1_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
 
-Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.5.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
+Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.5.1_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
 Au premier lancement, l'app prépare son environnement de calcul (une minute au plus), puis propose dans une fenêtre les outils qui manquent : Blender (obligatoire), OrcaSlicer, et sous Windows la photogrammétrie COLMAP + OpenMVS. Le module « Une photo (IA) » s'installe à part, depuis l'en-tête. Sous Windows, COLMAP, OpenMVS et l'IA demandent les composants Microsoft Visual C++ : Windows demande alors une autorisation.
 
@@ -16,7 +16,7 @@ Au premier lancement, l'app prépare son environnement de calcul (une minute au 
 
 Plusieurs photos (20 et plus, 50 pour un buste fidèle) : la forme vient des photos, rien n'est inventé.
 - Mac : Apple Object Capture, via l'outil `HelloPhotogrammetry` fourni avec l'app.
-- Windows : COLMAP 4.2.1 place les photos, OpenMVS 2.4.0 construit le maillage et sa texture, sur le processeur. Le nivellement des coutures de TextureMesh est désactivé : en 2.4.0, il noircit les textures (issue OpenMVS #1257). COLMAP extrait les points d'autant de photos à la fois que la mémoire libre le permet (environ 0,8, 1,2 et 3,1 Go par photo en LowPoly, Moyen et Détaillé), au lieu d'une par cœur, pour que le Détaillé ne fasse pas paginer Windows sur 8 Go ; les points trouvés restent les mêmes. COLMAP et OpenMVS tournent en priorité basse. COLMAP travaillant dans un repère arbitraire, l'app redresse le modèle d'après les photos : leur « haut » moyen donne la verticale, la première photo donne la face.
+- Windows : COLMAP 4.2.1 place les photos, OpenMVS 2.4.0 construit le maillage et sa texture, sur le processeur. Le nivellement des coutures de TextureMesh est désactivé : en 2.4.0, il noircit les textures (issue OpenMVS #1257). COLMAP extrait les points d'autant de photos à la fois que la mémoire libre le permet (environ 0,8, 1,2 et 3,1 Go par photo en résolution Basse, Moyenne et Haute), au lieu d'une par cœur, pour que la résolution Haute ne fasse pas paginer Windows sur 8 Go ; les points trouvés restent les mêmes. COLMAP et OpenMVS tournent en priorité basse. COLMAP travaillant dans un repère arbitraire, l'app redresse le modèle d'après les photos : leur « haut » moyen donne la verticale, la première photo donne la face.
 
 Une photo : l'IA TripoSR (Stability AI et Tripo, licence MIT) estime la forme et les couleurs à partir de la photo principale, détourée par rembg. L'arrière est deviné. Module facultatif d'environ 2,2 Go (4 à 4,7 Go sur un PC avec carte NVIDIA, où torch est pris en version CUDA).
 
@@ -36,6 +36,25 @@ Chaque projet s'affine en trois niveaux. Les reconstructions déjà faites reste
 | Détaillé | `-d full` | jusqu'à 300 000 | taille / 650 | qualité maximale, plus long |
 
 Le voxel est borné entre 0,2 et 0,5 mm. Méthode conseillée : lancer en LowPoly, redresser si besoin avec les quarts de tour, puis générer Moyen ou Détaillé.
+
+### Résolution des photos
+
+Le réglage « Résolution des photos », sous le niveau de détail et dans « Ajuster ce modèle », choisit la taille des photos que la photogrammétrie utilise, indépendamment du niveau. Auto, par défaut, garde le comportement d'avant : Basse pour LowPoly, Moyenne pour Moyen, Haute pour Détaillé. Basse, Moyenne, Haute ou Max s'appliquent à tous les niveaux, qui partagent alors le même scan. Sans effet sur « Une photo (IA) ».
+
+| Résolution | Mac : Object Capture | Windows : COLMAP, puis OpenMVS | Texture du scan (Windows) |
+|---|---|---|---|
+| Basse | `-d preview` | photos réduites à 1600 px, cartes de profondeur à 800 px | 4096 |
+| Moyenne | `-d medium` | 2000 px, puis 1000 px | 4096 |
+| Haute | `-d full` | 3200 px, puis 1600 px | 4096 |
+| Max | `-d raw` | pleine taille des photos, ajustée à la mémoire libre | 8192 |
+
+Max :
+- Mac : le détail `raw` d'Object Capture, que la documentation d'Apple décrit comme produit « at the highest resolution possible from the source images » (jusqu'à 30 millions de triangles et 16 textures 8192). macOS ne dit pas à l'avance si la mémoire suffit : si `raw` échoue, l'app refait le scan en `full` (Haute) et le journal le dit ; le projet ne retente plus `raw` ensuite (fichier `scan_raw.failed` dans son dossier de travail).
+- Windows : COLMAP et OpenMVS travaillent sur les photos entières (niveau de résolution 0 d'OpenMVS), texture du scan jusqu'à 8192. Avant le calcul, l'app estime la mémoire de chaque étape pour la taille et le nombre des photos (voir `MEMORY_MODEL` dans `engine/photogrammetry_win.py`) et réduit la taille par pas de 10 % jusqu'à tenir dans la mémoire libre, moins 1,5 Go laissés à Windows. Si la taille retenue ne dépasse pas celle de Haute, le scan se fait en Haute. Le journal donne la taille retenue et la mémoire libre ; les détails techniques du modèle aussi.
+- Blender : la texture de l'OBJ texturé et celles du profil Logiciels 3D passent de 4096 à 8192, ou à 6144 si la mémoire libre ne suffit pas à cuire 8192 (environ 150 octets par pixel d'après le code de cuisson de Blender 5, soit 10 Go pour 8192) ; LowPoly garde 2048.
+- Le STL imprimable reste plafonné par le niveau (300 000 triangles et voxel d'au moins 0,2 mm en Détaillé) : Max affine d'abord le scan, les couleurs et les textures. Le calcul est nettement plus long.
+
+« Enregistrer le scan brut », dans Autres enregistrements, copie dans Téléchargements le maillage de la photogrammétrie tel qu'il est sorti, avant nettoyage, pour Blender : le `.usdz` d'Object Capture sur Mac, l'OBJ texturé d'OpenMVS zippé avec son MTL et ses textures sous Windows, redressé comme le modèle imprimable et Y vers le haut.
 
 Lissage (aucun, léger, moyen, fort) : flou du volume du modèle sur 2 à 4 voxels (environ 0,4 à 0,8 mm pour un buste de 80 mm). Il efface le grain et les petites bosses ; au réglage fort, les détails fins du visage s'adoucissent aussi.
 
@@ -123,8 +142,8 @@ B=/Applications/Blender.app/Contents/MacOS/Blender
 $B -b --factory-startup --python-exit-code 1 -P engine/blender_lowpoly.py -- \
   --input scan.usdz --outdir sortie --name buste --level lowpoly --height-mm 80 --previews --colors --smooth 1
 # mêmes options et --profiles-only software,game,web : les profils d'export seuls
-.venv/bin/python engine/cli.py photos/ --niveau medium --exports game,web
+.venv/bin/python engine/cli.py photos/ --niveau medium --resolution max --exports game,web
 .venv/bin/python engine/triposr_infer.py photo.jpg sortie/brut.obj
 ```
 
-Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/couleurs_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py`.
+Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/couleurs_test.py`, `tests/photo_res_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py` (`--max` : un calcul complet en résolution Max).

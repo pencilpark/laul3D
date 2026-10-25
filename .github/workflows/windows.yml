@@ -47,6 +47,9 @@ jobs:
       - name: Translations, seven languages in agreement with the code
         run: .venv\Scripts\python.exe tests\i18n_test.py
 
+      - name: Photo resolution, Max on Object Capture, raw scan export
+        run: .venv\Scripts\python.exe tests\photo_res_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:
@@ -120,4 +123,76 @@ jobs:
             ci-out/**/*.3mf
             ci-out/**/*.zip
             ci-out/**/scan_*/*
+          if-no-files-found: warn
+
+  # Max resolution end to end, beside engine-smoke: the photos' full size through COLMAP, OpenMVS and Blender
+  photogrammetry-max:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PYTHONUTF8: "1"
+      BLENDER_VERSION: "5.2.3"
+      UV_VERSION: "0.13.5"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$env:UV_VERSION/uv-x86_64-pc-windows-msvc.zip" -OutFile uv.zip
+          Expand-Archive uv.zip -DestinationPath "$env:RUNNER_TEMP\uv"
+          "$env:RUNNER_TEMP\uv" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Python 3.11 environment
+        run: |
+          uv python install 3.11
+          uv venv .venv --python 3.11
+          uv pip install --python .venv\Scripts\python.exe -r requirements-core.txt
+
+      - name: Cache Blender
+        uses: actions/cache@v4
+        with:
+          path: tools\blender
+          key: blender-${{ env.BLENDER_VERSION }}-windows-x64
+
+      - name: Blender portable (SHA-256 checked)
+        run: |
+          if (-not (Test-Path tools\blender\blender.exe)) {
+            $name = "blender-$env:BLENDER_VERSION-windows-x64"
+            Invoke-WebRequest "https://download.blender.org/release/Blender5.2/$name.zip" -OutFile blender.zip
+            $sums = (Invoke-WebRequest "https://download.blender.org/release/Blender5.2/blender-$env:BLENDER_VERSION.sha256").Content
+            $line = ($sums -split "`n") | Where-Object { $_ -match [regex]::Escape("$name.zip") } | Select-Object -First 1
+            $expected = ($line.Trim() -split '\s+')[0]
+            $actual = (Get-FileHash blender.zip -Algorithm SHA256).Hash.ToLower()
+            if ($expected -ne $actual) { throw "SHA-256 Blender incorrect : $actual au lieu de $expected" }
+            New-Item -ItemType Directory -Force tools | Out-Null
+            Expand-Archive blender.zip -DestinationPath tools
+            Move-Item "tools\$name" tools\blender
+            Remove-Item blender.zip
+          }
+          tools\blender\blender.exe --version
+
+      - name: Tools installer real run (COLMAP + OpenMVS, accented path)
+        env:
+          LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
+        run: .venv\Scripts\python.exe tests\setup_tools_test.py --real photogrammetry
+
+      - name: Smoke test photogrammetry at Max resolution on CPU (accented path)
+        env:
+          LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
+          LOWPOLY_BLENDER: ${{ github.workspace }}\tools\blender\blender.exe
+        run: .venv\Scripts\python.exe tests\smoke_test.py --max --root ci-out --out smoke-max.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-max
+          path: |
+            smoke-*.json
+            ci-out/**/*.log
+            ci-out/**/*.json
+            ci-out/**/*.png
+            ci-out/**/scan_*/*.log
           if-no-files-found: warn
