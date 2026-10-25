@@ -4,11 +4,11 @@ Application de bureau pour Mac et Windows : on glisse des photos et on récupèr
 
 ## Installer
 
-Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt).
+Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt), où GitHub remplace l'espace du nom par un point (`Berria.Craft_…`).
 
-Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.2.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.3.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
 
-Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.2.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
+Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.3.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
 Au premier lancement, l'app prépare son environnement de calcul (une minute au plus), puis propose dans une fenêtre les outils qui manquent : Blender (obligatoire), OrcaSlicer, et sous Windows la photogrammétrie COLMAP + OpenMVS. Le module « Une photo (IA) » s'installe à part, depuis l'en-tête. Sous Windows, COLMAP, OpenMVS et l'IA demandent les composants Microsoft Visual C++ : Windows demande alors une autorisation.
 
@@ -16,7 +16,7 @@ Au premier lancement, l'app prépare son environnement de calcul (une minute au 
 
 Plusieurs photos (20 et plus, 50 pour un buste fidèle) : la forme vient des photos, rien n'est inventé.
 - Mac : Apple Object Capture, via l'outil `HelloPhotogrammetry` fourni avec l'app.
-- Windows : COLMAP 4.2.1 place les photos, OpenMVS 2.4.0 construit le maillage et sa texture, sur le processeur. Le nivellement des coutures de TextureMesh est désactivé : en 2.4.0, il noircit les textures (issue OpenMVS #1257). COLMAP travaillant dans un repère arbitraire, l'app redresse le modèle d'après les photos : leur « haut » moyen donne la verticale, la première photo donne la face.
+- Windows : COLMAP 4.2.1 place les photos, OpenMVS 2.4.0 construit le maillage et sa texture, sur le processeur. Le nivellement des coutures de TextureMesh est désactivé : en 2.4.0, il noircit les textures (issue OpenMVS #1257). COLMAP extrait les points d'autant de photos à la fois que la mémoire libre le permet (environ 0,8, 1,2 et 3,1 Go par photo en LowPoly, Moyen et Détaillé), au lieu d'une par cœur, pour que le Détaillé ne fasse pas paginer Windows sur 8 Go ; les points trouvés restent les mêmes. COLMAP et OpenMVS tournent en priorité basse. COLMAP travaillant dans un repère arbitraire, l'app redresse le modèle d'après les photos : leur « haut » moyen donne la verticale, la première photo donne la face.
 
 Une photo : l'IA TripoSR (Stability AI et Tripo, licence MIT) estime la forme et les couleurs à partir de la photo principale, détourée par rembg. L'arrière est deviné. Module facultatif d'environ 2,2 Go (4 à 4,7 Go sur un PC avec carte NVIDIA, où torch est pris en version CUDA).
 
