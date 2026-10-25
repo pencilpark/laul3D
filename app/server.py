@@ -31,7 +31,7 @@ MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
             "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0, "filaments": 4,
             "color_3mf": True, "color_obj": True, "color_texture": True,
-            "export_software": False, "export_game": False, "export_web": False}
+            "export_software": False, "export_game": False, "export_web": False, "photo_res": "auto"}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 i18n.startup_language(pl.DATA)
@@ -91,6 +91,8 @@ def clean_settings(raw, base=None):
         s[key] = bool(s[key])
     if s["level"] not in LEVELS:
         s["level"] = "lowpoly"
+    if s["photo_res"] not in pl.PHOTO_RES:
+        s["photo_res"] = "auto"
     return s
 
 
@@ -173,10 +175,13 @@ def process(job, level, log):
         log(i18n.tr("srv.few_photos", n=n_ok))
     safe_save(job, log)
 
-    main_photo = None
+    with LOCK:
+        s = dict(job["settings"])
+    main_photo, scan = None, None
     if engine == "photogrammetry":
         set_step(job, i18n.tr("srv.step_photogrammetry"))
-        raw = pl.photogrammetry(os.path.join(d, "photos"), job["photos"], work, level, log)
+        raw, scan = pl.photogrammetry(os.path.join(d, "photos"), job["photos"], work,
+                                      pl.photo_res(level, s["photo_res"]), log)
     else:
         set_step(job, i18n.tr("srv.step_ai"))
         raw, main_photo = pl.triposr(os.path.join(d, "photos"), job["photos"], job.get("main_photo"), work, log)
@@ -184,13 +189,11 @@ def process(job, level, log):
             job["main_photo"] = main_photo
 
     set_step(job, i18n.tr("srv.step_blender"))
-    with LOCK:
-        s = dict(job["settings"])
     version = int(time.time() * 1000)
     name = f"{slug(job['name'])}_{level}_{int(round(s['height_mm']))}mm"
     out = os.path.join(d, "export", level, str(version))
     try:
-        report = pl.blender_prep(raw, out, name, level, s, log)
+        report = pl.blender_prep(raw, out, name, level, s, log, scan and scan["res"])
     except Exception:
         shutil.rmtree(out, ignore_errors=True)
         raise
@@ -199,7 +202,9 @@ def process(job, level, log):
     report["previews"] = [rel(p) for p in report.get("previews", [])]
     for key in ("colors", "filaments", "obj_colors", "texture", "export_software", "export_game", "export_web"):
         report[key] = rel(report[key]) if report.get(key) else None
-    report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
+    if scan:
+        scan["path"] = os.path.relpath(raw, d).replace(os.sep, "/")
+    report.update(settings=s, engine=engine, main_photo=main_photo, version=version, scan=scan)
     with LOCK:
         job["results"][level] = report
         job.update(state="done", step=i18n.tr("srv.step_done"), running_level=None)
@@ -422,7 +427,7 @@ def rerun(jid: str, body: dict = Body(...)):
     return snapshot
 
 
-EXPORT_KINDS = ("stl", "blend", "3mf", "obj", "zip", "software", "game", "web")
+EXPORT_KINDS = ("stl", "blend", "3mf", "obj", "zip", "software", "game", "web", "scan")
 
 
 def result_path(jid, level, kind="stl"):
@@ -433,7 +438,8 @@ def result_path(jid, level, kind="stl"):
         r = job["results"][level]
         rel = {"stl": r["stl"], "blend": r["stl"][:-4] + ".blend", "3mf": r.get("filaments"),
                "obj": r.get("obj_colors"), "zip": r.get("texture"), "software": r.get("export_software"),
-               "game": r.get("export_game"), "web": r.get("export_web")}[kind]
+               "game": r.get("export_game"), "web": r.get("export_web"),
+               "scan": (r.get("scan") or {}).get("path")}[kind]
     if not rel:
         raise HTTPException(404, i18n.tr("srv.not_computed"))
     path = os.path.join(job_dir(jid), *rel.split("/"))
@@ -461,7 +467,13 @@ def reveal(jid: str, body: dict = Body(...)):
 def export(jid: str, body: dict = Body(...)):
     kind = body.get("kind") if body.get("kind") in EXPORT_KINDS else "stl"
     path = result_path(jid, body.get("level"), kind)
-    dest = pl.export_obj(path) if kind == "obj" else pl.export_copy(path)
+    if kind == "scan":
+        with LOCK:
+            job = JOBS[jid]
+            stem = f"{slug(job['name'])}_scan_{job['results'][body['level']]['scan']['res']}"
+        dest = pl.export_scan(path, stem)
+    else:
+        dest = pl.export_obj(path) if kind == "obj" else pl.export_copy(path)
     pl.reveal(dest)
     return {"path": dest}
 
