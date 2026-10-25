@@ -442,8 +442,7 @@ def reveal(jid: str, body: dict = Body(...)):
 def export(jid: str, body: dict = Body(...)):
     kind = body.get("kind") if body.get("kind") in EXPORT_KINDS else "stl"
     path = result_path(jid, body.get("level"), kind)
-    # the colored OBJ needs its MTL beside it: one zip keeps them together in Téléchargements
-    dest = pl.export_zip([path, path[:-4] + ".mtl"]) if kind == "obj" else pl.export_copy(path)
+    dest = pl.export_obj(path) if kind == "obj" else pl.export_copy(path)
     pl.reveal(dest)
     return {"path": dest}
 

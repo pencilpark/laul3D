@@ -169,13 +169,15 @@ def write_3mf(path, vertices, triangles, labels, palette):
 
 
 def write_obj(path, vertices, triangles, labels, palette):
-    """OBJ + MTL beside it, in mm with Z up like the STL, one material per filament: OrcaSlicer takes the color of a
-    face as Ka + Kd, so Ka is 0, and offers these colors as filaments. Faces keep their shared vertices."""
+    """OBJ + MTL beside it, in mm with Z up like the STL, one material per filament, faces grouped by material and
+    sharing their vertices: OrcaSlicer (2.1 or later) offers these colors as filaments. It takes Ka + Kd as the color,
+    so Ka is 0, and truncates to 8 bits, so each channel is written half a step up."""
     import os
     mtl = os.path.splitext(path)[0] + ".mtl"
+    channel = lambda v: "1" if v >= 255 else f"{(v + 0.5) / 255:.6f}"
     with open(mtl, "w", encoding="utf-8", newline="\n") as f:
-        for i, (r, g, b) in enumerate(palette):
-            f.write(f"newmtl filament_{i + 1}\nKa 0 0 0\nKd {r / 255:.6f} {g / 255:.6f} {b / 255:.6f}\n\n")
+        for i, c in enumerate(palette):
+            f.write(f"newmtl filament_{i + 1}\nKa 0 0 0\nKd {' '.join(channel(v) for v in c)}\n\n")
     labels, tris = np.asarray(labels), np.asarray(triangles) + 1
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(f"mtllib {os.path.basename(mtl)}\n")

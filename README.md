@@ -51,7 +51,7 @@ Rendu : la visionneuse s'ouvre en mode Rendu quand le modèle a des couleurs, ce
 4. Lissage éventuel (nœuds SDF d'OpenVDB), puis décimation au nombre de triangles du niveau. Si des auto-intersections apparaissent, la cible remonte de 40 % et l'app relance, jusqu'à 3 fois.
 5. Socle plat : coupe du bas (3 % par défaut) et fermeture de la section.
 6. Contrôles : arêtes non-manifold, auto-intersections, coques, parois plus fines que 2 × la buse, surplombs à plus de 45°, volume.
-7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu, en 3MF multi-filaments et en OBJ texturé (voir « Imprimer en couleur »).
+7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu, et, selon les cases cochées, en 3MF peint, OBJ en couleurs et OBJ texturé (voir « Imprimer en couleur »).
 8. Export STL en mm, vérifié en relisant le nombre de triangles écrit, plus un `.blend` et 4 aperçus PNG.
 
 ## Bien photographier
@@ -67,9 +67,13 @@ Bouton « Préparer l'impression dans OrcaSlicer », puis :
 
 ## Imprimer en couleur
 
-Quand le modèle a des couleurs, le bloc « Impression en couleur » propose deux fichiers en plus du STL :
-- 3MF multi-filaments, pour une imprimante à plusieurs bobines (l'Ender-3 V3 seule n'en a qu'une). Les couleurs des photos sont regroupées en 4 teintes par défaut, de 2 à 8 avec le réglage « Filaments pour l'impression en couleur », et chaque face reçoit l'une d'elles. Un îlot de couleur plus petit que (4 × buse)², environ 2,6 mm² avec une buse de 0,4, prend la couleur voisine la plus proche ; deux teintes trop proches (écart Lab inférieur à 12) ne prennent pas deux bobines. La palette s'affiche avec le numéro et le code de chaque couleur. Le 3MF peint chaque face d'un numéro de filament (attribut `paint_color` d'OrcaSlicer et Bambu Studio) mais ne transmet pas les couleurs : dans OrcaSlicer, régler d'abord autant de filaments que la palette, dans le même ordre et aux mêmes couleurs, puis ouvrir le fichier. Ouvert avec moins de filaments, les faces des numéros manquants s'affichent au filament 1 et leur peinture se perd quand on ajoute des filaments ensuite. Fichier > Importer ajoute lui-même les filaments manquants, avec des couleurs à corriger.
-- OBJ texturé zippé (OBJ, MTL et PNG, en mm, Z en haut comme le STL), pour un service d'impression en couleurs réelles (Sculpteo, i.materialise…). La texture fait 2 048 px en LowPoly et 4 096 px en Moyen et Détaillé ; elle ajoute de quelques secondes à une minute au calcul.
+Dans Réglages avancés, et dans « Recalculer avec ces réglages » pour un modèle déjà calculé, trois cases choisissent les fichiers couleur calculés en plus du STL. Elles sont cochées par défaut ; décochées, le calcul et les fichiers restent ceux d'avant (STL, `.blend`, aperçu en couleur). Les fichiers n'existent que si les photos donnent des couleurs exploitables.
+
+- 3MF peint, pour une imprimante à plusieurs bobines (l'Ender-3 V3 seule n'en a qu'une). Chaque face porte un numéro de filament (attribut `paint_color` d'OrcaSlicer et Bambu Studio), pas une couleur : dans OrcaSlicer, régler d'abord autant de filaments que la palette, dans le même ordre et aux mêmes couleurs, puis ouvrir le fichier. Ouvert avec moins de filaments, les faces des numéros manquants s'affichent au filament 1 et leur peinture se perd quand on ajoute des filaments ensuite. Fichier > Importer ajoute lui-même les filaments manquants, avec des couleurs à corriger.
+- OBJ en couleurs (OBJ et MTL côte à côte, en mm, Z en haut comme le STL), pour la même imprimante. À l'ouverture, OrcaSlicer 2.1 ou plus récent affiche une fenêtre qui ajoute les couleurs de la palette comme nouveaux filaments, après ceux déjà réglés. Les faces gardent exactement leur filament, mais OrcaSlicer recalcule les couleurs : elles peuvent s'écarter de quelques unités des codes affichés, et l'ordre des filaments ajoutés peut différer de celui de la palette. Le `.mtl` doit rester à côté du `.obj` : depuis un zip, OrcaSlicer ne lit que l'OBJ et l'ouvre sans couleur. « Enregistrer l'OBJ en couleurs » copie donc les deux fichiers dans Téléchargements.
+- OBJ texturé zippé (OBJ, MTL et PNG, en mm, Z en haut), pour un service d'impression en couleurs réelles (Sculpteo, i.materialise…). La texture fait 2 048 px en LowPoly et 4 096 px en Moyen et Détaillé ; elle ajoute de quelques secondes à une minute au calcul.
+
+Pour les deux premiers, les couleurs des photos sont regroupées en 4 teintes par défaut, de 2 à 8 avec le réglage « Filaments pour l'impression en couleur ». Un îlot de couleur plus petit que (4 × buse)², environ 2,6 mm² avec une buse de 0,4, prend la couleur voisine la plus proche ; deux teintes trop proches (écart Lab inférieur à 12) ne prennent pas deux bobines. La palette s'affiche avec le numéro et le code de chaque couleur.
 
 Les couleurs viennent des photos, ombres et reflets compris.
 

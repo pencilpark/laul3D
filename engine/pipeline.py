@@ -9,7 +9,6 @@ import subprocess
 import sys
 import time
 import unicodedata
-import zipfile
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -396,12 +395,19 @@ def export_copy(path):
     return dest
 
 
-def export_zip(paths):
-    """The files flat in one zip named after the first, in Downloads."""
-    dest = free_download_path(os.path.splitext(os.path.basename(paths[0]))[0], ".zip")
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in paths:
-            z.write(p, os.path.basename(p))
+def export_obj(path):
+    """The OBJ and its MTL side by side in Downloads, under a name free for both: OrcaSlicer reads the MTL next to the
+    OBJ, never out of a zip. The first line, mtllib, follows the new name."""
+    stem, dest_dir, i = os.path.splitext(os.path.basename(path))[0], downloads_dir(), 2
+    name = stem
+    while any(os.path.exists(os.path.join(dest_dir, name + ext)) for ext in (".obj", ".mtl")):
+        name, i = f"{stem}_{i}", i + 1
+    dest = os.path.join(dest_dir, name + ".obj")
+    shutil.copy2(path[:-4] + ".mtl", dest[:-4] + ".mtl")
+    with open(path, encoding="utf-8") as src, open(dest, "w", encoding="utf-8", newline="\n") as out:
+        src.readline()
+        out.write(f"mtllib {name}.mtl\n")
+        shutil.copyfileobj(src, out)
     return dest
 
 
