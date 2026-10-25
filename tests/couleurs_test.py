@@ -78,7 +78,7 @@ def main():
     assert [couleurs.paint_code(k) for k in range(1, 9)] == ["4", "8", "0C", "1C", "2C", "3C", "4C", "5C"]
     assert [t.get("paint_color") for t in triangles] == [couleurs.paint_code(k + 1) for k in labels]
 
-    obj = os.path.join(os.path.dirname(path), "modèle_couleurs_orca.obj")
+    obj = os.path.join(os.path.dirname(path), "modèle_colors_orca.obj")
     mtl = couleurs.write_obj(obj, verts, tris, labels, palette)
     with open(obj, encoding="utf-8") as f:
         lines = f.read().splitlines()

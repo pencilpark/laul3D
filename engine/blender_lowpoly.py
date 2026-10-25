@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import sys
 import time
 import zipfile
@@ -19,6 +20,7 @@ from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import couleurs  # noqa: E402
+import i18n  # noqa: E402
 
 
 # LowPoly -> detailed: (default triangles, voxels along the largest side, smoothing passes)
@@ -32,6 +34,13 @@ LEVELS = {
 SMOOTH = {1: (2, 1), 2: (3, 1), 3: (4, 2)}
 # texture for the color print services, per level: the facets of LowPoly need less
 TEXTURE_SIZE = {"lowpoly": 2048, "medium": 4096, "detailed": 4096}
+# export profiles outside printing: (faces, quads, texture px, extra levels of detail as fractions of the faces).
+# software comes last: it empties the scene to save its .blend
+PROFILES = {
+    "web": (50000, False, 2048, ()),
+    "game": (50000, False, 2048, (0.5, 0.25)),
+    "software": (20000, True, 4096, ()),
+}
 
 
 def parse_args():
@@ -39,7 +48,7 @@ def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
     ap.add_argument("--outdir", required=True)
-    ap.add_argument("--name", default="modele")
+    ap.add_argument("--name", default="model")
     ap.add_argument("--height-mm", type=float, default=80.0)
     ap.add_argument("--level", choices=list(LEVELS), default="lowpoly")
     ap.add_argument("--faces", type=int, default=0, help="target triangle count, 0 = level default")
@@ -57,10 +66,12 @@ def parse_args():
     ap.add_argument("--preview-engine", choices=["workbench", "cycles"], default="workbench",
                     help="cycles renders on the CPU and needs no OpenGL context")
     ap.add_argument("--smooth", type=int, choices=sorted(SMOOTH) + [0], default=0, help="extra smoothing: 0 none to 3 strong")
-    ap.add_argument("--colors", action="store_true", help="also write NAME_couleurs.glb, the scan's colors on the result")
+    ap.add_argument("--colors", action="store_true", help="also write NAME_colors.glb, the scan's colors on the result")
     ap.add_argument("--filaments", type=int, default=4, help="with --colors: filament colors of the 3MF and colored OBJ")
     ap.add_argument("--color-files", default="3mf,obj,texture",
                     help="with --colors: comma list among 3mf, obj (colored, for OrcaSlicer), texture; '-' for none")
+    ap.add_argument("--profiles-only", help="comma list among software, game, web: write only these export "
+                    "profiles (meters, Y up, base at the origin), no print files")
     ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
     ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
     return ap.parse_args(argv)
@@ -91,10 +102,10 @@ def import_any(path, raw_axes=False):
     elif ext == ".stl":
         bpy.ops.wm.stl_import(filepath=path)
     else:
-        raise SystemExit(f"format non pris en charge : {ext}")
+        raise SystemExit(i18n.tr("srv.bl_format_unsupported", ext=ext))
     meshes = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
     if not meshes:
-        raise SystemExit("aucun maillage dans le fichier importé")
+        raise SystemExit(i18n.tr("srv.bl_no_mesh"))
     return meshes
 
 
@@ -125,7 +136,7 @@ def object_to_bm(obj):
 
 def bounds(bm):
     if not bm.verts:
-        raise SystemExit("maillage vide")
+        raise SystemExit(i18n.tr("srv.bl_empty_mesh"))
     cs = [v.co for v in bm.verts]
     lo = Vector((min(c.x for c in cs), min(c.y for c in cs), min(c.z for c in cs)))
     hi = Vector((max(c.x for c in cs), max(c.y for c in cs), max(c.z for c in cs)))
@@ -179,7 +190,7 @@ def box_volume(faces):
 def keep_shells(bm, keep_parts):
     islands = islands_of(bm)
     if not islands:
-        raise SystemExit("plus aucune géométrie après nettoyage")
+        raise SystemExit(i18n.tr("srv.bl_nothing_left"))
     islands.sort(key=box_volume, reverse=True)
     total = len(bm.faces)
     if keep_parts:
@@ -269,7 +280,7 @@ def make_watertight(obj, voxel, force_closing=False):
         box0 = size0.x * size0.y * size0.z
         if all(size1[i] >= 0.8 * size0[i] for i in range(3)) and vol1 >= 0.03 * box0:
             return "voxel", holes
-        log(f"voxel incohérent (taille {tuple(round(v, 1) for v in size1)}, volume {vol1:.0f} mm3), fermeture morphologique")
+        log(i18n.tr("srv.bl_voxel_inconsistent", size=tuple(round(v, 1) for v in size1), volume=f"{vol1:.0f}"))
         obj.data = backup.copy()
     close_by_dilation(obj, radius=max(max(size0) * 0.012, voxel * 2.5), voxel=voxel)
     return "fermeture", holes
@@ -300,7 +311,7 @@ def cut_flat_base(bm, frac):
 def sdf_smooth(obj, voxel, width, iterations):
     """Blurs the model's volume (OpenVDB mean filter on its distance field): bumps narrower than about
     width x voxel melt, larger forms stay, and the result is closed by construction."""
-    ng = bpy.data.node_groups.new("lissage", "GeometryNodeTree")
+    ng = bpy.data.node_groups.new("smoothing", "GeometryNodeTree")
     ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     nodes, links = ng.nodes, ng.links
@@ -318,7 +329,7 @@ def sdf_smooth(obj, voxel, width, iterations):
     links.new(to_sdf.outputs[0], mean.inputs["Grid"])
     links.new(mean.outputs[0], to_mesh.inputs["Grid"])
     links.new(to_mesh.outputs[0], go.inputs[0])
-    mod = obj.modifiers.new("lissage", "NODES")
+    mod = obj.modifiers.new("smoothing", "NODES")
     mod.node_group = ng
     apply_modifier(obj, mod)
 
@@ -338,7 +349,7 @@ def has_colors(objects):
 
 
 def color_attribute_material(obj):
-    mat = bpy.data.materials.new("couleurs_scan")
+    mat = bpy.data.materials.new("scan_colors")
     if mat.node_tree is None:
         mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -360,10 +371,10 @@ def bake_colors(target, sources, reach):
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
     sc.cycles.samples = 1
-    attr = target.data.color_attributes.new("couleur", "BYTE_COLOR", "CORNER")
+    attr = target.data.color_attributes.new("color", "BYTE_COLOR", "CORNER")
     target.data.color_attributes.active_color = attr
     if not target.data.materials:
-        target.data.materials.append(bpy.data.materials.new("couleur"))
+        target.data.materials.append(bpy.data.materials.new("color"))
     for o in bpy.context.view_layer.objects:
         o.select_set(o in sources or o is target)
     bpy.context.view_layer.objects.active = target
@@ -371,7 +382,7 @@ def bake_colors(target, sources, reach):
         bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, margin=0,
                             cage_extrusion=reach, max_ray_distance=2 * reach, target="VERTEX_COLORS")
     except RuntimeError as e:
-        log(f"couleurs indisponibles : {e}")
+        log(i18n.tr("srv.bl_colors_unavailable", error=e))
         return False
     return True
 
@@ -380,9 +391,11 @@ def describe_textures(sources):
     for img in {n.image for o in sources for s in o.material_slots if s.material and s.material.node_tree
                 for n in s.material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image}:
         w, h = img.size  # reading the size loads the file
-        log(f"texture du scan : {os.path.basename(img.filepath)}, {w} x {h}{'' if w else ' (illisible)'}")
+        name = os.path.basename(img.filepath)
+        log(i18n.tr("srv.bl_scan_texture", name=name, w=w, h=h) if w else
+            i18n.tr("srv.bl_scan_texture_unreadable", name=name, w=w, h=h))
     if not any(o.data.uv_layers for o in sources if base_color_linked(o)):
-        log("texture du scan sans coordonnées de texture")
+        log(i18n.tr("srv.bl_scan_texture_no_uv"))
 
 
 UNSEEN_GREY = 0.716  # photogrammetry_win.UNSEEN (0xDCDCDC) in linear values, as the color attribute returns them
@@ -396,12 +409,12 @@ def colors_problem(obj):
     corners = [cols[i:i + 3] for i in range(0, len(cols), 4)]
     seen = [c for c in corners if not all(abs(v - UNSEEN_GREY) < 0.03 for v in c)]
     if len(seen) < 0.1 * len(corners):
-        return "faces absentes des photos"
+        return i18n.tr("srv.bl_colors_unseen")
     # judged on the seen faces only, so some unseen grey cannot hide a black model
     if sum(max(c) < 0.007 for c in seen) > 0.5 * len(seen):  # under about 20/255: rays that hit nothing, black texels
-        return "noires"
+        return i18n.tr("srv.bl_colors_black")
     if sum(c[0] > 0.8 and c[1] < 0.05 and c[2] > 0.8 for c in seen) > 0.5 * len(seen):  # Blender's missing image
-        return "texture illisible"
+        return i18n.tr("srv.bl_colors_bad_texture")
     return None
 
 
@@ -418,7 +431,7 @@ def flatten_face_colors(obj):
 
 
 def export_colors(obj, outdir, name):
-    path = os.path.join(outdir, f"{name}_couleurs.glb")
+    path = os.path.join(outdir, f"{name}_colors.glb")
     for o in bpy.context.view_layer.objects:
         o.select_set(o is obj)
     bpy.context.view_layer.objects.active = obj
@@ -488,7 +501,7 @@ def bake_texture(target, sources, reach, size, path):
 
 def export_textured(obj, outdir, name, png):
     """OBJ + MTL + PNG in mm, Z up like the STL, zipped without folders: what Sculpteo or i.materialise take."""
-    obj_path = os.path.join(outdir, f"{name}_couleurs.obj")
+    obj_path = os.path.join(outdir, f"{name}_colors.obj")
     for o in bpy.context.view_layer.objects:
         o.select_set(o is obj)
     bpy.context.view_layer.objects.active = obj
@@ -496,7 +509,7 @@ def export_textured(obj, outdir, name, png):
                           global_scale=1.0, export_uv=True, export_normals=False, export_materials=True,
                           path_mode="STRIP", export_colors=False)
     files = [obj_path, obj_path[:-4] + ".mtl", png]
-    path = os.path.join(outdir, f"{name}_couleurs_texture.zip")
+    path = os.path.join(outdir, f"{name}_colors_texture.zip")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for f in files:
             z.write(f, os.path.basename(f))
@@ -598,7 +611,8 @@ def render_previews(obj, outdir, name, engine="workbench"):
     dist = radius / math.tan(cam.data.angle / 2) * 1.1
     cam.data.clip_end = dist * 4
     paths = []
-    for label, d in (("face", (0, -1, 0.25)), ("droite", (1, 0, 0.25)), ("dos", (0, 1, 0.25)), ("trois_quarts", (0.8, -0.9, 0.5))):
+    for label, d in (("front", (0, -1, 0.25)), ("right", (1, 0, 0.25)), ("back", (0, 1, 0.25)),
+                     ("three_quarter", (0.8, -0.9, 0.5))):
         cam.location = center + Vector(d).normalized() * dist
         cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
         sc.render.filepath = os.path.join(outdir, f"{name}_{label}.png")
@@ -609,18 +623,231 @@ def render_previews(obj, outdir, name, engine="workbench"):
     return paths
 
 
-def main():
-    a = parse_args()
-    t0 = time.time()
-    os.makedirs(a.outdir, exist_ok=True)
-    clear_scene()
+def select_only(objs, active):
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o in objs or o is active)
+    bpy.context.view_layer.objects.active = active
 
-    if a.previews_only:
-        bpy.ops.wm.stl_import(filepath=a.input)
-        obj = next(o for o in bpy.data.objects if o.type == "MESH")
-        print("PREVIEWS " + json.dumps(render_previews(obj, a.outdir, a.name, a.preview_engine)), flush=True)
-        return
 
+def retopo_quads(obj, faces):
+    """QuadriFlow, Blender's quad remesher. It refuses edges under 1e-4 per axis (some come out of the voxel remesh)
+    and, run from a script, reads only target_faces and fails without raising: the result is checked."""
+    dims, _ = bm_stats(obj)
+    bm = object_to_bm(obj)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=max(dims) * 1e-4)
+    bm.to_mesh(obj.data)
+    bm.free()
+    decimate(obj, 10 * faces)  # its time grows with the input
+    select_only([], obj)
+    with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+        done = bpy.ops.object.quadriflow_remesh(mode="FACES", target_faces=faces, use_mesh_symmetry=False,
+                                                use_preserve_sharp=False, use_preserve_boundary=False,
+                                                preserve_attributes=False, smooth_normals=False, seed=0)
+    return "FINISHED" in done
+
+
+def unwrap(obj):
+    select_only([], obj)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.002)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def bake_image(target, sources, kind, image, reach):
+    """Selected-to-active bake into the target's active image node: the scan's colors, or the relief of the smooth
+    solid as a tangent-space normal map."""
+    nodes = target.active_material.node_tree.nodes
+    nodes.active = next(n for n in nodes if n.type == "TEX_IMAGE" and n.image is image)
+    select_only(sources, target)
+    extra = {"pass_filter": {"COLOR"}} if kind == "DIFFUSE" else {"normal_space": "TANGENT"}
+    bpy.ops.object.bake(type=kind, use_selected_to_active=True, margin=8, cage_extrusion=reach,
+                        max_ray_distance=2 * reach, target="IMAGE_TEXTURES", **extra)
+
+
+def colors_usable(high, sources, reach):
+    """The print step's verdict on the scan's colors, judged on a light copy."""
+    if not sources:
+        return False
+    probe = high.copy()
+    probe.data = high.data.copy()
+    bpy.context.scene.collection.objects.link(probe)
+    decimate(probe, 20000)
+    problem = colors_problem(probe) if bake_colors(probe, sources, reach) else i18n.tr("srv.bl_colors_no_bake")
+    if problem:
+        log(i18n.tr("srv.bl_colors_unusable_profiles", problem=problem))
+    bpy.data.objects.remove(probe, do_unlink=True)
+    return problem is None
+
+
+def profile_material(obj, images):
+    """Principled BSDF with the color texture and the normal map, what the glTF, FBX and OBJ exporters read."""
+    mat = bpy.data.materials.new(obj.name)
+    if mat.node_tree is None:
+        mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
+    texs = {}
+    for kind, img in images.items():
+        texs[kind] = nodes.new("ShaderNodeTexImage")
+        texs[kind].image = img
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+    return mat, bsdf, texs
+
+
+def export_profile(p, high, sources, colors, reach, workdir, name):
+    faces, quads, size, lods = PROFILES[p]
+    t1 = time.time()
+    low = high.copy()
+    low.data = high.data.copy()
+    low.name = low.data.name = f"{name}_{p}" + ("_LOD0" if lods else "")
+    bpy.context.scene.collection.objects.link(low)
+    if quads and not retopo_quads(low, faces):
+        log(i18n.tr("srv.bl_profile_no_quads", profile=p))
+        quads = False
+    if not quads:
+        decimate(low, faces)
+    bm = object_to_bm(low)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(low.data)
+    bm.free()
+    # smooth shading: vertices shared between faces, and the normals a baked normal map is measured against
+    low.data.shade_smooth()
+    seconds = f"{time.time() - t1:.1f}"
+    log(i18n.tr("srv.bl_profile_retopo", profile=p, s=seconds) if quads else
+        i18n.tr("srv.bl_profile_decimate", profile=p, s=seconds))
+    t1 = time.time()
+    unwrap(low)
+
+    images = {"normal": bpy.data.images.new(f"{name}_{p}_normal", size, size, is_data=True)}
+    if colors:
+        images["color"] = bpy.data.images.new(f"{name}_{p}_color", size, size)
+    mat, bsdf, texs = profile_material(low, images)
+    if colors:
+        bake_image(low, sources, "DIFFUSE", images["color"], reach)
+    bake_image(low, [high], "NORMAL", images["normal"], reach / 2)
+    links = mat.node_tree.links
+    if colors:
+        links.new(texs["color"].outputs["Color"], bsdf.inputs["Base Color"])
+    nmap = mat.node_tree.nodes.new("ShaderNodeNormalMap")
+    links.new(texs["normal"].outputs["Color"], nmap.inputs["Color"])
+    links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    for kind, img in images.items():
+        # game: a JPEG color keeps the three GLB of the levels of detail light; normal maps stay lossless
+        jpeg = p == "game" and kind == "color"
+        img.filepath_raw = os.path.join(workdir, f"{name}_{p}_{kind}.{'jpg' if jpeg else 'png'}")
+        img.file_format = "JPEG" if jpeg else "PNG"
+        img.save(quality=90)
+    log(i18n.tr("srv.bl_profile_textures", profile=p, size=size, s=f"{time.time() - t1:.1f}"))
+
+    low.data.transform(Matrix.Scale(0.001, 4))  # mm -> m
+    levels = [low]
+    for frac in lods:
+        lod = low.copy()
+        lod.data = low.data.copy()
+        lod.name = lod.data.name = f"{name}_{p}_LOD{len(levels)}"
+        bpy.context.scene.collection.objects.link(lod)
+        decimate(lod, int(faces * frac))
+        levels.append(lod)
+    count = sum(len(f.vertices) - 2 for f in low.data.polygons) if not quads else len(low.data.polygons)
+    return levels, quads, count
+
+
+def write_profile_files(p, levels, workdir, name):
+    """The formats of each profile, in meters. GLB: Y up as glTF requires. FBX and OBJ: the exporters' Y up axes,
+    what Maya, Unity or Unreal expect."""
+    files = []
+    for obj in levels:
+        select_only([], obj)
+        stem = os.path.join(workdir, obj.name if p == "game" else f"{name}_{p}")
+        if p in ("web", "game"):
+            fmt = {"export_image_format": "JPEG", "export_jpeg_quality": 85} if p == "web" else {}
+            bpy.ops.export_scene.gltf(filepath=stem + ".glb", export_format="GLB", use_selection=True,
+                                      export_yup=True, export_materials="EXPORT", **fmt)
+            files.append(stem + ".glb")
+        if p == "web":
+            draco = stem + "_draco.glb"
+            bpy.ops.export_scene.gltf(filepath=draco, export_format="GLB", use_selection=True, export_yup=True,
+                                      export_materials="EXPORT", export_draco_mesh_compression_enable=True, **fmt)
+            # without Blender's Draco library the exporter writes an uncompressed file and still reports success
+            with open(draco, "rb") as f:
+                if b"KHR_draco_mesh_compression" in f.read(1 << 16):
+                    files.append(draco)
+                else:
+                    os.remove(draco)
+                    log(i18n.tr("srv.bl_profile_no_draco"))
+        if p in ("game", "software"):
+            bpy.ops.export_scene.fbx(filepath=stem + ".fbx", use_selection=True, path_mode="STRIP",
+                                     embed_textures=False, apply_unit_scale=True)
+            files.append(stem + ".fbx")
+        if p == "software":
+            bpy.ops.wm.obj_export(filepath=stem + ".obj", export_selected_objects=True, export_uv=True,
+                                  export_normals=True, export_materials=True, path_mode="STRIP")
+            files += [stem + ".obj", stem + ".mtl"]
+    if p != "web":
+        files += sorted(os.path.join(workdir, f) for f in os.listdir(workdir) if f.startswith(f"{name}_{p}_")
+                        and f.endswith((".png", ".jpg")))
+    if p == "software":
+        obj = levels[0]
+        for o in list(bpy.data.objects):
+            if o is not obj:
+                bpy.data.objects.remove(o, do_unlink=True)
+        bpy.data.orphans_purge(do_recursive=True)
+        us = bpy.context.scene.unit_settings
+        us.system, us.scale_length, us.length_unit = "METRIC", 1.0, "CENTIMETERS"
+        blend = os.path.join(workdir, f"{name}_{p}.blend")
+        bpy.ops.wm.save_as_mainfile(filepath=blend, copy=True, relative_remap=True)
+        files.append(blend)
+    return files
+
+
+def export_profiles(a, high, sources, placed, fit, turn, height):
+    """The cleaned solid for 3D software, game engines and the web: base centered at the origin, real size in
+    meters, the scan's colors and the solid's relief baked into textures. One zip per profile."""
+    lo, hi = bounds(object_to_bm(high))
+    base = Matrix.Translation((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z))
+    high.data.transform(base)
+    for o, mw in zip(sources, placed):
+        o.matrix_world = base @ fit @ turn @ mw
+    sc = bpy.context.scene
+    sc.render.engine, sc.cycles.device, sc.cycles.samples = "CYCLES", "CPU", 1  # only Cycles bakes
+    reach = 0.03 * height
+    colors = colors_usable(high, sources, reach)
+    wanted = [p for p in PROFILES if p in a.profiles_only.split(",")]
+    results = {}
+    for p in wanted:
+        t1 = time.time()
+        workdir = os.path.join(a.outdir, f"{a.name}_{p}")
+        os.makedirs(workdir, exist_ok=True)
+        try:
+            levels, quads, count = export_profile(p, high, sources, colors, reach, workdir, a.name)
+            files = write_profile_files(p, levels, workdir, a.name)
+            path = os.path.join(a.outdir, f"{a.name}_{p}.zip")
+            with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+                for f in files:
+                    z.write(f, os.path.basename(f))
+            results[p] = {"path": path, "faces": count, "quads": quads, "lods": len(levels), "colors": colors}
+            seconds = f"{time.time() - t1:.1f}"
+            if len(levels) > 1:
+                log(i18n.tr("srv.bl_profile_done_lods", profile=p, faces=count, n=len(levels), s=seconds))
+            else:
+                log(i18n.tr("srv.bl_profile_done_quads", profile=p, faces=count, s=seconds) if quads else
+                    i18n.tr("srv.bl_profile_done_triangles", profile=p, faces=count, s=seconds))
+        except (RuntimeError, OSError) as e:
+            log(i18n.tr("srv.bl_profile_failed", profile=p, error=e))
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+            if p != "software":
+                for o in list(bpy.data.objects):
+                    if o is not high and o not in sources:
+                        bpy.data.objects.remove(o, do_unlink=True)
+    print("PROFILES " + json.dumps(results), flush=True)
+
+
+def clean_solid(a):
+    """Import, orientation, size in mm, watertight solid, main shells, smoothing: what printing and the export
+    profiles share."""
     meshes = import_any(a.input, a.raw_axes)
     bm = merge_to_bmesh(meshes)
     # the colored scan stays aside, frozen where it is, to color the result at the end
@@ -635,7 +862,8 @@ def main():
     for o in list(bpy.data.objects):
         if o not in sources:
             bpy.data.objects.remove(o, do_unlink=True)
-    log(f"import : {len(meshes)} maillage(s), {len(bm.faces)} faces{', couleurs du scan gardées' if sources else ''}")
+    log(i18n.tr("srv.bl_import_colors", n=len(meshes), faces=len(bm.faces)) if sources else
+        i18n.tr("srv.bl_import", n=len(meshes), faces=len(bm.faces)))
     if sources:
         describe_textures(sources)
 
@@ -649,7 +877,7 @@ def main():
     lo, hi = bounds(bm)
     size = hi - lo
     if min(size) <= 0:
-        raise SystemExit("maillage vide ou plat")
+        raise SystemExit(i18n.tr("srv.bl_flat_mesh"))
     bed = Vector(a.bed) - Vector((a.margin, a.margin, a.margin / 2))
     height = min(a.height_mm, bed.z)
     s = min(height / size.z, bed.x / size.x, bed.y / size.y)
@@ -660,16 +888,18 @@ def main():
     bm.free()
 
     dims, _ = bm_stats(obj)
-    default_faces, voxel_div, smooth_passes = LEVELS[a.level]
+    _, voxel_div, smooth_passes = LEVELS[a.level]
     voxel = min(max(max(dims) / voxel_div, 0.2), 0.5)
     method, holes = make_watertight(obj, voxel, a.force_closing)
-    log(f"étanchéité : {method}, {holes} arêtes de bord comblées, voxel {voxel:.2f} mm, {len(obj.data.polygons)} faces")
+    stats = {"n": holes, "voxel": f"{voxel:.2f}", "faces": len(obj.data.polygons)}
+    log(i18n.tr("srv.bl_watertight_voxel", **stats) if method == "voxel" else
+        i18n.tr("srv.bl_watertight_closing", **stats))
 
     bm = object_to_bm(obj)
     n_islands, kept = keep_shells(bm, a.keep_parts)
     bm.to_mesh(obj.data)
     bm.free()
-    log(f"coques : {n_islands} trouvées, {kept} gardée(s)")
+    log(i18n.tr("srv.bl_shells", n=n_islands, kept=kept))
 
     sm = obj.modifiers.new("relax", "SMOOTH")
     sm.factor = 0.5
@@ -683,10 +913,29 @@ def main():
         keep_shells(bm, a.keep_parts)  # a thin strand may have come loose
         bm.to_mesh(obj.data)
         bm.free()
-        log(f"lissage {a.smooth} : flou du volume sur {width * voxel:.1f} mm, {iterations} passe(s), "
-            f"{len(obj.data.polygons)} faces, {time.time() - t1:.1f} s")
+        log(i18n.tr("srv.bl_smoothing", level=a.smooth, mm=f"{width * voxel:.1f}", n=iterations,
+                    faces=len(obj.data.polygons), s=f"{time.time() - t1:.1f}"))
+    return obj, sources, placed, fit, turn, height, bed, voxel, method
 
-    target = a.faces or default_faces
+
+def main():
+    a = parse_args()
+    t0 = time.time()
+    os.makedirs(a.outdir, exist_ok=True)
+    clear_scene()
+
+    if a.previews_only:
+        bpy.ops.wm.stl_import(filepath=a.input)
+        obj = next(o for o in bpy.data.objects if o.type == "MESH")
+        print("PREVIEWS " + json.dumps(render_previews(obj, a.outdir, a.name, a.preview_engine)), flush=True)
+        return
+
+    obj, sources, placed, fit, turn, height, bed, voxel, method = clean_solid(a)
+    if a.profiles_only:
+        export_profiles(a, obj, sources, placed, fit, turn, height)
+        return
+
+    target = a.faces or LEVELS[a.level][0]
     work = bm = None
     for attempt in range(4):
         if work is not None:
@@ -703,7 +952,7 @@ def main():
             bmesh.ops.triangulate(bm, faces=bm.faces)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         topo = topology_checks(bm)
-        log(f"essai {attempt + 1} : cible {int(target)} triangles -> {topo}")
+        log(i18n.tr("srv.bl_attempt", attempt=attempt + 1, target=int(target), topo=topo))
         if (topo["non_manifold_edges"] == 0 and topo["self_intersections"] == 0) or attempt == 3:
             break
         target *= 1.4
@@ -727,32 +976,31 @@ def main():
         if bake_colors(work, sources, reach=0.03 * height):
             problem = colors_problem(work)
             if problem:
-                log(f"couleurs du scan inexploitables ({problem}) : aperçu Rendu désactivé pour ce modèle")
+                log(i18n.tr("srv.bl_colors_unusable_preview", problem=problem))
             else:
                 if a.level == "lowpoly":
                     flatten_face_colors(work)
                 report["colors"] = export_colors(work, a.outdir, a.name)
-                log("couleurs du scan projetées")
+                log(i18n.tr("srv.bl_colors_baked"))
                 if wanted & {"3mf", "obj"}:
                     verts, tris, labels, report["palette"] = split_filaments(work, a.filaments, (4 * a.nozzle) ** 2)
-                    log(f"couleurs réduites à {len(report['palette'])} filament(s) : "
-                        + ", ".join("#%02X%02X%02X" % c for c in report["palette"]))
+                    log(i18n.tr("srv.bl_filaments", n=len(report["palette"]),
+                                colors=", ".join("#%02X%02X%02X" % c for c in report["palette"])))
                     if "3mf" in wanted:
                         report["filaments"] = os.path.join(a.outdir, f"{a.name}_filaments.3mf")
                         couleurs.write_3mf(report["filaments"], verts, tris, labels, report["palette"])
                     if "obj" in wanted:
-                        report["obj_colors"] = os.path.join(a.outdir, f"{a.name}_couleurs_orca.obj")
+                        report["obj_colors"] = os.path.join(a.outdir, f"{a.name}_colors_orca.obj")
                         couleurs.write_obj(report["obj_colors"], verts, tris, labels, report["palette"])
                 if "texture" in wanted:
                     try:
-                        png = os.path.join(a.outdir, f"{a.name}_couleurs.png")
+                        png = os.path.join(a.outdir, f"{a.name}_colors.png")
                         t1 = time.time()
                         bake_texture(work, sources, 0.03 * height, TEXTURE_SIZE[a.level], png)
                         report["texture"] = export_textured(work, a.outdir, a.name, png)
-                        log(f"texture {TEXTURE_SIZE[a.level]} px pour les services d'impression couleur, "
-                            f"{time.time() - t1:.1f} s")
+                        log(i18n.tr("srv.bl_texture_done", size=TEXTURE_SIZE[a.level], s=f"{time.time() - t1:.1f}"))
                     except (RuntimeError, OSError) as e:
-                        log(f"texture pour les services d'impression indisponible : {e}")
+                        log(i18n.tr("srv.bl_texture_failed", error=e))
     for o in list(bpy.data.objects):
         if o is not work:
             bpy.data.objects.remove(o, do_unlink=True)
@@ -767,7 +1015,7 @@ def main():
         f.seek(80)
         written = int.from_bytes(f.read(4), "little")
     if written != report["triangles"]:
-        raise SystemExit(f"export STL incomplet : {written} triangles écrits sur {report['triangles']}")
+        raise SystemExit(i18n.tr("srv.bl_stl_incomplete", written=written, total=report["triangles"]))
 
     if a.save_blend:
         us = bpy.context.scene.unit_settings
@@ -789,7 +1037,7 @@ def main():
             json.dump(report, f, indent=2)
 
     write_report()
-    log(f"export {stl}")
+    log(i18n.tr("srv.bl_exported", path=stl))
     print("REPORT " + json.dumps(report), flush=True)
 
     if a.previews:

@@ -16,6 +16,7 @@ REAL = sys.argv[1:2] == ["--real"]
 if not REAL:
     os.environ["LOWPOLY_DATA"] = tempfile.mkdtemp(prefix="berria-tools-data-")
 sys.path.insert(0, os.path.join(ROOT, "engine"))
+import i18n  # noqa: E402
 import pipeline as pl  # noqa: E402
 import setup_tools  # noqa: E402
 
@@ -72,12 +73,13 @@ def main():
     assert not os.path.exists(os.path.join(pl.TOOLS, "outil.old"))
 
     state = install(part, local, tamper=True)
-    assert state["status"] == "error" and "altéré" in state["error"], state
+    assert state["status"] == "error" and state["error"] == i18n.tr("srv.tools_download_corrupt", name="OrcaSlicer"), state
     assert open(exe, "rb").read() == b"version 2", "a bad download must leave the installed tool alone"
 
     with mock.patch("shutil.disk_usage", return_value=mock.Mock(free=10)):
         state = install(part, local)
-    assert state["status"] == "error" and "espace libre" in state["error"], state
+    need = f"{3 * part['size'] / 1e9:.0f}"
+    assert state["status"] == "error" and state["error"] == i18n.tr("srv.setup_disk_space", gb=need), state
     print("setup_tools : installation, remplacement, téléchargement altéré et espace disque OK")
 
 

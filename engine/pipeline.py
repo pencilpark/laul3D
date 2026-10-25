@@ -13,6 +13,8 @@ import unicodedata
 import numpy as np
 from PIL import Image, ImageOps
 
+import i18n
+
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
@@ -40,7 +42,7 @@ class PipelineError(Exception):
 def slug(text):
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     s = re.sub(r"[^A-Za-z0-9_-]+", "_", text.strip())[:40].strip("_")
-    return s or "modele"
+    return s or "model"
 
 
 def _first_existing(paths):
@@ -161,18 +163,18 @@ def scan_photos(photo_dir, thumb_dir):
                 photos.append({"name": name, "thumb": thumb_name, "sharpness": round(score, 1),
                                "size": [im.width, im.height]})
         except Exception as e:
-            photos.append({"name": name, "error": f"illisible : {e}"})
+            photos.append({"name": name, "error": i18n.tr("srv.photo_unreadable", error=e)})
     return photos
 
 
 def choose_engine(mode, n_ok, tools):
     if mode == "photogrammetry":
         if not tools["photogrammetry"]:
-            raise PipelineError(f"{tools['photogrammetry_engine']} n'est pas installé : ouvre l'assistant d'installation ou passe en mode IA.")
+            raise PipelineError(i18n.tr("srv.engine_missing", engine=tools["photogrammetry_engine"]))
         return mode
     if mode == "ia":
         if not tools["ia"]:
-            raise PipelineError("Le module « Une photo (IA) » n'est pas encore installé : clique « Une photo (IA) : installer » en haut de la fenêtre.")
+            raise PipelineError(i18n.tr("srv.ai_missing"))
         return mode
     if n_ok >= MIN_PHOTOGRAMMETRY and tools["photogrammetry"]:
         return "photogrammetry"
@@ -180,10 +182,8 @@ def choose_engine(mode, n_ok, tools):
         return "ia"
     if tools["photogrammetry"]:
         # photogrammetry on a handful of photos fails after a long run: say so now
-        raise PipelineError(f"Avec {n_ok} photo{'s' if n_ok > 1 else ''}, il faut le module « Une photo (IA) », pas encore installé : "
-                            f"clique « Une photo (IA) : installer » en haut de la fenêtre. Sinon, ajoute des photos : au moins "
-                            f"{MIN_PHOTOGRAMMETRY}, et 50 ou plus pour un buste fidèle.")
-    raise PipelineError("Aucun moteur de reconstruction n'est installé : ouvre l'assistant d'installation.")
+        raise PipelineError(i18n.tr("srv.too_few_for_photogrammetry", n=n_ok, min=MIN_PHOTOGRAMMETRY))
+    raise PipelineError(i18n.tr("srv.no_engine"))
 
 
 def select_sharp(photos, keep_min=MIN_PHOTOGRAMMETRY):
@@ -247,31 +247,28 @@ def object_capture(photo_dir, photos, work_dir, level, log):
     detail = PG_DETAIL[level]
     out = os.path.join(work_dir, f"scan_{detail}.usdz")
     if os.path.exists(out):
-        log(f"reconstruction {detail} déjà en cache")
+        log(i18n.tr("srv.pg_cached", detail=detail))
         return out
     keep, dropped = select_sharp(photos)
     if dropped:
-        log(f"{len(dropped)} photo(s) floue(s) écartée(s) : {', '.join(dropped)}")
+        log(i18n.tr("srv.blurry_dropped", n=len(dropped), names=", ".join(dropped)))
     src = os.path.join(work_dir, "pg_input")
     stage_photos(photo_dir, keep, src, OBJECT_CAPTURE_EXT)
     tmp = os.path.join(work_dir, f"scan_{detail}.partial.usdz")
     for sensitivity in ("normal", "high"):
-        log(f"Object Capture : {len(keep)} photos, détail {detail}, sensibilité {sensitivity}")
+        log(i18n.tr("srv.object_capture_run", n=len(keep), detail=detail, sensitivity=sensitivity))
         t0 = time.time()
         if os.path.exists(tmp):
             os.remove(tmp)
         code, _ = run([object_capture_path(), src, tmp, "-d", detail, "-f", sensitivity], log)
         if code == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 0:
             os.replace(tmp, out)
-            log(f"reconstruction terminée en {time.time() - t0:.0f} s")
+            log(i18n.tr("srv.pg_done", s=f"{time.time() - t0:.0f}"))
             return out
-        log(f"échec (code {code})")
+        log(i18n.tr("srv.pg_attempt_failed", code=code))
     if os.path.exists(tmp):
         os.remove(tmp)
-    raise PipelineError(
-        "La photogrammétrie n'a pas pu reconstruire l'objet. Ajoute des photos (50 ou plus, tour complet, "
-        "environ 70 % de recouvrement, deux ou trois hauteurs, sujet immobile, lumière égale) "
-        "ou passe le moteur en IA (une seule photo).")
+    raise PipelineError(i18n.tr("srv.pg_failed"))
 
 
 def photogrammetry(photo_dir, photos, work_dir, level, log):
@@ -280,7 +277,7 @@ def photogrammetry(photo_dir, photos, work_dir, level, log):
     import photogrammetry_win
     keep, dropped = select_sharp(photos)
     if dropped:
-        log(f"{len(dropped)} photo(s) floue(s) écartée(s) : {', '.join(dropped)}")
+        log(i18n.tr("srv.blurry_dropped", n=len(dropped), names=", ".join(dropped)))
     return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, PipelineError)
 
 
@@ -301,24 +298,23 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
     marker = os.path.join(work_dir, "triposr_source.txt")
     ok = [p for p in photos if "error" not in p]
     if not ok:
-        raise PipelineError("aucune photo lisible")
+        raise PipelineError(i18n.tr("srv.no_readable_photo"))
     name = main_photo if any(p["name"] == main_photo for p in ok) else max(ok, key=lambda p: p["sharpness"])["name"]
     key = f"{name}|couleurs"  # meshes cached before the colored preview have none: computed again
     if os.path.exists(out) and os.path.exists(marker):
         with open(marker, encoding="utf-8") as f:
             if f.read() == key:
-                log(f"reconstruction IA de {name} déjà en cache")
+                log(i18n.tr("srv.ai_cached", name=name))
                 return out, name
     image = prepare_main_image(photo_dir, name, work_dir)
-    note = "" if triposr_weights() else " (premier lancement : téléchargement des poids depuis Hugging Face)"
-    log(f"IA TripoSR sur {name}{note}")
+    log(i18n.tr("srv.ai_run", name=name) if triposr_weights() else i18n.tr("srv.ai_run_first_download", name=name))
     tmp = os.path.join(work_dir, "triposr.partial.obj")
     # variables set explicitly (dev, CI) win over the models installed by the app
     env = {**local_model_env(), **os.environ}
     code, lines = run([PYTHON, os.path.join(ROOT, "engine", "triposr_infer.py"), image, tmp,
                        "--preprocessed-out", os.path.join(work_dir, "main_detoure.png")], log, env=env)
     if code != 0 or not os.path.exists(tmp):
-        raise PipelineError("TripoSR a échoué : " + (lines[-1] if lines else f"code {code}"))
+        raise PipelineError(i18n.tr("srv.triposr_failed", detail=lines[-1] if lines else i18n.tr("srv.exit_code", code=code)))
     os.replace(tmp, out)
     with open(marker, "w", encoding="utf-8") as f:
         f.write(key)
@@ -328,7 +324,7 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
 def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
-        raise PipelineError("Blender 5 ou plus est introuvable : clique « Calcul 3D : installer » en haut de la fenêtre.")
+        raise PipelineError(i18n.tr("srv.blender_missing"))
     script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
     base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
     engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
@@ -360,18 +356,30 @@ def blender_prep(raw, out_dir, name, level, s, log):
                 fatal = json.loads(fatal)
             except ValueError:
                 pass
-        raise PipelineError("Blender a échoué : " + (fatal or f"code {code}"))
+        raise PipelineError(i18n.tr("srv.blender_failed", detail=fatal or i18n.tr("srv.exit_code", code=code)))
     previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None)
     if code != 0 or previews is None:
         # REPORT comes before the views: only the viewport renderer died (typically no OpenGL),
         # the model is safe; retry the views with Cycles on the CPU
-        log("Aperçus indisponibles avec le rendu rapide : nouvel essai en rendu CPU.")
+        log(i18n.tr("srv.previews_retry_cpu"))
         code, lines = run(base + ["--previews-only", "--input", report["stl"], "--outdir", out_dir,
                                   "--name", name, "--preview-engine", "cycles"], log)
         previews = next((json.loads(l[9:]) for l in lines if l.startswith("PREVIEWS ")), None) if code == 0 else None
         if not previews:
-            log("Aperçus indisponibles : le modèle reste utilisable.")
+            log(i18n.tr("srv.previews_unavailable"))
     report["previews"] = previews or []
+    report.update(export_software=None, export_game=None, export_web=None, profiles={})
+    profiles = [k for k in ("software", "game", "web") if s.get("export_" + k)]
+    if profiles:
+        # a second Blender: a failed profile never costs the printable model
+        cmd = [c for c in cmd if c not in ("--previews", "--save-blend")] + ["--profiles-only", ",".join(profiles)]
+        code, lines = run(cmd, log)
+        done = next((json.loads(l[9:]) for l in lines if l.startswith("PROFILES ")), None) or {}
+        for k, v in done.items():
+            report["export_" + k] = v.pop("path")
+            report["profiles"][k] = v
+        if len(done) < len(profiles):
+            log(i18n.tr("srv.profiles_partial"))
     return report
 
 
@@ -430,7 +438,7 @@ def launch_detached(cmd):
 def open_in_orca(stl):
     orca = orca_path()
     if not orca:
-        raise PipelineError("OrcaSlicer est introuvable : ouvre l'assistant d'installation.")
+        raise PipelineError(i18n.tr("srv.orca_missing"))
     if IS_MAC:
         subprocess.Popen(["open", "-a", orca, stl])
     elif IS_WIN:

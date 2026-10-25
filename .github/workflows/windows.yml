@@ -44,6 +44,9 @@ jobs:
       - name: Colors reduced to filaments, multi-filament 3MF
         run: .venv\Scripts\python.exe tests\couleurs_test.py
 
+      - name: Translations, seven languages in agreement with the code
+        run: .venv\Scripts\python.exe tests\i18n_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:

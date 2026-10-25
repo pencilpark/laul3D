@@ -16,6 +16,7 @@ import time
 import numpy as np
 from PIL import Image, ImageOps
 
+import i18n
 import pipeline as pl
 
 COLMAP_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
@@ -66,7 +67,7 @@ def _public_root():
     """Last resort: a folder of the shared Public folder, one per run, that only this account and Windows can open."""
     base = os.path.join(os.environ.get("PUBLIC", r"C:\Users\Public"), "BerriaCraft")
     os.makedirs(base, exist_ok=True)
-    root = tempfile.mkdtemp(prefix="travail-", dir=base)
+    root = tempfile.mkdtemp(prefix="work-", dir=base)
     try:
         _private_dir(root)
     except Exception:
@@ -80,11 +81,11 @@ def _private_dir(path):
     who = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, creationflags=pl.NO_WINDOW).stdout
     sid = re.search(rb"S-1-[0-9-]+", who)
     if not sid:
-        raise RuntimeError("compte Windows introuvable pour protéger le dossier de travail")
+        raise RuntimeError(i18n.tr("srv.pgw_no_account"))
     r = subprocess.run(["icacls", path, "/inheritance:r", "/grant:r", f"*{sid.group().decode()}:(OI)(CI)F",
                         "*S-1-5-18:(OI)(CI)F"], capture_output=True, creationflags=pl.NO_WINDOW)
     if r.returncode != 0:
-        raise RuntimeError(f"le dossier de travail n'a pas pu être protégé (icacls, code {r.returncode})")
+        raise RuntimeError(i18n.tr("srv.pgw_protect_failed", code=r.returncode))
 
 
 def _free_memory():
@@ -245,11 +246,10 @@ def _publish(work_dir, level, files, orient):
 
 def reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls):
     if not available():
-        raise error_cls("La photogrammétrie n'est pas encore installée : clique « Plusieurs photos : installer » en haut "
-                        "de la fenêtre, ou passe le moteur en IA (une seule photo).")
+        raise error_cls(i18n.tr("srv.pgw_missing"))
     cached = _cached(work_dir, level)
     if cached:
-        log(f"reconstruction {level} déjà en cache")
+        log(i18n.tr("srv.pg_cached", detail=level))
         return cached
     w = _ascii_workspace(work_dir, level)
     root = None if w else _public_root()
@@ -282,38 +282,44 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
         code, _ = run(cmd, log, cwd=w, env=env, low_priority=True)
         if code != 0:
             tool_log(os.path.splitext(os.path.basename(cmd[0]))[0])
-            raise error_cls(f"La photogrammétrie a échoué ({what}). " + _advice(len(photos)))
+            raise error_cls(i18n.tr("srv.pgw_step_failed", step=what, advice=_advice(len(photos))))
 
-    log(f"COLMAP + OpenMVS : {len(photos)} photos, {cameras} réglage(s) d'appareil, niveau {level}")
+    log(i18n.tr("srv.pgw_start", n=len(photos), cameras=cameras, level=level))
     threads, free = _sift_threads(photo_dir, photos, cfg["max_image"])
     if threads:
-        log(f"points communs : {threads} photo(s) à la fois sur {os.cpu_count()} cœur(s), "
-            f"pour {free / 2 ** 30:.1f} Go de mémoire libre")
-    step("points communs", [colmap(), "feature_extractor", "--database_path", db, "--image_path", images,
-                            "--ImageReader.single_camera_per_folder", "1", "--FeatureExtraction.use_gpu", "0",
-                            "--FeatureExtraction.max_image_size", str(cfg["max_image"]),
-                            *(["--FeatureExtraction.num_threads", str(threads)] if threads else [])])
-    step("appariement", [colmap(), "exhaustive_matcher", "--database_path", db, "--FeatureMatching.use_gpu", "0"])
-    step("position des photos", [colmap(), "mapper", "--database_path", db, "--image_path", images, "--output_path", sparse])
+        log(i18n.tr("srv.pgw_threads", n=threads, cores=os.cpu_count(), gb=f"{free / 2 ** 30:.1f}"))
+    step(i18n.tr("srv.pgw_step_features"),
+         [colmap(), "feature_extractor", "--database_path", db, "--image_path", images,
+          "--ImageReader.single_camera_per_folder", "1", "--FeatureExtraction.use_gpu", "0",
+          "--FeatureExtraction.max_image_size", str(cfg["max_image"]),
+          *(["--FeatureExtraction.num_threads", str(threads)] if threads else [])])
+    step(i18n.tr("srv.pgw_step_matching"),
+         [colmap(), "exhaustive_matcher", "--database_path", db, "--FeatureMatching.use_gpu", "0"])
+    step(i18n.tr("srv.pgw_step_mapping"),
+         [colmap(), "mapper", "--database_path", db, "--image_path", images, "--output_path", sparse])
     model = _largest_model(sparse)
     if not model:
-        raise error_cls("La photogrammétrie n'a pas pu placer les photos. " + _advice(len(photos)))
-    log(f"{_registered(model)} photos placées sur {len(photos)}")
+        raise error_cls(i18n.tr("srv.pgw_not_placed", advice=_advice(len(photos))))
+    log(i18n.tr("srv.pgw_placed", n=_registered(model), total=len(photos)))
     poses = os.path.join(w, "poses")
     os.makedirs(poses)
-    step("lecture des positions", [colmap(), "model_converter", "--input_path", model, "--output_path", poses, "--output_type", "TXT"])
+    step(i18n.tr("srv.pgw_step_read_poses"),
+         [colmap(), "model_converter", "--input_path", model, "--output_path", poses, "--output_type", "TXT"])
     orient = orientation(os.path.join(poses, "images.txt"))
-    step("correction des photos", [colmap(), "image_undistorter", "--image_path", images, "--input_path", model,
-                                   "--output_path", dense, "--output_type", "COLMAP", "--max_image_size", str(cfg["max_image"])])
+    step(i18n.tr("srv.pgw_step_undistort"),
+         [colmap(), "image_undistorter", "--image_path", images, "--input_path", model, "--output_path", dense,
+          "--output_type", "COLMAP", "--max_image_size", str(cfg["max_image"])])
     scene = os.path.join(w, "scene.mvs")
-    step("import OpenMVS", [openmvs("InterfaceCOLMAP"), "-w", w, "-i", dense, "-o", scene])
-    step("nuage de points", [openmvs("DensifyPointCloud"), "-w", w, "-i", scene, "--resolution-level", str(cfg["resolution_level"]),
-                             "--max-resolution", "2560", "--tower-mode", "0"])
-    step("maillage", [openmvs("ReconstructMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"),
-                      "-p", os.path.join(w, "scene_dense.ply")])
+    step(i18n.tr("srv.pgw_step_import"), [openmvs("InterfaceCOLMAP"), "-w", w, "-i", dense, "-o", scene])
+    step(i18n.tr("srv.pgw_step_densify"),
+         [openmvs("DensifyPointCloud"), "-w", w, "-i", scene, "--resolution-level", str(cfg["resolution_level"]),
+          "--max-resolution", "2560", "--tower-mode", "0"])
+    step(i18n.tr("srv.pgw_step_mesh"),
+         [openmvs("ReconstructMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"),
+          "-p", os.path.join(w, "scene_dense.ply")])
     mesh = os.path.join(w, "scene_dense_mesh.ply")
     if not os.path.exists(mesh):
-        raise error_cls("La photogrammétrie n'a pas produit de maillage. " + _advice(len(photos)))
+        raise error_cls(i18n.tr("srv.pgw_no_mesh", advice=_advice(len(photos))))
     # the photos' colors on the mesh, for the colored preview; a failure only loses the colors.
     # As in OpenMVS's own pipeline: the dense scene (cameras, images) plus, apart, the mesh to texture.
     # Seam leveling off: in 2.4.0 it samples 8-bit images as floats and turns the faces black (OpenMVS issue #1257,
@@ -326,11 +332,11 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
     tool_log("TextureMesh")  # how many views and faces it textured
     if code != 0 or not any(p.endswith(".obj") for p in textured):
-        log(f"texture des photos indisponible (code {code}) : le modèle reste sans couleurs")
+        log(i18n.tr("srv.pgw_no_texture", code=code))
         textured = [mesh]
     # OpenMVS's own logs stay with the scan, for a diagnosis after the workspace is gone
     out = _publish(work_dir, level, textured + glob.glob(os.path.join(w, "*.log")), orient)
-    log(f"reconstruction terminée en {time.time() - t0:.0f} s")
+    log(i18n.tr("srv.pg_done", s=f"{time.time() - t0:.0f}"))
     return out
 
 
@@ -348,5 +354,4 @@ def _largest_model(sparse):
 
 
 def _advice(n):
-    return (f"Avec {n} photos, vise 50 ou plus : tour complet, environ 70 % de recouvrement, deux ou trois hauteurs, "
-            "sujet immobile, lumière égale. Ou passe le moteur en IA (une seule photo).")
+    return i18n.tr("srv.pgw_advice", n=n)
