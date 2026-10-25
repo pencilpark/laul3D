@@ -5,6 +5,11 @@ on:
     branches: ["**"]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publier la release vX.Y.Z (version de tauri.conf.json) depuis ce commit"
+        type: boolean
+        default: false
 
 jobs:
   installer:
@@ -98,19 +103,21 @@ jobs:
           Start-Sleep 10
           if (& $find) { throw "le moteur a survécu à l'app" }
 
-      # a v* tag publishes the tested installer; the Mac DMG, built on a Mac, is added to the same release
+      # a v* tag, or a manual run with "release" ticked (gh then creates the tag), publishes the tested
+      # installer; the Mac DMG, built on a Mac, is added to the same release
       - name: Publish the GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          REF_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
         run: |
           $setup = Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
-          gh release view $env:TAG *> $null
+          $tag = if ($env:REF_TAG) { $env:REF_TAG } else { "v" + (Get-Content desktop\src-tauri\tauri.conf.json -Raw | ConvertFrom-Json).version }
+          gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:TAG $setup.FullName --clobber
+            gh release upload $tag $setup.FullName --clobber
           } else {
-            gh release create $env:TAG $setup.FullName --title "Berria Craft $($env:TAG.TrimStart('v'))" --notes-file desktop\release-notes.md
+            gh release create $tag $setup.FullName --target $env:GITHUB_SHA --title "Berria Craft $($tag.TrimStart('v'))" --notes-file desktop\release-notes.md
           }
           if ($LASTEXITCODE -ne 0) { throw "publication de la release impossible (code $LASTEXITCODE)" }
 
