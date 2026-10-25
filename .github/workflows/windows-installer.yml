@@ -1,0 +1,105 @@
+name: windows-installer
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      UV_VERSION: "0.13.5"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$env:UV_VERSION/uv-x86_64-pc-windows-msvc.zip" -OutFile uv.zip
+          Expand-Archive uv.zip -DestinationPath "$env:RUNNER_TEMP\uv"
+          "$env:RUNNER_TEMP\uv" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            desktop\src-tauri\target
+          key: tauri-win-${{ hashFiles('desktop/src-tauri/Cargo.toml', 'desktop/src-tauri/Cargo.lock') }}
+
+      - name: Build the installer
+        run: desktop\build_windows.ps1
+
+      - name: Silent install
+        run: |
+          $setup = Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList "/S" -Wait
+          $inst = @("$env:LOCALAPPDATA\Berria Craft", "$env:LOCALAPPDATA\Programs\Berria Craft") |
+            Where-Object { Test-Path "$_\python\python.exe" } | Select-Object -First 1
+          if (-not $inst) { throw "installation introuvable" }
+          "INSTALL_DIR=$inst" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-ChildItem $inst | Select-Object -ExpandProperty Name
+
+      - name: Launcher starts and stops the engine (accented data path)
+        run: |
+          $psi = [System.Diagnostics.ProcessStartInfo]::new("$env:INSTALL_DIR\python\python.exe")
+          $psi.Arguments = "-I -B -X utf8 `"$env:INSTALL_DIR\app\desktop\boot.py`" --port 8650"
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardInput = $true
+          $psi.RedirectStandardOutput = $true
+          $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+          $psi.Environment["LOWPOLY_HOME"] = Join-Path $env:RUNNER_TEMP "Frédéric\ Mon -Chemin\Données appli"
+          $p = [System.Diagnostics.Process]::Start($psi)
+          $ready = $false
+          while ($null -ne ($line = $p.StandardOutput.ReadLine())) {
+            Write-Host $line
+            if ($line.StartsWith("READY")) { $ready = $true; break }
+          }
+          if (-not $ready) { throw "le moteur n'a pas démarré" }
+          (Invoke-RestMethod http://127.0.0.1:8650/api/status).tools | ConvertTo-Json
+          $p.StandardInput.Close()
+          if (-not $p.WaitForExit(20000)) { throw "le lanceur ne s'est pas arrêté" }
+          Start-Sleep 2
+          if (Get-NetTCPConnection -LocalPort 8650 -State Listen -ErrorAction SilentlyContinue) { throw "le moteur écoute encore" }
+
+      - name: App window starts the engine, which stops with the app
+        run: |
+          $exe = Get-ChildItem $env:INSTALL_DIR -Filter *.exe | Where-Object { $_.Name -notlike "uninstall*" } | Select-Object -First 1
+          $app = Start-Process $exe.FullName -PassThru
+          $find = { Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Where-Object { $_.CommandLine -like "*uvicorn app.server*" } }
+          $deadline = (Get-Date).AddMinutes(5)
+          do { Start-Sleep 3; $server = & $find } until ($server -or (Get-Date) -gt $deadline -or $app.HasExited)
+          if (-not $server) { throw "l'app n'a pas démarré son moteur" }
+          $port = [regex]::Match($server.CommandLine, '--port (\d+)').Groups[1].Value
+          # the process shows up a moment before the server listens
+          $ok = $false
+          for ($i = 0; $i -lt 30 -and -not $ok; $i++) {
+            try { Invoke-RestMethod "http://127.0.0.1:$port/api/status" | Out-Null; $ok = $true } catch { Start-Sleep 1 }
+          }
+          if (-not $ok) { throw "le moteur de l'app ne répond pas" }
+          Start-Sleep 8
+          $log = "$env:LOCALAPPDATA\com.pencilpark.berriacraft\logs\serveur.log"
+          Get-Content $log -Tail 8
+          if (-not (Select-String -Path $log -Pattern '"GET / HTTP' -Quiet)) { throw "la fenêtre n'a pas chargé l'interface" }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$env:GITHUB_WORKSPACE\app-windows.png")
+          Stop-Process -Id $app.Id
+          Start-Sleep 10
+          if (& $find) { throw "le moteur a survécu à l'app" }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: berria-craft-windows
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            app-windows.png
+          if-no-files-found: warn

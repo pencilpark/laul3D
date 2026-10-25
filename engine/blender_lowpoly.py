@@ -22,6 +22,9 @@ LEVELS = {
     "medium": (20000, 400, 2),
     "detailed": (300000, 650, 1),
 }
+# extra smoothing on demand, as a blur of the volume: (filter width in voxels, iterations). Surface filters were
+# tried first on a 69-photo bust: Blender's Laplacian solver took minutes, Taubin left 5 mm bumps untouched.
+SMOOTH = {1: (2, 1), 2: (3, 1), 3: (4, 2)}
 
 
 def parse_args():
@@ -46,6 +49,10 @@ def parse_args():
     ap.add_argument("--previews-only", action="store_true", help="only render the 4 views of --input (an STL)")
     ap.add_argument("--preview-engine", choices=["workbench", "cycles"], default="workbench",
                     help="cycles renders on the CPU and needs no OpenGL context")
+    ap.add_argument("--smooth", type=int, choices=sorted(SMOOTH) + [0], default=0, help="extra smoothing: 0 none to 3 strong")
+    ap.add_argument("--colors", action="store_true", help="also write NAME_couleurs.glb, the scan's colors on the result")
+    ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
+    ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
     return ap.parse_args(argv)
 
 
@@ -58,11 +65,13 @@ def clear_scene():
         bpy.data.objects.remove(o, do_unlink=True)
 
 
-def import_any(path):
+def import_any(path, raw_axes=False):
     ext = os.path.splitext(path)[1].lower()
     before = set(bpy.data.objects)
     if ext in (".usdz", ".usd", ".usdc", ".usda"):
         bpy.ops.wm.usd_import(filepath=path)
+    elif ext == ".obj" and raw_axes:
+        bpy.ops.wm.obj_import(filepath=path, forward_axis="Y", up_axis="Z")
     elif ext == ".obj":
         bpy.ops.wm.obj_import(filepath=path)
     elif ext in (".glb", ".gltf"):
@@ -278,6 +287,133 @@ def cut_flat_base(bm, frac):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 
 
+def sdf_smooth(obj, voxel, width, iterations):
+    """Blurs the model's volume (OpenVDB mean filter on its distance field): bumps narrower than about
+    width x voxel melt, larger forms stay, and the result is closed by construction."""
+    ng = bpy.data.node_groups.new("lissage", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nodes, links = ng.nodes, ng.links
+    gi, go = nodes.new("NodeGroupInput"), nodes.new("NodeGroupOutput")
+    to_sdf = nodes.new("GeometryNodeMeshToSDFGrid")
+    set_input(to_sdf, "Voxel Size", voxel)
+    set_input(to_sdf, "Band Width", width + 3)
+    mean = nodes.new("GeometryNodeSDFGridMean")
+    set_input(mean, "Width", width)
+    set_input(mean, "Iterations", iterations)
+    to_mesh = nodes.new("GeometryNodeGridToMesh")
+    set_input(to_mesh, "Threshold", 0.0)
+    set_input(to_mesh, "Adaptivity", 0.0)
+    links.new(gi.outputs[0], to_sdf.inputs["Mesh"])
+    links.new(to_sdf.outputs[0], mean.inputs["Grid"])
+    links.new(mean.outputs[0], to_mesh.inputs["Grid"])
+    links.new(to_mesh.outputs[0], go.inputs[0])
+    mod = obj.modifiers.new("lissage", "NODES")
+    mod.node_group = ng
+    apply_modifier(obj, mod)
+
+
+def base_color_linked(obj):
+    for slot in obj.material_slots:
+        m = slot.material
+        bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None) if m and m.node_tree else None
+        if bsdf and bsdf.inputs[0].is_linked:
+            return True
+    return False
+
+
+def has_colors(objects):
+    """The scan carries colors: a texture behind its base color, or a color attribute (TripoSR)."""
+    return any(o.data.color_attributes or base_color_linked(o) for o in objects)
+
+
+def color_attribute_material(obj):
+    mat = bpy.data.materials.new("couleurs_scan")
+    if mat.node_tree is None:
+        mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
+    attr = nodes.new("ShaderNodeVertexColor")
+    attr.layer_name = obj.data.color_attributes[0].name
+    mat.node_tree.links.new(attr.outputs[0], bsdf.inputs[0])
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+
+
+def bake_colors(target, sources, reach):
+    """Projects the scan's colors onto the printable mesh: Cycles bake into a face-corner color attribute."""
+    for o in sources:
+        if o.data.color_attributes and not base_color_linked(o):
+            color_attribute_material(o)
+        o.hide_render = False
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 1
+    attr = target.data.color_attributes.new("couleur", "BYTE_COLOR", "CORNER")
+    target.data.color_attributes.active_color = attr
+    if not target.data.materials:
+        target.data.materials.append(bpy.data.materials.new("couleur"))
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o in sources or o is target)
+    bpy.context.view_layer.objects.active = target
+    try:
+        bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, margin=0,
+                            cage_extrusion=reach, max_ray_distance=2 * reach, target="VERTEX_COLORS")
+    except RuntimeError as e:
+        log(f"couleurs indisponibles : {e}")
+        return False
+    return True
+
+
+def describe_textures(sources):
+    for img in {n.image for o in sources for s in o.material_slots if s.material and s.material.node_tree
+                for n in s.material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image}:
+        w, h = img.size  # reading the size loads the file
+        log(f"texture du scan : {os.path.basename(img.filepath)}, {w} x {h}{'' if w else ' (illisible)'}")
+    if not any(o.data.uv_layers for o in sources if base_color_linked(o)):
+        log("texture du scan sans coordonnées de texture")
+
+
+UNSEEN_GREY = 0.716  # photogrammetry_win.UNSEEN (0xDCDCDC) in linear values, as the color attribute returns them
+
+
+def colors_blank(obj):
+    """A bake that hit nothing, a black texture, or one of faces no photo showed: no colors beats a dull model."""
+    data = obj.data.color_attributes.active_color.data
+    cols = [0.0] * (len(data) * 4)
+    data.foreach_get("color", cols)
+    corners = [cols[i:i + 3] for i in range(0, len(cols), 4)]
+    dark = sum(max(c) for c in corners) / len(corners) < 0.04
+    unseen = sum(all(abs(v - UNSEEN_GREY) < 0.03 for v in c) for c in corners) > 0.9 * len(corners)
+    return dark or unseen
+
+
+def flatten_face_colors(obj):
+    """LowPoly: one color per facet, the look of a painted figurine."""
+    data = obj.data.color_attributes.active_color.data
+    cols = [0.0] * (len(data) * 4)
+    data.foreach_get("color", cols)
+    for p in obj.data.polygons:
+        start, n = p.loop_start * 4, p.loop_total
+        mean = [sum(cols[start + k * 4 + c] for k in range(n)) / n for c in range(4)]
+        cols[start:start + n * 4] = mean * n
+    data.foreach_set("color", cols)
+
+
+def export_colors(obj, outdir, name):
+    path = os.path.join(outdir, f"{name}_couleurs.glb")
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o is obj)
+    bpy.context.view_layer.objects.active = obj
+    # Z up like the STL, so the viewer places both the same way; normals are recomputed there
+    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_yup=False,
+                              export_materials="NONE", export_vertex_color="ACTIVE",
+                              export_active_vertex_color_when_no_material=True, export_normals=False,
+                              export_texcoords=False)
+    return path
+
+
 def topology_checks(bm):
     bm.normal_update()
     tree = BVHTree.FromBMesh(bm, epsilon=0.00001)
@@ -394,15 +530,31 @@ def main():
         print("PREVIEWS " + json.dumps(render_previews(obj, a.outdir, a.name, a.preview_engine)), flush=True)
         return
 
-    meshes = import_any(a.input)
+    meshes = import_any(a.input, a.raw_axes)
     bm = merge_to_bmesh(meshes)
-    clear_scene()
-    log(f"import : {len(meshes)} maillage(s), {len(bm.faces)} faces")
+    # the colored scan stays aside, frozen where it is, to color the result at the end
+    sources = meshes if a.colors and has_colors(meshes) else []
+    placed = []
+    for o in sources:
+        mw = o.matrix_world.copy()
+        o.parent = None
+        o.matrix_world = mw
+        o.hide_render = True
+        placed.append(mw)
+    for o in list(bpy.data.objects):
+        if o not in sources:
+            bpy.data.objects.remove(o, do_unlink=True)
+    log(f"import : {len(meshes)} maillage(s), {len(bm.faces)} faces{', couleurs du scan gardées' if sources else ''}")
+    if sources:
+        describe_textures(sources)
 
-    bm.transform(Euler([math.radians(r) for r in a.rot], "XYZ").to_matrix().to_4x4())
+    turn = Euler([math.radians(r) for r in a.rot], "XYZ").to_matrix().to_4x4()
+    if a.orient:
+        turn = turn @ Matrix([a.orient[0:3], a.orient[3:6], a.orient[6:9]]).to_4x4()
     for axis in a.rot_seq.lower():
         if axis in "xyz":
-            bm.transform(Matrix.Rotation(math.radians(90), 4, axis.upper()))
+            turn = Matrix.Rotation(math.radians(90), 4, axis.upper()) @ turn
+    bm.transform(turn)
     lo, hi = bounds(bm)
     size = hi - lo
     if min(size) <= 0:
@@ -410,7 +562,8 @@ def main():
     bed = Vector(a.bed) - Vector((a.margin, a.margin, a.margin / 2))
     height = min(a.height_mm, bed.z)
     s = min(height / size.z, bed.x / size.x, bed.y / size.y)
-    bm.transform(Matrix.Scale(s, 4) @ Matrix.Translation(-(lo + hi) / 2))
+    fit = Matrix.Scale(s, 4) @ Matrix.Translation(-(lo + hi) / 2)
+    bm.transform(fit)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=max(size) * s * 1e-5)
     obj = bm_to_object(bm, a.name)
     bm.free()
@@ -431,6 +584,16 @@ def main():
     sm.factor = 0.5
     sm.iterations = smooth_passes
     apply_modifier(obj, sm)
+    if a.smooth:
+        t1 = time.time()
+        width, iterations = SMOOTH[a.smooth]
+        sdf_smooth(obj, voxel, width, iterations)
+        bm = object_to_bm(obj)
+        keep_shells(bm, a.keep_parts)  # a thin strand may have come loose
+        bm.to_mesh(obj.data)
+        bm.free()
+        log(f"lissage {a.smooth} : flou du volume sur {width * voxel:.1f} mm, {iterations} passe(s), "
+            f"{len(obj.data.polygons)} faces, {time.time() - t1:.1f} s")
 
     target = a.faces or default_faces
     work = bm = None
@@ -457,12 +620,26 @@ def main():
     lo, hi = bounds(bm)
     size = hi - lo
     s2 = min(height / size.z, bed.x / size.x, bed.y / size.y)
-    bm.transform(Matrix.Translation((0, 0, size.z * s2 / 2)) @ Matrix.Scale(s2, 4) @ Matrix.Translation(-(lo + hi) / 2))
+    refit = Matrix.Translation((0, 0, size.z * s2 / 2)) @ Matrix.Scale(s2, 4) @ Matrix.Translation(-(lo + hi) / 2)
+    bm.transform(refit)
     lo, hi = bounds(bm)
     report = topology_checks(bm)
     report.update(print_checks(bm, 2 * a.nozzle))
     bm.to_mesh(work.data)
     bm.free()
+    report["colors"] = None
+    if sources:
+        for o, mw in zip(sources, placed):
+            o.matrix_world = refit @ fit @ turn @ mw
+        # the result moved off the scan by remeshing, smoothing and decimation: a few percent of the height
+        if bake_colors(work, sources, reach=0.03 * height):
+            if colors_blank(work):
+                log("couleurs du scan inexploitables (noires ou absentes des photos) : aperçu Rendu désactivé pour ce modèle")
+            else:
+                if a.level == "lowpoly":
+                    flatten_face_colors(work)
+                report["colors"] = export_colors(work, a.outdir, a.name)
+                log("couleurs du scan projetées")
     for o in list(bpy.data.objects):
         if o is not work:
             bpy.data.objects.remove(o, do_unlink=True)

@@ -20,6 +20,9 @@ def run_cli(photos, out, extra):
     cmd = [sys.executable, os.path.join(ROOT, "engine", "cli.py"), photos, "--sortie", out, *extra]
     t0 = time.time()
     p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "cli.log"), "w", encoding="utf-8") as f:  # whole run, kept in the CI artifact
+        f.write(p.stdout + p.stderr)
     print(p.stdout[-4000:])
     if p.returncode != 0:
         print(p.stderr[-4000:], file=sys.stderr)
