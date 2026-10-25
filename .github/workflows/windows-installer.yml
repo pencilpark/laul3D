@@ -3,12 +3,15 @@ name: windows-installer
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
   installer:
     runs-on: windows-latest
     timeout-minutes: 75
+    permissions:
+      contents: write
     defaults:
       run:
         shell: pwsh
@@ -94,6 +97,22 @@ jobs:
           Stop-Process -Id $app.Id
           Start-Sleep 10
           if (& $find) { throw "le moteur a survécu à l'app" }
+
+      # a v* tag publishes the tested installer; the Mac DMG, built on a Mac, is added to the same release
+      - name: Publish the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $setup = Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $setup.FullName --clobber
+          } else {
+            gh release create $env:TAG $setup.FullName --title "Berria Craft $($env:TAG.TrimStart('v'))" --notes-file desktop\release-notes.md
+          }
+          if ($LASTEXITCODE -ne 0) { throw "publication de la release impossible (code $LASTEXITCODE)" }
 
       - uses: actions/upload-artifact@v4
         if: always()

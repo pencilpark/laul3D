@@ -38,6 +38,9 @@ jobs:
       - name: Launcher stops its children when closed early or when the engine never answers
         run: .venv\Scripts\python.exe tests\boot_test.py
 
+      - name: Project deletion (open file refused, queued job dropped)
+        run: .venv\Scripts\python.exe tests\delete_project_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:

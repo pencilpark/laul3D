@@ -378,15 +378,21 @@ def describe_textures(sources):
 UNSEEN_GREY = 0.716  # photogrammetry_win.UNSEEN (0xDCDCDC) in linear values, as the color attribute returns them
 
 
-def colors_blank(obj):
-    """A bake that hit nothing, a black texture, or one of faces no photo showed: no colors beats a dull model."""
+def colors_problem(obj):
+    """Why the baked colors are unusable, or None: no colors beats a wrong model."""
     data = obj.data.color_attributes.active_color.data
     cols = [0.0] * (len(data) * 4)
     data.foreach_get("color", cols)
     corners = [cols[i:i + 3] for i in range(0, len(cols), 4)]
-    dark = sum(max(c) for c in corners) / len(corners) < 0.04
-    unseen = sum(all(abs(v - UNSEEN_GREY) < 0.03 for v in c) for c in corners) > 0.9 * len(corners)
-    return dark or unseen
+    seen = [c for c in corners if not all(abs(v - UNSEEN_GREY) < 0.03 for v in c)]
+    if len(seen) < 0.1 * len(corners):
+        return "faces absentes des photos"
+    # judged on the seen faces only, so some unseen grey cannot hide a black model
+    if sum(max(c) < 0.007 for c in seen) > 0.5 * len(seen):  # under about 20/255: rays that hit nothing, black texels
+        return "noires"
+    if sum(c[0] > 0.8 and c[1] < 0.05 and c[2] > 0.8 for c in seen) > 0.5 * len(seen):  # Blender's missing image
+        return "texture illisible"
+    return None
 
 
 def flatten_face_colors(obj):
@@ -633,8 +639,9 @@ def main():
             o.matrix_world = refit @ fit @ turn @ mw
         # the result moved off the scan by remeshing, smoothing and decimation: a few percent of the height
         if bake_colors(work, sources, reach=0.03 * height):
-            if colors_blank(work):
-                log("couleurs du scan inexploitables (noires ou absentes des photos) : aperçu Rendu désactivé pour ce modèle")
+            problem = colors_problem(work)
+            if problem:
+                log(f"couleurs du scan inexploitables ({problem}) : aperçu Rendu désactivé pour ce modèle")
             else:
                 if a.level == "lowpoly":
                     flatten_face_colors(work)

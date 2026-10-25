@@ -1,12 +1,15 @@
 """End-to-end smoke test: headless CLI on synthetic photos, inside a folder with accents and spaces.
 
 python tests/smoke_test.py [--photogrammetry] [--ia] [--out results.json]
-Photos: tests/fixtures/suzanne_48 (Blender renders, regenerate with tests/fixtures/render_views.py).
+Photos: tests/fixtures/suzanne_48, a Suzanne with colored cells (Blender renders, regenerate with
+tests/fixtures/render_views.py -- OUT --couleurs). The photogrammetry run must give a colored preview.
 """
 import argparse
 import json
 import os
+import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -14,6 +17,27 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "suzanne_48")
+# the lines that explain the colors, which the end of the output alone often misses
+KEY_LINES = re.compile(r"TextureMesh|texture du scan|texture des photos|couleurs|photos placées|reconstruction|ERREUR")
+
+
+def glb_colors(path):
+    """Share of black corners and mean saturation of the colored preview (its COLOR_0), in sRGB."""
+    import numpy as np
+    with open(path, "rb") as f:
+        data = f.read()
+    size = struct.unpack_from("<I", data, 12)[0]
+    gltf = json.loads(data[20:20 + size])
+    acc = gltf["accessors"][gltf["meshes"][0]["primitives"][0]["attributes"]["COLOR_0"]]
+    view = gltf["bufferViews"][acc["bufferView"]]
+    dtype, scale = {5121: (np.uint8, 255), 5123: (np.uint16, 65535), 5126: (np.float32, 1)}[acc["componentType"]]
+    n = {"VEC3": 3, "VEC4": 4}[acc["type"]]
+    assert view.get("byteStride", n * np.dtype(dtype).itemsize) == n * np.dtype(dtype).itemsize, view
+    start = 20 + size + 8 + view.get("byteOffset", 0) + acc.get("byteOffset", 0)
+    lin = np.frombuffer(data, dtype, acc["count"] * n, start).reshape(-1, n)[:, :3] / scale
+    srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(lin, 1 / 2.4) - 0.055)
+    return {"black": round(float((srgb.max(1) < 20 / 255).mean()), 3),
+            "saturation": round(float((srgb.max(1) - srgb.min(1)).mean()), 3)}
 
 
 def run_cli(photos, out, extra):
@@ -23,7 +47,8 @@ def run_cli(photos, out, extra):
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "cli.log"), "w", encoding="utf-8") as f:  # whole run, kept in the CI artifact
         f.write(p.stdout + p.stderr)
-    print(p.stdout[-4000:])
+    print("\n".join(line for line in p.stdout.splitlines() if KEY_LINES.search(line)))
+    print(p.stdout[-1500:])
     if p.returncode != 0:
         print(p.stderr[-4000:], file=sys.stderr)
         raise SystemExit(f"échec de la CLI (code {p.returncode})")
@@ -31,6 +56,8 @@ def run_cli(photos, out, extra):
     assert summary["printable"], summary
     assert summary["triangles"] > 100, summary
     assert os.path.getsize(summary["stl"]) > 1000, summary
+    if summary.get("colors"):
+        summary["colors_stats"] = glb_colors(summary["colors"])
     summary["seconds"] = round(time.time() - t0, 1)
     return summary
 
@@ -52,8 +79,12 @@ def main():
     if a.photogrammetry:
         photos = os.path.join(base, "photos multi")
         shutil.copytree(FIXTURES, photos)
-        results["photogrammetry"] = run_cli(photos, os.path.join(base, "sortie pg"),
-                                            ["--niveau", "lowpoly", "--moteur", "photogrammetry", "--facettes", "500", "--hauteur", "60"])
+        pg = run_cli(photos, os.path.join(base, "sortie pg"),
+                     ["--niveau", "lowpoly", "--moteur", "photogrammetry", "--facettes", "500", "--hauteur", "60"])
+        results["photogrammetry"] = pg
+        # black: OpenMVS 2.4.0 seam leveling; grey: faces without photos. The fixture's cells average to about 0.12
+        assert pg.get("colors"), "photogrammétrie sans aperçu en couleurs"
+        assert pg["colors_stats"]["black"] < 0.3 and pg["colors_stats"]["saturation"] > 0.06, pg["colors_stats"]
     if a.ia:
         photo = os.path.join(base, "photo unique")
         os.makedirs(photo)

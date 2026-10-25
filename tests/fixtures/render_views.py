@@ -1,6 +1,7 @@
 import bpy, math, sys, os
 from mathutils import Vector
-out = sys.argv[sys.argv.index("--") + 1]
+args = sys.argv[sys.argv.index("--") + 1:]
+out = args[0]
 os.makedirs(out, exist_ok=True)
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
 bpy.ops.mesh.primitive_monkey_add(size=2)
@@ -16,6 +17,12 @@ mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"
 mix.inputs["Factor"].default_value = 0.5
 nt.links.new(noise.outputs["Color"], mix.inputs[6])
 nt.links.new(vor.outputs["Color"], mix.inputs[7])
+if "--couleurs" in args:
+    # saturated cells, so a grey or black texture shows in the colored preview test
+    hsv = nt.nodes.new("ShaderNodeHueSaturation"); hsv.inputs["Saturation"].default_value = 2.5
+    nt.links.new(vor.outputs["Color"], hsv.inputs["Color"])
+    nt.links.new(hsv.outputs["Color"], mix.inputs[7])
+    mix.inputs["Factor"].default_value = 0.85
 nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
 bsdf.inputs["Roughness"].default_value = 0.7
 m.data.materials.append(mat)
@@ -25,7 +32,7 @@ bg.inputs["Color"].default_value = (0.85, 0.85, 0.85, 1); bg.inputs["Strength"].
 sc = bpy.context.scene
 engines = [i.identifier for i in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
 print("engines", engines)
-eng = next((e for e in engines if "EEVEE" in e), "CYCLES")
+eng = "CYCLES" if "--cycles" in args else next((e for e in engines if "EEVEE" in e), "CYCLES")
 sc.render.engine = eng
 if eng == "CYCLES": sc.cycles.samples = 32
 sc.render.resolution_x, sc.render.resolution_y = 1600, 1200
