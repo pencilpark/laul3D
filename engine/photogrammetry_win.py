@@ -21,6 +21,7 @@ import pipeline as pl
 COLMAP_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
 ORIENTATION, MAKE, MODEL, EXIF_IFD, FOCAL, FOCAL_35MM = 0x0112, 0x010F, 0x0110, 0x8769, 0x920A, 0xA405
 UNSEEN = 0xDCDCDC  # faces no photo shows: the solid preview's grey rather than OpenMVS's orange
+SCAN_VERSION = 2  # raised when the same photos give a different scan: older caches are computed again
 # CPU time grows fast with image size: the levels follow Object Capture's preview / medium / full
 LEVELS = {"lowpoly": {"max_image": 1600, "resolution_level": 2},
           "medium": {"max_image": 2000, "resolution_level": 1},
@@ -171,7 +172,14 @@ def _cached(work_dir, level):
     # the folder only appears complete (see _publish): mesh, its textures and its orientation together
     folder = os.path.join(work_dir, f"scan_{level}")
     found = glob.glob(os.path.join(folder, "*.obj")) + glob.glob(os.path.join(folder, "*.ply"))
-    return found[0] if found and os.path.exists(found[0] + ".orient.json") else None
+    if not found:
+        return None
+    try:
+        with open(found[0] + ".orient.json", encoding="utf-8") as f:
+            current = json.load(f).get("version") == SCAN_VERSION
+    except (OSError, ValueError):
+        return None
+    return found[0] if current else None
 
 
 def _publish(work_dir, level, files, orient):
@@ -184,7 +192,7 @@ def _publish(work_dir, level, files, orient):
         shutil.move(p, staged)
     mesh = next(p for p in glob.glob(os.path.join(staged, "*")) if p.endswith((".obj", ".ply")))
     with open(mesh + ".orient.json", "w", encoding="utf-8") as f:  # read by blender_prep: COLMAP axes, then this rotation
-        json.dump({"matrix": orient, "raw_axes": True}, f)
+        json.dump({"matrix": orient, "raw_axes": True, "version": SCAN_VERSION}, f)
     shutil.rmtree(final, ignore_errors=True)
     os.replace(staged, final)
     return os.path.join(final, os.path.basename(mesh))
@@ -257,10 +265,13 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     if not os.path.exists(mesh):
         raise error_cls("La photogrammétrie n'a pas produit de maillage. " + _advice(len(photos)))
     # the photos' colors on the mesh, for the colored preview; a failure only loses the colors.
-    # As in OpenMVS's own pipeline: the dense scene (cameras, images) plus, apart, the mesh to texture
+    # As in OpenMVS's own pipeline: the dense scene (cameras, images) plus, apart, the mesh to texture.
+    # Seam leveling off: in 2.4.0 it samples 8-bit images as floats and turns the faces black (OpenMVS issue #1257,
+    # fixed on develop only). The colors end on the vertices of the printable mesh, where seams barely show.
     code, _ = run([openmvs("TextureMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"), "-m", mesh,
                    "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj", "--empty-color", str(UNSEEN),
-                   "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096"], log, cwd=w, env=env)
+                   "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096",
+                   "--global-seam-leveling", "0", "--local-seam-leveling", "0"], log, cwd=w, env=env)
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
     tool_log("TextureMesh")  # how many views and faces it textured
     if code != 0 or not any(p.endswith(".obj") for p in textured):
