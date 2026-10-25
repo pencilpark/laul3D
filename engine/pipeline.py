@@ -335,7 +335,8 @@ def blender_prep(raw, out_dir, name, level, s, log):
     cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
                   "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
                   "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
-                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors"]
+                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors",
+                  "--filaments", str(int(s.get("filaments", 4)))]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
