@@ -84,16 +84,24 @@ Trois cases dans Réglages avancés, et dans « Recalculer avec ces réglages »
 
 - Logiciels 3D (Blender, sculpture, animation) : 20 000 quads environ par QuadriFlow, le remailleur de Blender, textures 4096, fichiers `.blend` (textures à côté, chemins relatifs), FBX et OBJ. Si QuadriFlow refuse le modèle, le profil sort en triangles et le journal le dit. Pour animer un personnage, une retopologie à la main reste utile : QuadriFlow aligne les quads sur la forme, sans tenir compte des articulations.
 - Jeux (Unity, Unreal, Godot) : 50 000 triangles et deux niveaux de détail à 50 et 25 %, en GLB et en FBX, couleur en JPEG et normal map en PNG, 2048 px.
-- Web (three.js, model-viewer) : un GLB de 50 000 triangles, textures JPEG 2048, environ 1,7 Mo sur le scan de test. Une version compressée Draco s'y ajoute quand le Blender installé contient la bibliothèque Draco ; le fichier est vérifié, car l'export de Blender réussit sans elle mais n'écrit alors rien de compressé.
+- Web (three.js, model-viewer) : un GLB de 50 000 triangles, textures JPEG 2048, environ 1,7 Mo sur le scan de test. Une version compressée Draco s'y ajoute quand le Blender installé contient la bibliothèque Draco, ce qui est le cas du Blender 5.2.3 officiel (vérifié dans la CI Windows) ; le fichier est contrôlé, car l'export de Blender réussit sans elle mais n'écrit alors rien de compressé.
 
 Pour chaque profil : morceaux détachés retirés, surface fermée et lissée comme pour l'impression, puis réduction, dépliage UV (Smart UV Project), couleurs des photos cuites dans une texture et relief du modèle lissé dans une normal map. Sans couleurs exploitables, seule la normal map est livrée. Durées mesurées sur un petit scan de test, processeur à 4 cœurs : 15 s environ pour Web ou Jeux, une minute environ pour Logiciels 3D ; davantage sur un scan détaillé. Ces fichiers portent des noms en anglais (`_software`, `_game`, `_web`).
+
+## Langues
+
+L'app existe en anglais (langue par défaut), français, espagnol, allemand, portugais du Brésil, chinois simplifié et japonais. Au premier lancement, elle prend la langue de l'interface du système, lue par le moteur Python (sous Windows, le navigateur intégré ne la donne pas de façon fiable) ; une langue absente de la liste donne l'anglais, le chinois traditionnel aussi. Le menu en haut à droite change de langue ; le choix est gardé dans `data/prefs.json`. L'installeur Windows s'affiche dans la langue du système parmi les sept.
+
+Les textes sont dans `app/static/i18n/<langue>.json`, partagés par l'interface (`tr()`) et par le moteur (`engine/i18n.py`, clés `srv.`). La page de démarrage en garde une copie : après une modification des clés `splash.`, lancer `python desktop/splash_strings.py`. `tests/i18n_test.py` vérifie que les sept fichiers ont les mêmes clés et les mêmes variables, et que le code n'utilise que des clés existantes. Les messages déjà enregistrés dans un projet (étapes, erreurs, journal) restent dans la langue où ils ont été écrits.
+
+Les fichiers produits ont des noms anglais pour tout le monde depuis la 0.5.0 (`_colors.glb`, `_colors_orca.obj`, `_colors_texture.zip`, vues `_front`, `_right`, `_back`, `_three_quarter`) ; ceux des projets déjà calculés gardent leur nom.
 
 ## Dossiers de l'app installée
 
 Données dans `~/Library/Application Support/com.pencilpark.berriacraft` (Mac) ou `%LOCALAPPDATA%\com.pencilpark.berriacraft` (Windows) :
 - `runtime`, `venv` : Python privé de l'app et ses bibliothèques ;
 - `data/tools` : Blender, COLMAP, OpenMVS, OrcaSlicer (Windows) installés par l'app ; `data/models` : modèles du module IA ;
-- `Projets/<date>-<nom>` : photos reçues, reconstructions en cache, exports par niveau ;
+- `Projects/<date>-<nom>` : photos reçues, reconstructions en cache, exports par niveau (le dossier `Projets` des versions précédentes est renommé au premier lancement de la 0.5.0) ;
 - `logs/serveur.log` : journal du moteur.
 
 Les STL enregistrés vont dans Téléchargements. Un projet se supprime depuis la liste des projets (corbeille, avec confirmation) : son dossier est effacé, sauf pendant un calcul ; les fichiers déjà enregistrés dans Téléchargements restent.

@@ -13,6 +13,7 @@ import urllib.request
 import zipfile
 
 import fetch
+import i18n
 import pipeline as pl
 
 # pinned downloads from the official release pages; each part: url, size, sha256, kind (dmg-app, zip),
@@ -21,7 +22,7 @@ BLENDER = "https://download.blender.org/release/Blender5.2"
 GITHUB = "https://github.com"
 SPECS = {
     "blender": {
-        "label": "Blender", "role": "Calcul 3D", "required": True,
+        "label": "Blender", "required": True,
         "mac": [{"url": f"{BLENDER}/blender-5.2.3-macos-arm64.dmg", "size": 346295881, "kind": "dmg-app",
                  "sha256": "acc05374485a272342d4b323c15ac01953e7f697da2f1bad8af9c3bf087267a4",
                  "inner": "Blender.app", "dest": "Blender.app"}],
@@ -30,7 +31,7 @@ SPECS = {
                  "inner": "blender-5.2.3-windows-x64", "dest": "blender"}],
     },
     "photogrammetry": {
-        "label": "COLMAP + OpenMVS", "role": "Plusieurs photos", "required": False,
+        "label": "COLMAP + OpenMVS", "required": False,
         "mac": None,  # Object Capture comes with the app
         "win": [{"url": f"{GITHUB}/colmap/colmap/releases/download/4.2.1/colmap-x64-windows-nocuda.zip", "size": 127731595,
                  "kind": "zip", "sha256": "c493d88cb4a43f21afba42cb55bf786e5434a0420e73db0ba1454c5d8b3686ae",
@@ -40,7 +41,7 @@ SPECS = {
                  "inner": "vc17/x64/Release", "dest": "openmvs"}],
     },
     "orcaslicer": {
-        "label": "OrcaSlicer", "role": "Impression", "required": False,
+        "label": "OrcaSlicer", "required": False,
         "mac": [{"url": f"{GITHUB}/OrcaSlicer/OrcaSlicer/releases/download/v2.4.2/OrcaSlicer_Mac_universal_V2.4.2.dmg",
                  "size": 246088803, "kind": "dmg-app",
                  "sha256": "e15e7bb1b66214ec6e96b169b388004179c4f5f705effcdaf8c80d4992ee0366",
@@ -56,7 +57,6 @@ SKIP_IN_ZIP = ("_test.exe", ".pdb")
 # COLMAP 4.2.1 is linked with MSVC 14.51, and so needs at least that runtime; OpenMVS and torch use it too
 VCREDIST_URL = "https://aka.ms/vc14/vc_redist.x64.exe"
 VCREDIST_MIN = (14, 51)
-NET_ERROR = "connexion à Internet impossible ; vérifie la connexion puis clique « Réessayer »"
 
 LOCK = threading.Lock()
 VCREDIST_LOCK = threading.Lock()  # the AI and photogrammetry installs both need it, and may run together
@@ -76,11 +76,17 @@ def parts(tool):
     return SPECS[tool].get(_platform()) or []
 
 
+def role(tool):
+    """What the tool does in the app, in the current language: read at each status request."""
+    return {"blender": i18n.tr("srv.tools_role_blender"), "photogrammetry": i18n.tr("srv.tools_role_photogrammetry"),
+            "orcaslicer": i18n.tr("srv.tools_role_orcaslicer")}[tool]
+
+
 def snapshot():
     with LOCK:
         s = dict(STATE)
     have = installed()
-    s["tools"] = [{"id": k, "label": v["label"], "role": v["role"], "required": v["required"], "installed": have[k],
+    s["tools"] = [{"id": k, "label": v["label"], "role": role(k), "required": v["required"], "installed": have[k],
                    "size": sum(p["size"] for p in parts(k)), "available": bool(parts(k))} for k, v in SPECS.items()]
     return s
 
@@ -105,7 +111,7 @@ def start(ids):
     with LOCK:
         if STATE["status"] == "running" or not todo:
             return
-        STATE.update(status="running", current=None, step="Préparation", done=0,
+        STATE.update(status="running", current=None, step=i18n.tr("srv.setup_preparing"), done=0,
                      total=sum(p["size"] for t in todo for p in parts(t)), error=None)
     threading.Thread(target=_install, args=(todo,), daemon=True).start()
 
@@ -115,22 +121,22 @@ def _install(todo):
         os.makedirs(pl.TOOLS, exist_ok=True)
         need = 3 * STATE["total"]  # archive, unpacked copy, margin
         if shutil.disk_usage(pl.TOOLS).free < need:
-            raise RuntimeError(f"il faut environ {need / 1e9:.0f} Go d'espace libre sur le disque ; libère de la place puis réessaie")
+            raise RuntimeError(i18n.tr("srv.setup_disk_space", gb=f"{need / 1e9:.0f}"))
         for tool in todo:
             _set(current=tool)
             if tool == "photogrammetry":
                 ensure_vcredist(lambda text: _set(step=text))
             for part in parts(tool):
                 archive = _fetch(tool, part["url"], part["size"], part["sha256"])
-                _set(step=f"Installation de {SPECS[tool]['label']}")
+                _set(step=i18n.tr("srv.tools_installing", name=SPECS[tool]["label"]))
                 dest = os.path.join(pl.TOOLS, os.path.expanduser(part["dest"]))
                 {"dmg-app": _from_dmg, "zip": _from_zip}[part["kind"]](archive, part["inner"], dest)
                 os.remove(archive)
-        _set(status="done", current=None, step="Outils installés", done=STATE["total"])
+        _set(status="done", current=None, step=i18n.tr("srv.tools_done"), done=STATE["total"])
     except urllib.error.HTTPError as e:
-        _set(status="error", error=f"le serveur de téléchargement a répondu {e.code} ; réessaie plus tard")
+        _set(status="error", error=i18n.tr("srv.setup_http_error", code=e.code))
     except (urllib.error.URLError, TimeoutError, ConnectionError):
-        _set(status="error", error=NET_ERROR)
+        _set(status="error", error=i18n.tr("srv.setup_net_error"))
     except Exception as e:  # noqa: BLE001
         _set(status="error", error=str(e) or type(e).__name__)
 
@@ -139,11 +145,11 @@ def _fetch(tool, url, size, sha256):
     folder = os.path.join(pl.DATA, "downloads")
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, url.rsplit("/", 1)[-1])
-    _set(step=f"Téléchargement de {SPECS[tool]['label']}")
+    _set(step=i18n.tr("srv.tools_downloading", name=SPECS[tool]["label"]))
     fetch.download(url, path + ".partial", size, _advance)
     if os.path.getsize(path + ".partial") != size or not fetch.digest_ok(path + ".partial", sha256):
         os.remove(path + ".partial")
-        raise RuntimeError(f"téléchargement de {SPECS[tool]['label']} incomplet ou altéré ; réessaie")
+        raise RuntimeError(i18n.tr("srv.tools_download_corrupt", name=SPECS[tool]["label"]))
     os.replace(path + ".partial", path)
     return path
 
@@ -207,7 +213,7 @@ def ensure_vcredist(step):
 
 
 def _install_vcredist(step):
-    step("Composants Microsoft Visual C++ : Windows va demander ton accord")
+    step(i18n.tr("srv.tools_vcredist_step"))
     exe = os.path.join(pl.DATA, "downloads", "vc_redist.x64.exe")
     os.makedirs(os.path.dirname(exe), exist_ok=True)
     request = urllib.request.Request(VCREDIST_URL, headers={"User-Agent": "BerriaCraft"})
@@ -219,11 +225,11 @@ def _install_vcredist(step):
                         "$s.Status.ToString() + '|' + $s.SignerCertificate.Subject").stdout.strip()
     if not sig.startswith("Valid|") or "O=Microsoft Corporation" not in sig:
         os.remove(exe)
-        raise RuntimeError("le programme d'installation Microsoft n'a pas une signature valide ; réessaie plus tard")
+        raise RuntimeError(i18n.tr("srv.tools_vcredist_signature"))
     r = pl.powershell(f"try {{ $p = Start-Process -FilePath '{quoted}' -ArgumentList '/install','/quiet','/norestart' "
                       f"-Verb RunAs -Wait -PassThru; exit $p.ExitCode }} catch {{ exit 1223 }}")
     os.remove(exe)
     if r.returncode == 1223:
-        raise RuntimeError("Windows n'a pas reçu ton accord pour les composants Microsoft ; clique « Réessayer » et réponds Oui")
+        raise RuntimeError(i18n.tr("srv.tools_vcredist_declined"))
     if r.returncode not in (0, 1638, 3010):  # 1638: a newer version is there, 3010: restart advised
-        raise RuntimeError(f"installation des composants Microsoft impossible (code {r.returncode})")
+        raise RuntimeError(i18n.tr("srv.tools_vcredist_failed", code=r.returncode))
