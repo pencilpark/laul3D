@@ -28,7 +28,8 @@ STATIC = os.path.join(ROOT, "app", "static")
 LEVELS = ("lowpoly", "medium", "detailed")
 MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
-            "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0, "filaments": 4}
+            "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0, "filaments": 4,
+            "color_3mf": True, "color_obj": True, "color_texture": True}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 app = FastAPI()
@@ -82,7 +83,8 @@ def clean_settings(raw, base=None):
     s["smooth"] = num("smooth", 0, 3, int)
     s["filaments"] = num("filaments", 2, 8, int)
     s["rot_seq"] = canonical_rot(s["rot_seq"])
-    s["keep_parts"] = bool(s["keep_parts"])
+    for key in ("keep_parts", "color_3mf", "color_obj", "color_texture"):
+        s[key] = bool(s[key])
     if s["level"] not in LEVELS:
         s["level"] = "lowpoly"
     return s
@@ -191,7 +193,7 @@ def process(job, level, log):
     rel = lambda p: os.path.relpath(os.path.join(out, os.path.basename(p)), d).replace(os.sep, "/")
     report["stl"] = rel(report["stl"])
     report["previews"] = [rel(p) for p in report.get("previews", [])]
-    for key in ("colors", "filaments", "texture"):
+    for key in ("colors", "filaments", "obj_colors", "texture"):
         report[key] = rel(report[key]) if report.get(key) else None
     report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
     with LOCK:
@@ -402,7 +404,7 @@ def rerun(jid: str, body: dict = Body(...)):
     return snapshot
 
 
-EXPORT_KINDS = ("stl", "blend", "3mf", "zip")
+EXPORT_KINDS = ("stl", "blend", "3mf", "obj", "zip")
 
 
 def result_path(jid, level, kind="stl"):
@@ -412,7 +414,7 @@ def result_path(jid, level, kind="stl"):
             raise HTTPException(404, "pas de résultat pour ce niveau")
         r = job["results"][level]
         rel = {"stl": r["stl"], "blend": r["stl"][:-4] + ".blend", "3mf": r.get("filaments"),
-               "zip": r.get("texture")}[kind]
+               "obj": r.get("obj_colors"), "zip": r.get("texture")}[kind]
     if not rel:
         raise HTTPException(404, "pas de fichier couleur pour ce niveau : recalcule-le")
     path = os.path.join(job_dir(jid), *rel.split("/"))
@@ -424,7 +426,7 @@ def result_path(jid, level, kind="stl"):
 @app.post("/api/jobs/{jid}/orca")
 def orca(jid: str, body: dict = Body(...)):
     try:
-        pl.open_in_orca(result_path(jid, body.get("level"), "3mf" if body.get("kind") == "3mf" else "stl"))
+        pl.open_in_orca(result_path(jid, body.get("level"), body.get("kind") if body.get("kind") in ("3mf", "obj") else "stl"))
     except pl.PipelineError as e:
         raise HTTPException(400, str(e))
     return {"ok": True}
@@ -439,7 +441,9 @@ def reveal(jid: str, body: dict = Body(...)):
 @app.post("/api/jobs/{jid}/export")
 def export(jid: str, body: dict = Body(...)):
     kind = body.get("kind") if body.get("kind") in EXPORT_KINDS else "stl"
-    dest = pl.export_copy(result_path(jid, body.get("level"), kind))
+    path = result_path(jid, body.get("level"), kind)
+    # the colored OBJ needs its MTL beside it: one zip keeps them together in Téléchargements
+    dest = pl.export_zip([path, path[:-4] + ".mtl"]) if kind == "obj" else pl.export_copy(path)
     pl.reveal(dest)
     return {"path": dest}
 

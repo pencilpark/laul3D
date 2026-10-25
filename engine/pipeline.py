@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import unicodedata
+import zipfile
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -336,7 +337,8 @@ def blender_prep(raw, out_dir, name, level, s, log):
                   "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
                   "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
                   "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors",
-                  "--filaments", str(int(s.get("filaments", 4)))]
+                  "--filaments", str(int(s.get("filaments", 4))),
+                  "--color-files", ",".join(k for k in ("3mf", "obj", "texture") if s.get("color_" + k, True)) or "-"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
@@ -380,13 +382,26 @@ def downloads_dir():
     return d
 
 
-def export_copy(path):
+def free_download_path(stem, ext):
     dest_dir = downloads_dir()
-    stem, ext = os.path.splitext(os.path.basename(path))
     dest, i = os.path.join(dest_dir, stem + ext), 2
     while os.path.exists(dest):
         dest, i = os.path.join(dest_dir, f"{stem} ({i}){ext}"), i + 1
+    return dest
+
+
+def export_copy(path):
+    dest = free_download_path(*os.path.splitext(os.path.basename(path)))
     shutil.copy2(path, dest)
+    return dest
+
+
+def export_zip(paths):
+    """The files flat in one zip named after the first, in Downloads."""
+    dest = free_download_path(os.path.splitext(os.path.basename(paths[0]))[0], ".zip")
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in paths:
+            z.write(p, os.path.basename(p))
     return dest
 
 

@@ -1,4 +1,4 @@
-"""Colors reduced to filaments, and the multi-filament 3MF.
+"""Colors reduced to filaments, the painted 3MF and the colored OBJ.
 
 python tests/couleurs_test.py
 A grid of red, blue and green faces with 1 % stray white texels and, in one case, a small black patch:
@@ -77,7 +77,28 @@ def main():
     # OrcaSlicer's own table for filaments 1 to 8 (CONST_FILAMENTS, src/libslic3r/Model.cpp, v2.4.2)
     assert [couleurs.paint_code(k) for k in range(1, 9)] == ["4", "8", "0C", "1C", "2C", "3C", "4C", "5C"]
     assert [t.get("paint_color") for t in triangles] == [couleurs.paint_code(k + 1) for k in labels]
-    print("couleurs : taches écartées, petit détail gardé, teintes jumelles fusionnées, 3MF lisible")
+
+    obj = os.path.join(os.path.dirname(path), "modèle_couleurs_orca.obj")
+    mtl = couleurs.write_obj(obj, verts, tris, labels, palette)
+    with open(obj, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    assert lines[0] == "mtllib " + os.path.basename(mtl), lines[0]
+    assert sum(ln.startswith("v ") for ln in lines) == len(verts)
+    current, faces = None, []
+    for ln in lines:
+        if ln.startswith("usemtl "):
+            current = int(ln.split("_")[1]) - 1
+        elif ln.startswith("f "):
+            faces.append((tuple(int(v) - 1 for v in ln.split()[1:]), current))
+    assert len(faces) == len(tris)
+    by_face = {tuple(t): k for t, k in zip(tris.tolist(), labels)}
+    assert all(by_face[t] == k for t, k in faces)  # same triangles, same shared vertices, same filament
+    with open(mtl, encoding="utf-8") as f:
+        materials = f.read()
+    assert "map_Kd" not in materials and materials.count("Ka 0 0 0") == len(palette)
+    kd = [tuple(round(float(v) * 255) for v in ln.split()[1:]) for ln in materials.splitlines() if ln.startswith("Kd ")]
+    assert kd == [tuple(c) for c in palette], (kd, palette)
+    print("couleurs : taches écartées, petit détail gardé, teintes jumelles fusionnées, 3MF et OBJ lisibles")
     return 0
 
 

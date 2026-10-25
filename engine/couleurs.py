@@ -166,3 +166,21 @@ def write_3mf(path, vertices, triangles, labels, palette):
                    '"/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"'
                    '/></Relationships>')
         z.writestr("3D/3dmodel.model", "".join(parts))
+
+
+def write_obj(path, vertices, triangles, labels, palette):
+    """OBJ + MTL beside it, in mm with Z up like the STL, one material per filament: OrcaSlicer takes the color of a
+    face as Ka + Kd, so Ka is 0, and offers these colors as filaments. Faces keep their shared vertices."""
+    import os
+    mtl = os.path.splitext(path)[0] + ".mtl"
+    with open(mtl, "w", encoding="utf-8", newline="\n") as f:
+        for i, (r, g, b) in enumerate(palette):
+            f.write(f"newmtl filament_{i + 1}\nKa 0 0 0\nKd {r / 255:.6f} {g / 255:.6f} {b / 255:.6f}\n\n")
+    labels, tris = np.asarray(labels), np.asarray(triangles) + 1
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"mtllib {os.path.basename(mtl)}\n")
+        f.writelines(f"v {x:.4f} {y:.4f} {z:.4f}\n" for x, y, z in vertices)
+        for i in range(len(palette)):
+            f.write(f"usemtl filament_{i + 1}\n")
+            f.writelines(f"f {a} {b} {c}\n" for a, b, c in tris[labels == i])
+    return mtl
