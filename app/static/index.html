@@ -379,7 +379,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <button class="ghost" id="finder">Afficher dans le Finder</button>
       </div>
       <div class="hidden" id="colorBox">
-        <div class="labrow" style="margin-top:14px"><span class="lab">Impression en couleur</span><button type="button" class="tip" aria-label="Aide : impression en couleur" aria-describedby="tipColor">?</button><span class="tip-text" role="tooltip" id="tipColor">3MF multi-filaments : chaque face reçoit l'un des filaments ci-dessous, pour une imprimante à plusieurs bobines ; l'Ender-3 V3 seule n'en a qu'une. Le fichier donne à chaque face un numéro de filament, pas une couleur : dans OrcaSlicer, règle d'abord autant de filaments que la palette, dans cet ordre et à ces couleurs, puis ouvre-le. Fichier > Importer ajoute les filaments manquants, couleurs à corriger. OBJ texturé : toutes les couleurs des photos, pour un service d'impression en couleur (Sculpteo, i.materialise…). Les couleurs viennent des photos, ombres comprises.</span></div>
+        <div class="labrow" style="margin-top:14px"><span class="lab">Impression en couleur</span><button type="button" class="tip" aria-label="Aide : impression en couleur" aria-describedby="tipColor">?</button><span class="tip-text" role="tooltip" id="tipColor">Les deux premiers fichiers demandent une imprimante à plusieurs bobines ; l'Ender-3 V3 seule n'en a qu'une. 3MF peint : chaque face reçoit un numéro de filament, pas une couleur ; dans OrcaSlicer, règle d'abord autant de filaments que la palette, dans cet ordre et à ces couleurs, puis ouvre-le. Fichier > Importer ajoute les filaments manquants, couleurs à corriger. OBJ en couleurs : OrcaSlicer (2.1 ou plus récent) ouvre une fenêtre qui ajoute ces couleurs comme filaments, à quelques unités près ; garde le .mtl à côté du .obj. OBJ texturé : toutes les couleurs des photos, pour un service d'impression en couleur (Sculpteo, i.materialise…). Les couleurs viennent des photos, ombres comprises.</span></div>
         <div class="palette" id="palette" role="list" aria-label="Couleurs des filaments"></div>
         <div class="actions">
           <button class="ghost" id="orcaColor">Ouvrir le 3MF peint dans OrcaSlicer</button>
@@ -1136,7 +1136,8 @@ async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
     const r = await post(`/api/jobs/${encodeURIComponent(current.id)}/export`, { level: viewLevel, kind });
-    showNotice(`Fichier enregistré dans Téléchargements : ${r.path}`);
+    showNotice(kind === "obj" ? `OBJ et MTL enregistrés côte à côte dans Téléchargements : ${r.path}`
+      : `Fichier enregistré dans Téléchargements : ${r.path}`);
   } catch (e) { showError(e.message); }
 }
 $("expStl").onclick = () => exportFile("stl");

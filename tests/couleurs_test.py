@@ -96,8 +96,13 @@ def main():
     with open(mtl, encoding="utf-8") as f:
         materials = f.read()
     assert "map_Kd" not in materials and materials.count("Ka 0 0 0") == len(palette)
-    kd = [tuple(round(float(v) * 255) for v in ln.split()[1:]) for ln in materials.splitlines() if ln.startswith("Kd ")]
+    # OrcaSlicer reads a channel as (int)(x * 255.f), src/libslic3r/ObjColorUtils.hpp:258 (v2.4.2)
+    kd = [tuple(int(float(v) * 255) for v in ln.split()[1:]) for ln in materials.splitlines() if ln.startswith("Kd ")]
     assert kd == [tuple(c) for c in palette], (kd, palette)
+    every = [(v, (v + 85) % 256, (v + 170) % 256) for v in range(256)]  # each byte value on each channel
+    with open(couleurs.write_obj(obj, verts, tris, np.zeros(len(tris), dtype=int), every), encoding="utf-8") as f:
+        kd = [tuple(int(float(v) * 255) for v in ln.split()[1:]) for ln in f if ln.startswith("Kd ")]
+    assert kd == every
     print("couleurs : taches écartées, petit détail gardé, teintes jumelles fusionnées, 3MF et OBJ lisibles")
     return 0
 
