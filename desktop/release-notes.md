@@ -1,17 +1,12 @@
 ## Nouveautés
 
-- Exports 3D hors impression : trois profils au choix, en plus des fichiers d'impression, par des cases dans Réglages avancés et dans « Recalculer avec ces réglages ». Elles sont décochées par défaut : sans elles, rien ne change.
-  - Logiciels 3D (Blender, sculpture, animation) : environ 20 000 quads, textures 4096, fichiers .blend, FBX et OBJ.
-  - Jeux (Unity, Unreal, Godot) : 50 000 triangles et deux niveaux de détail (50 et 25 %), GLB et FBX, textures 2048.
-  - Web (three.js, model-viewer) : un GLB léger de 50 000 triangles, textures JPEG, plus une version compressée Draco quand Blender la produit.
-- Chaque profil donne un zip : taille réelle en mètres, Y vers le haut, couleurs des photos et normal map pour le relief fin. Un profil allonge le calcul d'environ 15 s (Web, Jeux) à plus d'une minute (Logiciels 3D) sur un modèle simple.
+- Résolution des photos, au choix : un réglage sous le niveau de détail, et dans « Ajuster ce modèle », choisit la taille des photos que la photogrammétrie utilise, indépendamment du niveau. Auto, par défaut, garde le comportement d'avant (Basse pour LowPoly, Moyenne pour Moyen, Haute pour Détaillé) ; Basse, Moyenne, Haute et Max s'imposent à tous les niveaux.
+- Max garde la pleine résolution des photos autant que la mémoire libre le permet : Object Capture en détail raw sur Mac, photos entières pour COLMAP et OpenMVS sous Windows, textures 8192 pour l'OBJ texturé et le profil Logiciels 3D. Le scan et les textures gagnent en finesse ; le calcul est nettement plus long. Quand la mémoire ne suffit pas, l'app descend d'elle-même et le journal technique dit à quelle résolution. Le STL imprimable reste limité par le niveau de détail (300 000 triangles en Détaillé).
+- Nouveau bouton « Enregistrer le scan brut » : le maillage complet de la photogrammétrie, avant nettoyage, à ouvrir dans Blender (.usdz sur Mac, OBJ texturé zippé sous Windows).
 
-- Sept langues : anglais (par défaut), français, espagnol, allemand, portugais du Brésil, chinois simplifié et japonais. L'app prend la langue du système au premier lancement ; le menu en haut à droite la change. L'installeur Windows suit la langue du système.
-- Les fichiers produits ont désormais des noms anglais (`_colors`, `_front`…) et le dossier des projets s'appelle `Projects` : l'ancien dossier `Projets` est renommé au premier lancement, sans perte.
-
-Rappel de la 0.4.0 : impression en couleur au choix, 3MF peint, OBJ en couleurs pour OrcaSlicer et OBJ texturé pour les services d'impression couleur.
+Rappel de la 0.5.0 : exports 3D hors impression (Logiciels 3D, Jeux, Web) et sept langues.
 
 ## Installer
 
-- Windows 10 ou 11, 64 bits : `Berria.Craft_0.5.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». La mise à jour garde les projets ; un modèle déjà calculé obtient ses exports en cochant les profils puis « Recalculer avec ces réglages ».
-- Mac (puce Apple, macOS 14 ou plus récent) : `Berria.Craft_0.5.0_aarch64.dmg`, ajouté à cette release une fois construit sur un Mac. L'app n'est pas notarisée : au premier lancement, l'autoriser dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+- Windows 10 ou 11, 64 bits : `Berria.Craft_0.5.1_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». La mise à jour garde les projets et leurs scans ; un modèle déjà calculé passe en Max en choisissant Max dans « Ajuster ce modèle », puis « Recalculer avec ces réglages ».
+- Mac (puce Apple, macOS 14 ou plus récent) : `Berria.Craft_0.5.1_aarch64.dmg`, ajouté à cette release une fois construit sur un Mac. L'app n'est pas notarisée : au premier lancement, l'autoriser dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».

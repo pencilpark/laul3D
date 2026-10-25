@@ -4,6 +4,7 @@ python tests/photogrammetry_win_test.py
 Staging (names, EXIF orientation, camera folders), model choice, atomic cache, Blender version, Visual C++ lock;
 on Windows also the private fallback folder and OrcaSlicer surviving the engine's stop.
 """
+import json
 import os
 import shutil
 import struct
@@ -115,11 +116,12 @@ def test_cache():
     print("photogrammetry_win : le cache n'apparaît que complet, et les scans d'une version antérieure sont refaits")
 
 
-def test_texture_command():
+def reconstruct_commands(name, cfg, px):
+    """The commands _reconstruct runs for one resolution, COLMAP and OpenMVS replaced by files they would write."""
     src = tempfile.mkdtemp(prefix="berria-pgw-tex-")
     photos = [photo(src, f"p{i}.jpg", (40, 30)) for i in range(3)]
     work = tempfile.mkdtemp(prefix="berria-pgw-texwork-")
-    w = os.path.join(work, "colmap_lowpoly")
+    w = os.path.join(work, f"colmap_{name}")
     calls = []
 
     def fake_run(cmd, log, cwd=None, env=None, low_priority=False):
@@ -141,23 +143,90 @@ def test_texture_command():
         return 0, []
 
     with mock.patch.object(pgw, "_free_memory", return_value=8 * 2 ** 30):
-        out = pgw._reconstruct(src, photos, work, "lowpoly", lambda line: None, fake_run, RuntimeError, w)
-    sift = next(c for c in calls if "feature_extractor" in c)
-    assert int(sift[sift.index("--FeatureExtraction.num_threads") + 1]) >= 1, sift
-    tex = next(c for c in calls if os.path.basename(c[0]).startswith("TextureMesh"))
-    for opt in ("--global-seam-leveling", "--local-seam-leveling"):
-        assert tex[tex.index(opt) + 1] == "0", tex
-    assert out.endswith("scene_texture.obj") and pgw._cached(work, "lowpoly") == out, out
+        out = pgw._reconstruct(src, photos, work, name, cfg, px, lambda line: None, fake_run, RuntimeError, w)
+    assert out.endswith("scene_texture.obj") and pgw._cached(work, name) == out, out
+    assert pgw._scan_px(out) == px, pgw._scan_px(out)
+    tool = lambda name: next(c for c in calls if os.path.basename(c[0]).startswith(name) or name in c)  # noqa: E731
+    opt = lambda cmd, name: cmd[cmd.index(name) + 1]  # noqa: E731
+    return {"sift": tool("feature_extractor"), "undistort": tool("image_undistorter"),
+            "densify": tool("DensifyPointCloud"), "texture": tool("TextureMesh")}, opt
+
+
+def test_texture_command():
+    cmds, opt = reconstruct_commands("lowpoly", pgw.RESOLUTIONS["low"], 800)
+    assert int(opt(cmds["sift"], "--FeatureExtraction.num_threads")) >= 1, cmds["sift"]
+    for name in ("--global-seam-leveling", "--local-seam-leveling"):
+        assert opt(cmds["texture"], name) == "0", cmds["texture"]
+    # the commands of the levels before the choice existed: Low is LowPoly's
+    assert opt(cmds["sift"], "--FeatureExtraction.max_image_size") == "1600"
+    assert opt(cmds["densify"], "--resolution-level") == "2" and opt(cmds["densify"], "--max-resolution") == "2560"
+    assert opt(cmds["texture"], "--max-texture-size") == "4096"
+
+    cfg = pgw._max_config([(4032, 3024)], None)
+    cmds, opt = reconstruct_commands("max", cfg, 4032)
+    assert opt(cmds["sift"], "--FeatureExtraction.max_image_size") == "4032", cmds["sift"]
+    assert opt(cmds["undistort"], "--max_image_size") == "4032", cmds["undistort"]
+    assert opt(cmds["densify"], "--resolution-level") == "0" and opt(cmds["densify"], "--max-resolution") == "4032"
+    assert opt(cmds["texture"], "--resolution-level") == "0" and opt(cmds["texture"], "--max-texture-size") == "8192"
     print("photogrammetry_win : TextureMesh sans nivellement des coutures (textures noires d'OpenMVS 2.4.0), "
-          "COLMAP et OpenMVS en priorité basse")
+          "COLMAP et OpenMVS en priorité basse ; Max en pleine résolution, textures 8192")
+
+
+def test_max_config():
+    iphone = [(4032, 3024)] * 60
+    assert pgw._max_config(iphone, None)["max_image"] == 4032  # memory unknown: the photos' own size
+    assert pgw._max_config(iphone, 256 * 2 ** 30)["max_image"] == 4032
+    assert pgw._max_config(iphone, 2 * 2 ** 30) is None  # no better than High: High's scan
+    assert pgw._max_config([(1200, 900)] * 60, 256 * 2 ** 30) is None  # small photos: High already keeps them whole
+    budget_free = 16 * 2 ** 30
+    cfg = pgw._max_config(iphone, budget_free)
+    side, budget = cfg["max_image"], budget_free - pgw.MEMORY_RESERVE
+    assert 1600 < side < 4032 and pgw._peak_memory(side, 0.75, 60) <= budget, cfg
+    s = 4032
+    while int(s * 0.9) > side:
+        s = int(s * 0.9)
+    assert pgw._peak_memory(s, 0.75, 60) > budget, (s, side)  # the size above did not fit
+    # cameras found on photos at least as large as High's, even when the depth maps are smaller
+    assert cfg["sift"] == max(side, 3200) and cfg["texture"] == 8192 and cfg["resolution_level"] == 0, cfg
+    print(f"photogrammetry_win : Max à {side} px sur 4032 pour {budget_free / 2 ** 30:.0f} Go libres et 60 photos, "
+          "Haute quand la mémoire ne permet pas mieux")
+
+
+def test_max_choice():
+    src = tempfile.mkdtemp(prefix="berria-pgw-max-")
+    photos = [photo(src, f"p{i}.jpg", (4032, 3024)) for i in range(3)]
+    runs = []
+
+    def fake(photo_dir, photos_, work_dir, name, cfg, px, log, run, error_cls, w):
+        runs.append((name, cfg, px))
+        return os.path.join(work_dir, f"scan_{name}", "m.obj")
+
+    with mock.patch.object(pgw, "available", return_value=True), mock.patch.object(pgw, "_reconstruct", fake):
+        work = tempfile.mkdtemp(prefix="berria-pgw-maxwork-")
+        with mock.patch.object(pgw, "_free_memory", return_value=2 * 2 ** 30):
+            out, info = pgw.reconstruct(src, photos, work, "max", lambda line: None, None, RuntimeError)
+        assert runs[-1][0] == "detailed" and runs[-1][1] is pgw.RESOLUTIONS["high"] and info["res"] == "high", runs
+        with mock.patch.object(pgw, "_free_memory", return_value=256 * 2 ** 30):
+            out, info = pgw.reconstruct(src, photos, work, "max", lambda line: None, None, RuntimeError)
+        assert runs[-1][0] == "max" and info == {"res": "max", "px": 4032}, (runs, info)
+        mesh = os.path.join(work, "scan_max", "scene_texture.obj")
+        os.makedirs(os.path.dirname(mesh))
+        open(mesh, "w").close()
+        with open(mesh + ".orient.json", "w", encoding="utf-8") as f:
+            json.dump({"matrix": None, "raw_axes": True, "version": pgw.SCAN_VERSION, "px": 3265}, f)
+        n = len(runs)
+        with mock.patch.object(pgw, "_free_memory", return_value=2 * 2 ** 30):  # a Max scan made earlier serves as is
+            out, info = pgw.reconstruct(src, photos, work, "max", lambda line: None, None, RuntimeError)
+        assert len(runs) == n and out == mesh and info == {"res": "max", "px": 3265}, (runs, out, info)
+    print("photogrammetry_win : Max ramené à Haute réutilise le scan Haute, un scan Max existant sert tel quel")
 
 
 def test_sift_threads():
     src = tempfile.mkdtemp(prefix="berria-pgw-sift-")
     photos = [photo(src, "iphone.jpg", (4032, 3024)), {"name": "absente.jpg"}]
     with mock.patch.object(pgw, "_free_memory", return_value=8 * 2 ** 30), mock.patch.object(os, "cpu_count", return_value=8):
-        counts = {lv: pgw._sift_threads(src, photos, cfg["max_image"])[0] for lv, cfg in pgw.LEVELS.items()}
-    assert counts == {"lowpoly": 8, "medium": 5, "detailed": 2}, counts
+        counts = {res: pgw._sift_threads(src, photos, cfg["max_image"])[0] for res, cfg in pgw.RESOLUTIONS.items()}
+    assert counts == {"low": 8, "mid": 5, "high": 2}, counts
     with mock.patch.object(pgw, "_free_memory", return_value=2 * 2 ** 30):
         assert pgw._sift_threads(src, photos, 3200)[0] == 1
     with mock.patch.object(pgw, "_free_memory", return_value=None):
@@ -287,6 +356,8 @@ def main():
     test_largest_model()
     test_cache()
     test_texture_command()
+    test_max_config()
+    test_max_choice()
     test_sift_threads()
     test_blender_version()
     test_vcredist_lock()
