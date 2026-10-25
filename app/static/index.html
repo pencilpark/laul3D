@@ -202,7 +202,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 pre { max-height: 260px; overflow: auto; background: var(--drop); padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .history { list-style: none; padding: 0; margin: 0; }
 .history li.sub { padding: 9px 0; }
-.proj { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 9px 8px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .18s; }
+.history li:has(.proj) { display: flex; }
+.proj { display: flex; justify-content: space-between; gap: 8px; flex: 1; min-width: 0; padding: 9px 8px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .18s; }
+.proj-del { flex: none; width: 38px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; transition: background .18s, color .18s; }
+.proj-del svg { display: block; width: 16px; height: 16px; margin: 0 auto; }
+.proj-del:hover:not(:disabled) { background: rgba(255,255,255,.05); color: var(--bad); }
+.proj-del:disabled { opacity: .35; cursor: not-allowed; }
 .proj:hover { background: rgba(255,255,255,.05); }
 .proj[aria-current="true"] { background: var(--accent-tint); }
 :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
@@ -411,6 +416,12 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
   <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="aiInstall">Installer maintenant</button><button type="button" class="ghost" id="aiLater">Plus tard</button></div>
 </dialog>
 
+<dialog id="delDialog" class="modal" aria-labelledby="delDialogTitle" aria-describedby="delText">
+  <h2 id="delDialogTitle">Supprimer ce projet ?</h2>
+  <p id="delText"></p>
+  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="delConfirm">Supprimer</button><button type="button" class="ghost" id="delCancel">Annuler</button></div>
+</dialog>
+
 <script type="module">
 const $ = (id) => document.getElementById(id);
 const LEVELS = { lowpoly: ["LowPoly", "grandes facettes, rapide"], medium: ["Moyen", "plus lisse"], detailed: ["Détaillé", "le plus fidèle, plus long"] };
@@ -418,7 +429,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
 const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
-let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, toolsState = null, toolsAsked = false, lastToolIds = [], renderMode = "solid";
+let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, toolsState = null, toolsAsked = false, lastToolIds = [], renderMode = "render";
 const doneAt = {};
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -718,13 +729,19 @@ $("go").onclick = async () => {
   renderLocalThumbs();
 };
 
+const TRASH_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`;
+
 async function loadHistory() {
   try {
     const jobs = await api("/api/jobs");
-    if (!jobs.length) return;
     const key = focusKey();
     const box = $("history");
     box.replaceChildren();
+    if (!jobs.length) {
+      const li = document.createElement("li");
+      li.className = "sub"; li.textContent = "Aucun projet pour l'instant. Ils s'afficheront ici.";
+      box.appendChild(li);
+    }
     for (const j of jobs) {
       const li = document.createElement("li");
       const b = document.createElement("button");
@@ -735,11 +752,65 @@ async function loadHistory() {
       b.querySelector("b").textContent = j.name;
       b.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
       b.onclick = () => openJob(j.id);
-      li.appendChild(b);
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "proj-del"; del.dataset.focus = "del-" + j.id;
+      del.innerHTML = TRASH_ICON;
+      del.setAttribute("aria-label", `Supprimer le projet ${j.name}`);
+      del.disabled = j.state === "running";
+      del.title = del.disabled ? "Calcul en cours : suppression possible à la fin" : "Supprimer le projet";
+      del.onclick = () => askDelete(j);
+      li.append(b, del);
       box.appendChild(li);
     }
     restoreFocus(key);
   } catch {}
+}
+
+let deleting = null;
+function askDelete(j) {
+  deleting = j;
+  $("delText").textContent = `« ${j.name} » : ses photos, ses modèles et ses fichiers de calcul seront effacés de cet ordinateur. `
+    + "Les fichiers déjà enregistrés dans Téléchargements restent.";
+  $("delConfirm").disabled = false;
+  $("delDialog").showModal(); $("delCancel").focus();
+}
+$("delCancel").onclick = () => $("delDialog").close();
+$("delConfirm").onclick = async () => {
+  const j = deleting;
+  if (!j) return;
+  $("delConfirm").disabled = true;
+  const rows = [...document.querySelectorAll("#history .proj")];
+  const at = rows.findIndex((b) => b.dataset.focus === "proj-" + j.id);
+  try {
+    await api(`/api/jobs/${encodeURIComponent(j.id)}`, { method: "DELETE" });
+  } catch (e) {
+    $("delDialog").close();
+    if (e.status !== 404) { showError(e.message); return; }
+  }
+  $("delDialog").close();
+  deleting = null;
+  if (openId === j.id) closeJob();
+  await loadHistory();
+  const left = document.querySelectorAll("#history .proj");
+  (left[Math.min(Math.max(at, 0), left.length - 1)] || $("name")).focus();
+  showNotice(`Projet « ${j.name} » supprimé.`);
+};
+
+// back to the empty stage, as at startup
+function closeJob() {
+  clearTimeout(pollTimer);
+  ++pollGen;
+  openId = null; current = null; viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null; adjustDirty = false;
+  $("jobTitle").textContent = "Aucun projet ouvert";
+  $("jobState").className = "state hidden";
+  $("spin").classList.add("hidden");
+  $("jobStep").textContent = ""; $("jobMeta").textContent = ""; $("live").textContent = "";
+  $("levels").replaceChildren();
+  $("resultCard").classList.add("hidden"); $("adjustCard").classList.add("hidden");
+  clearModel();
+  $("viewer").classList.remove("loading");
+  $("viewerEmpty").textContent = "Dépose des photos à gauche, ou ouvre un projet de la liste.";
+  $("jobError").classList.add("hidden");
 }
 
 function clearModel() {
@@ -1094,6 +1165,8 @@ async function createViewer() {
     requestRender();
   }
   new ResizeObserver(resize).observe(box);
+  // the view only draws on demand: after a graphics driver reset it would stay black until the next gesture
+  canvas.addEventListener("webglcontextrestored", requestRender);
   resize();
   viewer = { THREE, scene, camera, controls, loader: new STLLoader(), mesh: null, home: null, requestRender };
   return viewer;
@@ -1170,7 +1243,7 @@ function updateRenderButtons() {
   const has = !!viewer?.colorsUrl;
   $("viewRender").disabled = !has;
   $("viewRender").title = has ? "Couleurs des photos posées sur le modèle (aperçu seulement : l'impression reste d'une couleur)"
-    : "Pas de couleurs pour ce modèle : recalcule-le pour les obtenir";
+    : "Pas de couleurs pour ce modèle : le Journal technique dit pourquoi. Un modèle Windows calculé avant la version 0.2.0 les obtient avec « Recalculer avec ces réglages ».";
   $("viewSolid").setAttribute("aria-pressed", renderMode !== "render" || !has);
   $("viewRender").setAttribute("aria-pressed", renderMode === "render" && has);
 }
@@ -1204,8 +1277,9 @@ async function loadColors() {
     v.colorMesh = new v.THREE.Mesh(geom, mat);
     v.scene.add(v.colorMesh);
   } catch {
+    // only this model falls back to Solide: the next one opens in Rendu again
     if (seq === loadSeq) {
-      renderMode = "solid";
+      if (v.colorsUrl === url) v.colorsUrl = null;
       showError("Les couleurs de ce modèle n'ont pas pu être chargées ; l'aperçu reste en mode Solide.");
     }
   } finally {
@@ -1250,6 +1324,7 @@ async function showModel(url, flat, colorsUrl = null) {
     $("viewer").classList.add("has-model");
     $("viewerEmpty").classList.add("hidden");
     $("previews").classList.add("hidden");
+    updateRenderButtons();
     if (renderMode === "render" && colorsUrl) loadColors();
     else applyRenderMode();
   } catch (e) {

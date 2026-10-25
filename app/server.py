@@ -145,6 +145,8 @@ def set_step(job, step):
 
 def process(job, level, log):
     with LOCK:
+        if JOBS.get(job["id"]) is not job:  # deleted while queued
+            return
         job.update(state="running", running_level=level, error=None, started=time.time())
     d = job_dir(job["id"])
     work = os.path.join(d, "work")
@@ -217,7 +219,8 @@ def worker():
                 job.update(state="error", error=f"erreur inattendue : {e}", running_level=None)
             log(traceback.format_exc())
         finally:
-            safe_save(job, log)
+            if JOBS.get(jid) is job:
+                safe_save(job, log)
 
 
 def migrate(job):
@@ -232,9 +235,15 @@ def migrate(job):
     return job
 
 
+TRASH = ".suppression"
+
+
 def load_projects():
     os.makedirs(PROJECTS, exist_ok=True)
     for jid in sorted(os.listdir(PROJECTS)):
+        if jid.endswith(TRASH):  # a deletion cut short when the app closed
+            shutil.rmtree(os.path.join(PROJECTS, jid), ignore_errors=True)
+            continue
         p = os.path.join(PROJECTS, jid, "job.json")
         if not os.path.exists(p):
             continue
@@ -342,6 +351,30 @@ def get_job(jid: str):
         if jid not in JOBS:
             raise HTTPException(404)
         return public(JOBS[jid])
+
+
+@app.delete("/api/jobs/{jid}")
+def delete_job(jid: str):
+    with LOCK:
+        job = JOBS.get(jid)
+        if job is None:
+            raise HTTPException(404)
+        if job["state"] == "running":
+            raise HTTPException(409, "Calcul en cours : attends la fin pour supprimer ce projet.")
+        del JOBS[jid]
+        SAVED.pop(jid, None)
+        trash = job_dir(jid) + TRASH
+        shutil.rmtree(trash, ignore_errors=True)
+        try:
+            # one rename first: a file held open (Windows) refuses it and the project stays whole
+            if os.path.exists(job_dir(jid)):
+                os.replace(job_dir(jid), trash)
+        except OSError:
+            JOBS[jid] = job
+            raise HTTPException(409, "Un fichier de ce projet est ouvert dans un autre programme (OrcaSlicer ?) : "
+                                     "ferme-le, puis supprime à nouveau.")
+    shutil.rmtree(trash, ignore_errors=True)
+    return {"ok": True}
 
 
 @app.post("/api/jobs/{jid}/run")
