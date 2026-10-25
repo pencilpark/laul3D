@@ -9,11 +9,16 @@ import math
 import os
 import sys
 import time
+import zipfile
 
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Euler, Matrix, Vector
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import couleurs  # noqa: E402
 
 
 # LowPoly -> detailed: (default triangles, voxels along the largest side, smoothing passes)
@@ -25,6 +30,8 @@ LEVELS = {
 # extra smoothing on demand, as a blur of the volume: (filter width in voxels, iterations). Surface filters were
 # tried first on a 69-photo bust: Blender's Laplacian solver took minutes, Taubin left 5 mm bumps untouched.
 SMOOTH = {1: (2, 1), 2: (3, 1), 3: (4, 2)}
+# texture for the color print services, per level: the facets of LowPoly need less
+TEXTURE_SIZE = {"lowpoly": 2048, "medium": 4096, "detailed": 4096}
 
 
 def parse_args():
@@ -51,6 +58,9 @@ def parse_args():
                     help="cycles renders on the CPU and needs no OpenGL context")
     ap.add_argument("--smooth", type=int, choices=sorted(SMOOTH) + [0], default=0, help="extra smoothing: 0 none to 3 strong")
     ap.add_argument("--colors", action="store_true", help="also write NAME_couleurs.glb, the scan's colors on the result")
+    ap.add_argument("--filaments", type=int, default=4, help="with --colors: filament colors of the 3MF and colored OBJ")
+    ap.add_argument("--color-files", default="3mf,obj,texture",
+                    help="with --colors: comma list among 3mf, obj (colored, for OrcaSlicer), texture; '-' for none")
     ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
     ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
     return ap.parse_args(argv)
@@ -420,6 +430,81 @@ def export_colors(obj, outdir, name):
     return path
 
 
+def split_filaments(obj, count, min_island_area):
+    """The colors reduced to a few filaments, one per triangle of the fan triangulation the STL export makes."""
+    me = obj.data
+    n = len(me.polygons)
+    start, total, areas = np.zeros(n, dtype=np.int64), np.zeros(n, dtype=np.int64), np.zeros(n)
+    me.polygons.foreach_get("loop_start", start)
+    me.polygons.foreach_get("loop_total", total)
+    me.polygons.foreach_get("area", areas)
+    cols = np.zeros(len(me.loops) * 4, dtype=np.float32)
+    me.color_attributes.active_color.data.foreach_get("color", cols)
+    face_colors = np.add.reduceat(cols.reshape(-1, 4)[:, :3], start) / total[:, None]
+    corner_vertex = np.zeros(len(me.loops), dtype=np.int64)
+    me.loops.foreach_get("vertex_index", corner_vertex)
+    verts = np.zeros(len(me.vertices) * 3)
+    me.vertices.foreach_get("co", verts)
+    tris, owner = [], []
+    for f in range(n):  # fan, as the STL export triangulates
+        s, t = start[f], total[f]
+        tris.extend((corner_vertex[s], corner_vertex[s + k], corner_vertex[s + k + 1]) for k in range(1, t - 1))
+        owner.extend([f] * (t - 2))
+    owner = np.array(owner)
+    labels, palette = couleurs.filaments(face_colors[owner], areas[owner] / (total[owner] - 2), tris, count,
+                                         min_island_area)
+    return verts.reshape(-1, 3), tris, labels, palette
+
+
+def bake_texture(target, sources, reach, size, path):
+    """The preview's projection again, into an image laid out by Smart UV Project: color print services print a
+    texture, much finer than one color per vertex."""
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o is target)
+    bpy.context.view_layer.objects.active = target
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.002)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    img = bpy.data.images.new("texture", size, size)
+    mat = bpy.data.materials.new("texture")
+    if mat.node_tree is None:
+        mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    tex = nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nodes.active = tex  # the bake writes into the active image node
+    mat.node_tree.links.new(tex.outputs["Color"], next(n for n in nodes if n.type == "BSDF_PRINCIPLED").inputs[0])
+    target.data.materials.clear()
+    target.data.materials.append(mat)
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o in sources or o is target)
+    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, margin=8,
+                        cage_extrusion=reach, max_ray_distance=2 * reach, target="IMAGE_TEXTURES")
+    img.filepath_raw = path
+    img.file_format = "PNG"
+    img.save()
+
+
+def export_textured(obj, outdir, name, png):
+    """OBJ + MTL + PNG in mm, Z up like the STL, zipped without folders: what Sculpteo or i.materialise take."""
+    obj_path = os.path.join(outdir, f"{name}_couleurs.obj")
+    for o in bpy.context.view_layer.objects:
+        o.select_set(o is obj)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.wm.obj_export(filepath=obj_path, export_selected_objects=True, forward_axis="Y", up_axis="Z",
+                          global_scale=1.0, export_uv=True, export_normals=False, export_materials=True,
+                          path_mode="STRIP", export_colors=False)
+    files = [obj_path, obj_path[:-4] + ".mtl", png]
+    path = os.path.join(outdir, f"{name}_couleurs_texture.zip")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in files:
+            z.write(f, os.path.basename(f))
+    for f in files:
+        os.remove(f)
+    return path
+
+
 def topology_checks(bm):
     bm.normal_update()
     tree = BVHTree.FromBMesh(bm, epsilon=0.00001)
@@ -633,7 +718,8 @@ def main():
     report.update(print_checks(bm, 2 * a.nozzle))
     bm.to_mesh(work.data)
     bm.free()
-    report["colors"] = None
+    report.update(colors=None, filaments=None, obj_colors=None, palette=None, texture=None)
+    wanted = set(a.color_files.split(",")) - {"-", ""}
     if sources:
         for o, mw in zip(sources, placed):
             o.matrix_world = refit @ fit @ turn @ mw
@@ -647,6 +733,26 @@ def main():
                     flatten_face_colors(work)
                 report["colors"] = export_colors(work, a.outdir, a.name)
                 log("couleurs du scan projetées")
+                if wanted & {"3mf", "obj"}:
+                    verts, tris, labels, report["palette"] = split_filaments(work, a.filaments, (4 * a.nozzle) ** 2)
+                    log(f"couleurs réduites à {len(report['palette'])} filament(s) : "
+                        + ", ".join("#%02X%02X%02X" % c for c in report["palette"]))
+                    if "3mf" in wanted:
+                        report["filaments"] = os.path.join(a.outdir, f"{a.name}_filaments.3mf")
+                        couleurs.write_3mf(report["filaments"], verts, tris, labels, report["palette"])
+                    if "obj" in wanted:
+                        report["obj_colors"] = os.path.join(a.outdir, f"{a.name}_couleurs_orca.obj")
+                        couleurs.write_obj(report["obj_colors"], verts, tris, labels, report["palette"])
+                if "texture" in wanted:
+                    try:
+                        png = os.path.join(a.outdir, f"{a.name}_couleurs.png")
+                        t1 = time.time()
+                        bake_texture(work, sources, 0.03 * height, TEXTURE_SIZE[a.level], png)
+                        report["texture"] = export_textured(work, a.outdir, a.name, png)
+                        log(f"texture {TEXTURE_SIZE[a.level]} px pour les services d'impression couleur, "
+                            f"{time.time() - t1:.1f} s")
+                    except (RuntimeError, OSError) as e:
+                        log(f"texture pour les services d'impression indisponible : {e}")
     for o in list(bpy.data.objects):
         if o is not work:
             bpy.data.objects.remove(o, do_unlink=True)

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "suzanne_48")
@@ -62,6 +63,20 @@ def run_cli(photos, out, extra):
     return summary
 
 
+def check_color_files(summary):
+    """The painted 3MF and colored OBJ for multi-filament printers, the textured OBJ zip for color print services."""
+    assert summary.get("filaments") and 1 <= len(summary.get("palette") or []) <= 4, summary
+    with zipfile.ZipFile(summary["filaments"]) as z:
+        assert "3D/3dmodel.model" in z.namelist(), z.namelist()
+    assert summary.get("obj_colors") and os.path.isfile(summary["obj_colors"][:-4] + ".mtl"), summary
+    with open(summary["obj_colors"], encoding="utf-8") as f:
+        assert sum(ln.startswith("usemtl ") for ln in f) == len(summary["palette"])
+    assert summary.get("texture"), summary
+    with zipfile.ZipFile(summary["texture"]) as z:
+        names = z.namelist()
+    assert sorted(os.path.splitext(n)[1] for n in names) == [".mtl", ".obj", ".png"] and not any("/" in n for n in names), names
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--photogrammetry", action="store_true")
@@ -85,6 +100,7 @@ def main():
         # black: OpenMVS 2.4.0 seam leveling; grey: faces without photos. The fixture's cells average to about 0.12
         assert pg.get("colors"), "photogrammétrie sans aperçu en couleurs"
         assert pg["colors_stats"]["black"] < 0.3 and pg["colors_stats"]["saturation"] > 0.06, pg["colors_stats"]
+        check_color_files(pg)
     if a.ia:
         photo = os.path.join(base, "photo unique")
         os.makedirs(photo)
