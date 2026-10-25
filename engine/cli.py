@@ -1,7 +1,8 @@
 """Headless command line: photo folder -> printable STL, without window or server.
 
-lowpoly3d PHOTOS [--niveau lowpoly|medium|detailed] [--hauteur 80] [--moteur auto|photogrammetry|ia]
-          [--facettes 1000] [--socle 3] [--buse 0.4] [--rotation zx] [--photo-principale NAME] [--sortie FOLDER]
+lowpoly3d PHOTOS [--niveau lowpoly|medium|detailed] [--resolution auto|low|mid|high|max] [--hauteur 80]
+          [--moteur auto|photogrammetry|ia] [--facettes 1000] [--socle 3] [--buse 0.4] [--rotation zx]
+          [--photo-principale NAME] [--sortie FOLDER]
 """
 import argparse
 import json
@@ -23,6 +24,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="lowpoly3d", description=i18n.tr("srv.cli_description"))
     ap.add_argument("photos", help=helptext("srv.cli_help_photos"))
     ap.add_argument("--niveau", choices=["lowpoly", "medium", "detailed"], default="lowpoly")
+    ap.add_argument("--resolution", choices=pl.PHOTO_RES, default="auto", help=helptext("srv.cli_help_resolution"))
     ap.add_argument("--hauteur", type=float, default=80.0, metavar="MM", help=helptext("srv.cli_help_height"))
     ap.add_argument("--moteur", choices=["auto", "photogrammetry", "ia"], default="auto")
     ap.add_argument("--facettes", type=int, default=1000, metavar="N", help=helptext("srv.cli_help_faces"))
@@ -52,15 +54,16 @@ def main(argv=None):
             raise pl.PipelineError(i18n.tr("srv.cli_no_readable_photo"))
         engine = pl.choose_engine(a.moteur, n_ok, pl.tools_status())
         log(i18n.tr("srv.cli_photos_engine", n=n_ok, engine=engine))
+        scan = None
         if engine == "photogrammetry":
-            raw = pl.photogrammetry(photos_dir, photos, work, a.niveau, log)
+            raw, scan = pl.photogrammetry(photos_dir, photos, work, pl.photo_res(a.niveau, a.resolution), log)
         else:
             raw, _ = pl.triposr(photos_dir, photos, a.photo_principale, work, log)
         settings = {"height_mm": a.hauteur, "base_cut": a.socle, "rot_seq": a.rotation, "nozzle": a.buse,
                     "faces": a.facettes, "keep_parts": False,
                     **{"export_" + k: True for k in a.exports.split(",") if k in ("software", "game", "web")}}
         name = f"{pl.slug(os.path.basename(photos_dir))}_{a.niveau}_{int(round(a.hauteur))}mm"
-        report = pl.blender_prep(raw, out_dir, name, a.niveau, settings, log)
+        report = pl.blender_prep(raw, out_dir, name, a.niveau, settings, log, scan and scan["res"])
     except pl.PipelineError as e:
         print(i18n.tr("srv.error_line", error=e), file=sys.stderr)
         return 1

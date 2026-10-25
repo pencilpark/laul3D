@@ -282,6 +282,12 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <div class="hint" data-i18n="ui.level_hint">Commence en LowPoly, le plus rapide, pour vérifier la forme, puis affine.</div>
       </div>
       <div class="field">
+        <div class="labrow"><span class="lab" id="resLab" data-i18n="ui.res_label">Résolution des photos</span><button type="button" class="tip" aria-label="Aide : résolution des photos" data-i18n-attr="aria-label:ui.help_res" aria-describedby="tipRes">?</button><span class="tip-text" role="tooltip" id="tipRes" data-i18n="ui.tip_res">Taille des photos que la reconstruction « Toutes les photos » utilise. Auto suit le niveau de détail : Basse pour LowPoly, Moyenne pour Moyen, Haute pour Détaillé. Max garde la pleine résolution des photos et passe les textures en 8192, autant que la mémoire libre le permet : un scan et des textures plus fins, un calcul bien plus long. Le journal technique indique la résolution utilisée. Sans effet sur « Une photo (IA) ».</span></div>
+        <div class="seg" id="photoRes" role="group" aria-labelledby="resLab">
+          <button type="button" data-v="auto" class="on" aria-pressed="true" data-i18n="ui.res_auto">Auto</button><button type="button" data-v="low" aria-pressed="false" data-i18n="ui.res_low">Basse</button><button type="button" data-v="mid" aria-pressed="false" data-i18n="ui.res_mid">Moyenne</button><button type="button" data-v="high" aria-pressed="false" data-i18n="ui.res_high">Haute</button><button type="button" data-v="max" aria-pressed="false" data-i18n="ui.res_max">Max</button>
+        </div>
+      </div>
+      <div class="field">
         <div class="labrow"><label for="height" data-i18n="ui.height_label">Hauteur imprimée (mm)</label><button type="button" class="tip" aria-label="Aide : hauteur imprimée" data-i18n-attr="aria-label:ui.help_height" aria-describedby="tipHeight">?</button><span class="tip-text" role="tooltip" id="tipHeight" data-i18n="ui.tip_height">Hauteur du modèle une fois imprimé. L'Ender-3 V3 imprime jusqu'à 245 mm de haut.</span></div>
         <input id="height" type="number" min="10" max="245" step="1" value="80" aria-describedby="heightErr"><div class="field-err hidden" id="heightErr"></div>
       </div>
@@ -381,10 +387,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <button class="primary" id="orca" data-i18n="ui.orca_prepare">Préparer l'impression dans OrcaSlicer</button>
       </div>
       <div class="hint" id="slicerHint"></div>
-      <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.other_saves">Autres enregistrements</span><button type="button" class="tip" aria-label="Aide : autres enregistrements" data-i18n-attr="aria-label:ui.help_other_saves" aria-describedby="tipFiles">?</button><span class="tip-text" role="tooltip" id="tipFiles" data-i18n="ui.tip_files">STL : fichier standard de l'impression 3D, accepté par tous les logiciels de découpe. .blend : fichier Blender, pour retoucher le modèle. Les fichiers sont copiés dans Téléchargements.</span></div>
+      <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.other_saves">Autres enregistrements</span><button type="button" class="tip" aria-label="Aide : autres enregistrements" data-i18n-attr="aria-label:ui.help_other_saves" aria-describedby="tipFiles">?</button><span class="tip-text" role="tooltip" id="tipFiles" data-i18n="ui.tip_files">STL : fichier standard de l'impression 3D, accepté par tous les logiciels de découpe. .blend : fichier Blender, pour retoucher le modèle. Scan brut : le maillage complet de la photogrammétrie, avant nettoyage, à ouvrir dans Blender (.usdz sur Mac, OBJ texturé zippé sur Windows). Les fichiers sont copiés dans Téléchargements.</span></div>
       <div class="actions">
         <button class="ghost" id="expStl" data-i18n="ui.save_stl">Enregistrer le STL</button>
         <button class="ghost" id="expBlend" data-i18n="ui.save_blend">Enregistrer pour Blender</button>
+        <button class="ghost hidden" id="expScan" data-i18n="ui.save_scan">Enregistrer le scan brut</button>
         <button class="ghost" id="finder" data-i18n="ui.show_finder">Afficher dans le Finder</button>
       </div>
       <div class="hidden" id="colorBox">
@@ -414,6 +421,12 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="field"><span class="lab" id="aModeLab" data-i18n="ui.method_label">Méthode</span>
         <div class="seg" id="aMode" role="group" aria-labelledby="aModeLab">
           <button type="button" data-v="auto" aria-pressed="false" data-i18n="ui.mode_auto">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false" data-i18n="ui.mode_photogrammetry">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false" data-i18n="ui.mode_ia">Une photo (IA)</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="labrow"><span class="lab" id="aResLab" data-i18n="ui.res_label">Résolution des photos</span><button type="button" class="tip" aria-label="Aide : résolution des photos" data-i18n-attr="aria-label:ui.help_res" aria-describedby="tipARes">?</button><span class="tip-text" role="tooltip" id="tipARes" data-i18n="ui.tip_res">Taille des photos que la reconstruction « Toutes les photos » utilise. Auto suit le niveau de détail : Basse pour LowPoly, Moyenne pour Moyen, Haute pour Détaillé. Max garde la pleine résolution des photos et passe les textures en 8192, autant que la mémoire libre le permet : un scan et des textures plus fins, un calcul bien plus long. Le journal technique indique la résolution utilisée. Sans effet sur « Une photo (IA) ».</span></div>
+        <div class="seg" id="aPhotoRes" role="group" aria-labelledby="aResLab">
+          <button type="button" data-v="auto" aria-pressed="false" data-i18n="ui.res_auto">Auto</button><button type="button" data-v="low" aria-pressed="false" data-i18n="ui.res_low">Basse</button><button type="button" data-v="mid" aria-pressed="false" data-i18n="ui.res_mid">Moyenne</button><button type="button" data-v="high" aria-pressed="false" data-i18n="ui.res_high">Haute</button><button type="button" data-v="max" aria-pressed="false" data-i18n="ui.res_max">Max</button>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
@@ -555,11 +568,20 @@ function seg(id, onChange) {
   };
 }
 const modeSeg = seg("mode", updateRoute);
+const photoResSeg = seg("photoRes");
+const aPhotoResSeg = seg("aPhotoRes", () => (adjustDirty = true));
 const levelSeg = seg("level", (v) => $("facesField").classList.toggle("hidden", v !== "lowpoly"));
 const aModeSeg = seg("aMode", (v) => (adjustMode = v));
 const smoothSeg = seg("smooth");
 const aSmoothSeg = seg("aSmooth", () => (adjustDirty = true));
 const SMOOTH_NAMES = ["ui.smooth_value_0", "ui.smooth_value_1", "ui.smooth_value_2", "ui.smooth_value_3"];
+const RES_NAMES = { low: "ui.res_low", mid: "ui.res_mid", high: "ui.res_high", max: "ui.res_max" };
+// the resolution the scan really used: Max comes down to what the memory allowed
+function scanText(r) {
+  const s = r.scan, name = tr(RES_NAMES[s.res] || "ui.res_auto");
+  const text = s.px ? tr("ui.res_px", { res: name, px: num(s.px) }) : s.detail ? tr("ui.res_detail", { res: name, detail: s.detail }) : name;
+  return r.settings?.photo_res === "max" && s.res !== "max" ? tr("ui.res_lowered", { res: text }) : text;
+}
 // slider labels: the value keeps its own element inside the translated sentence
 const RANGES = { faces: ["facesVal", "ui.faces_label"], base: ["baseVal", "ui.base_label"], aFaces: ["aFacesVal", "ui.faces_label_adjust"] };
 function syncRange(id) {
@@ -824,7 +846,7 @@ $("go").onclick = async () => {
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
     nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), filaments: +$("filaments").value,
     color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked,
-    ...exportChoice("e"), rot_seq: "" }));
+    ...exportChoice("e"), photo_res: photoResSeg.get(), rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -979,6 +1001,7 @@ function staleReasons(j, level) {
   if (a.nozzle !== b.nozzle) out.push("ui.stale_nozzle");
   if (!!a.keep_parts !== !!b.keep_parts) out.push("ui.stale_parts");
   if ((a.smooth || 0) !== (b.smooth || 0)) out.push("ui.stale_smooth");
+  if (r.engine === "photogrammetry" && (a.photo_res || "auto") !== (b.photo_res || "auto")) out.push("ui.stale_photo_res");
   if (level === "lowpoly" && a.faces !== b.faces) out.push("ui.stale_faces");
   if ((r.filaments || r.obj_colors) && (a.filaments || 4) !== (b.filaments || 4)) out.push("ui.stale_filaments");
   // results from before these options have none of the files: they all count as unchecked
@@ -1092,6 +1115,7 @@ function renderResult(j) {
     [tr("ui.method_label"), escapeHtml(r.engine === "photogrammetry" ? tr("ui.row_method_photogrammetry", { engine: tools?.photogrammetry_engine || tr("ui.photogrammetry") }) : tr("ui.row_method_ia"))],
     [tr("ui.smooth_label"), escapeHtml(SMOOTH_NAMES[smooth] ? tr(SMOOTH_NAMES[smooth]) : smooth)],
   ];
+  if (r.scan) rows.push([tr("ui.res_label"), escapeHtml(scanText(r))]);
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${escapeHtml(a)}</td><td>${b}</td></tr>`).join("");
   $("colorBox").classList.toggle("hidden", !r.filaments && !r.obj_colors && !r.texture);
   const hex = (c) => "#" + c.map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();
@@ -1109,6 +1133,7 @@ function renderResult(j) {
     if (p) $("exp" + id).textContent = tr(saveKeys[k][p.quads ? 0 : 1], { count: num(p.faces) });
   }
   $("expZip").classList.toggle("hidden", !r.texture);
+  $("expScan").classList.toggle("hidden", !r.scan?.path);
   $("slicerHint").textContent = tools?.orcaslicer === false
     ? tr(supports ? "ui.slicer_hint_stl_supports" : "ui.slicer_hint_stl")
     : tr(supports ? "ui.slicer_hint_orca_supports" : "ui.slicer_hint_orca");
@@ -1130,6 +1155,7 @@ function renderAdjust(j) {
     $("aFaces").value = s.faces;
     syncRange("aFaces");
     aSmoothSeg.set(String(s.smooth || 0));
+    aPhotoResSeg.set(s.photo_res || "auto");
     $("aFilaments").value = String(s.filaments || 4);
     $("a3mf").checked = s.color_3mf !== false;
     $("aObj").checked = s.color_obj !== false;
@@ -1216,6 +1242,7 @@ $("apply").onclick = () => {
   if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "ui.height_error")) return;
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "ui.base_error")) return;
   runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get(),
+    photo_res: aPhotoResSeg.get(),
     filaments: +$("aFilaments").value, color_3mf: $("a3mf").checked, color_obj: $("aObj").checked,
     color_texture: $("aTex").checked, ...exportChoice("a") },
     adjustMode ? { mode: adjustMode } : {})
@@ -1243,6 +1270,7 @@ $("expBlend").onclick = () => exportFile("blend");
 $("exp3mf").onclick = () => exportFile("3mf");
 $("expZip").onclick = () => exportFile("zip");
 $("expObj").onclick = () => exportFile("obj");
+$("expScan").onclick = () => exportFile("scan");
 for (const [k, id] of Object.entries(EXPORTS)) $("exp" + id).onclick = () => exportFile(k);
 ["3mf", "obj"].forEach((kind) => ($(kind === "3mf" ? "orcaColor" : "orcaObj").onclick = () => current
   && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel, kind }).catch((e) => showError(e.message))));
