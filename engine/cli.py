@@ -55,8 +55,8 @@ def main(argv=None):
     except pl.PipelineError as e:
         print(f"ERREUR : {e}", file=sys.stderr)
         return 1
-    print(json.dumps({k: report[k] for k in ("stl", "dimensions_mm", "triangles", "printable", "volume_cm3")},
-                     ensure_ascii=False))
+    print(json.dumps({**{k: report[k] for k in ("stl", "dimensions_mm", "triangles", "printable", "volume_cm3")},
+                      "colors": report.get("colors")}, ensure_ascii=False))
     return 0
 
 

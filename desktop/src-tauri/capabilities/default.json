@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Start window only; the app pages are served by the local engine and use no Tauri API.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

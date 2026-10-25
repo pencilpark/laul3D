@@ -31,6 +31,13 @@ jobs:
           uv venv .venv --python 3.11
           uv pip install --python .venv\Scripts\python.exe -r requirements-core.txt -r requirements-ai.txt
 
+      # quick checks first: a failure here shows in a few minutes, before the long smoke tests
+      - name: Photogrammetry staging, private fallback folder, OrcaSlicer detached
+        run: .venv\Scripts\python.exe tests\photogrammetry_win_test.py
+
+      - name: Launcher stops its children when closed early or when the engine never answers
+        run: .venv\Scripts\python.exe tests\boot_test.py
+
       - name: Cache Blender
         uses: actions/cache@v4
         with:
@@ -73,6 +80,23 @@ jobs:
           LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données IA'
         run: .venv\Scripts\python.exe tests\setup_ai_test.py --real
 
+      - name: Tools installer logic
+        run: .venv\Scripts\python.exe tests\setup_tools_test.py
+
+      - name: Photogrammetry orientation logic
+        run: .venv\Scripts\python.exe tests\orientation_test.py
+
+      - name: Tools installer real run (COLMAP + OpenMVS, accented path)
+        env:
+          LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
+        run: .venv\Scripts\python.exe tests\setup_tools_test.py --real photogrammetry
+
+      - name: Smoke test photogrammetry COLMAP + OpenMVS on CPU (accented path)
+        env:
+          LOWPOLY_DATA: '${{ github.workspace }}\ci-out\Frédéric\ Mon -Chemin\Données outils'
+          LOWPOLY_BLENDER: ${{ github.workspace }}\tools\blender\blender.exe
+        run: .venv\Scripts\python.exe tests\smoke_test.py --photogrammetry --root ci-out --out smoke-pg.json
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -82,4 +106,7 @@ jobs:
             ci-out/**/*.png
             ci-out/**/*.stl
             ci-out/**/*.json
+            ci-out/**/*.log
+            ci-out/**/*.glb
+            ci-out/**/scan_*/*
           if-no-files-found: warn

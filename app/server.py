@@ -1,4 +1,4 @@
-"""Local LowPoly3D server: drop photos, get a printable STL. Started by the desktop app (or start.command)."""
+"""Local Berria Craft server: drop photos, get a printable STL. Started by the desktop app (or start.command)."""
 import copy
 import itertools
 import json
@@ -21,13 +21,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "engine"))
 import pipeline as pl  # noqa: E402
 import setup_ai  # noqa: E402
+import setup_tools  # noqa: E402
 
 PROJECTS = os.environ.get("LOWPOLY_PROJECTS", os.path.join(ROOT, "projects"))
 STATIC = os.path.join(ROOT, "app", "static")
 LEVELS = ("lowpoly", "medium", "detailed")
 MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
-            "rot_seq": "", "keep_parts": False, "nozzle": 0.4}
+            "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 app = FastAPI()
@@ -78,6 +79,7 @@ def clean_settings(raw, base=None):
     s["base_cut"] = num("base_cut", 0.0, 20.0)
     s["faces"] = num("faces", 100, 20000, int)
     s["nozzle"] = num("nozzle", 0.2, 1.0)
+    s["smooth"] = num("smooth", 0, 3, int)
     s["rot_seq"] = canonical_rot(s["rot_seq"])
     s["keep_parts"] = bool(s["keep_parts"])
     if s["level"] not in LEVELS:
@@ -186,6 +188,7 @@ def process(job, level, log):
     rel = lambda p: os.path.relpath(os.path.join(out, os.path.basename(p)), d).replace(os.sep, "/")
     report["stl"] = rel(report["stl"])
     report["previews"] = [rel(p) for p in report.get("previews", [])]
+    report["colors"] = rel(report["colors"]) if report.get("colors") else None
     report.update(settings=s, engine=engine, main_photo=main_photo, version=version)
     with LOCK:
         job["results"][level] = report
@@ -266,7 +269,7 @@ def tools_now():
 
 @app.get("/api/status")
 def status():
-    return {"tools": tools_now(), "setup": pl.setup_state(), "ai_install": setup_ai.snapshot(),
+    return {"tools": tools_now(), "tools_setup": setup_tools.snapshot(), "ai_install": setup_ai.snapshot(),
             "queue": TASKS.qsize(), "printer": {"name": "Creality Ender-3 V3", "bed_mm": [220, 220, 250]}}
 
 
@@ -274,6 +277,12 @@ def status():
 def install_ai():
     setup_ai.start()
     return setup_ai.snapshot()
+
+
+@app.post("/api/setup/tools")
+def install_tools(body: dict = Body(...)):
+    setup_tools.start([str(t) for t in body.get("ids", [])])
+    return setup_tools.snapshot()
 
 
 @app.get("/api/jobs")

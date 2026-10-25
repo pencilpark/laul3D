@@ -47,18 +47,39 @@ def _first_existing(paths):
     return next((p for p in paths if p and os.path.exists(p)), None)
 
 
+TOOLS = os.path.join(DATA, "tools")  # what the app installs itself (setup_tools)
+BLENDER_MIN = (5, 0)  # the smoothing uses the SDF grid nodes, new in Blender 5.0
+
+
+def blender_version(exe):
+    """(major, minor) from the X.Y folder Blender keeps beside its program (in Contents/Resources on a Mac)."""
+    base = os.path.dirname(os.path.realpath(exe))
+    if IS_MAC:
+        base = os.path.join(os.path.dirname(base), "Resources")
+    try:
+        names = os.listdir(base)
+    except OSError:
+        return None
+    return max((tuple(map(int, n.split("."))) for n in names if re.fullmatch(r"\d+\.\d+", n)), default=None)
+
+
 def blender_path():
     env = os.environ.get("LOWPOLY_BLENDER")
     if env:
         return env
     if IS_MAC:
-        return _first_existing(["/Applications/Blender.app/Contents/MacOS/Blender",
-                                os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender")])
-    if IS_WIN:
-        found = sorted(glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
-                                              "Blender Foundation", "Blender*", "blender.exe")))
-        return found[-1] if found else None
-    return shutil.which("blender")
+        found = [os.path.join(TOOLS, "Blender.app", "Contents", "MacOS", "Blender"),
+                 "/Applications/Blender.app/Contents/MacOS/Blender",
+                 os.path.expanduser("~/Applications/Blender.app/Contents/MacOS/Blender")]
+    elif IS_WIN:
+        found = [os.path.join(TOOLS, "blender", "blender.exe"),
+                 *glob.glob(os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
+                                         "Blender Foundation", "Blender*", "blender.exe"))]
+    else:
+        return shutil.which("blender")
+    # the copy the app installed first (the tested version), then the newest recent enough
+    usable = [p for p in found if os.path.exists(p) and (blender_version(p) or (0, 0)) >= BLENDER_MIN]
+    return next((p for p in usable if p.startswith(TOOLS)), None) or max(usable, key=blender_version, default=None)
 
 
 def orca_path():
@@ -68,7 +89,8 @@ def orca_path():
     if IS_MAC:
         return _first_existing(["/Applications/OrcaSlicer.app", os.path.expanduser("~/Applications/OrcaSlicer.app")])
     if IS_WIN:
-        return _first_existing([os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "OrcaSlicer", "orca-slicer.exe")])
+        return _first_existing([os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "OrcaSlicer", "orca-slicer.exe"),
+                                os.path.join(TOOLS, "OrcaSlicer", "orca-slicer.exe")])
     return shutil.which("orca-slicer")
 
 
@@ -113,14 +135,6 @@ def tools_status():
         "triposr_weights_cached": weights_cached,
         "orcaslicer": bool(orca_path()),
     }
-
-
-def setup_state():
-    try:
-        with open(os.path.join(DATA, "state.json"), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return None
 
 
 def sharpness(img):
@@ -262,7 +276,7 @@ def photogrammetry(photo_dir, photos, work_dir, level, log):
     keep, dropped = select_sharp(photos)
     if dropped:
         log(f"{len(dropped)} photo(s) floue(s) écartée(s) : {', '.join(dropped)}")
-    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, stage_photos, PipelineError)
+    return photogrammetry_win.reconstruct(photo_dir, keep, work_dir, level, log, run, PipelineError)
 
 
 def prepare_main_image(photo_dir, name, work_dir):
@@ -284,9 +298,10 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
     if not ok:
         raise PipelineError("aucune photo lisible")
     name = main_photo if any(p["name"] == main_photo for p in ok) else max(ok, key=lambda p: p["sharpness"])["name"]
+    key = f"{name}|couleurs"  # meshes cached before the colored preview have none: computed again
     if os.path.exists(out) and os.path.exists(marker):
         with open(marker, encoding="utf-8") as f:
-            if f.read() == name:
+            if f.read() == key:
                 log(f"reconstruction IA de {name} déjà en cache")
                 return out, name
     image = prepare_main_image(photo_dir, name, work_dir)
@@ -301,25 +316,34 @@ def triposr(photo_dir, photos, main_photo, work_dir, log):
         raise PipelineError("TripoSR a échoué : " + (lines[-1] if lines else f"code {code}"))
     os.replace(tmp, out)
     with open(marker, "w", encoding="utf-8") as f:
-        f.write(name)
+        f.write(key)
     return out, name
 
 
 def blender_prep(raw, out_dir, name, level, s, log):
     blender = blender_path()
     if not blender or not os.path.exists(blender):
-        raise PipelineError("Blender est introuvable : ouvre l'assistant d'installation.")
+        raise PipelineError("Blender 5 ou plus est introuvable : clique « Calcul 3D : installer » en haut de la fenêtre.")
     script = os.path.join(ROOT, "engine", "blender_lowpoly.py")
     base = [blender, "-b", "--factory-startup", "--python-exit-code", "1", "-P", script, "--"]
     engine = "cycles" if os.environ.get("LOWPOLY_PREVIEW_ENGINE") == "cycles" else "workbench"
     cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
                   "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
                   "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
-                  "--preview-engine", engine, "--save-blend"]
+                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
+    try:  # photogrammetry_win: the scan stays in COLMAP's frame, this rotation stands it up
+        with open(raw + ".orient.json", encoding="utf-8") as f:
+            orient = json.load(f)
+        if orient.get("matrix"):
+            cmd += ["--orient", *(str(v) for row in orient["matrix"] for v in row)]
+        if orient.get("raw_axes"):
+            cmd += ["--raw-axes"]
+    except (OSError, ValueError):
+        pass
     code, lines = run(cmd, log)
     report = next((json.loads(l[7:]) for l in lines if l.startswith("REPORT ")), None)
     if report is None:
@@ -360,14 +384,32 @@ def export_copy(path):
     return dest
 
 
+def powershell(script, env=None):
+    """Windows PowerShell 5.1. A module path inherited from PowerShell 7 (app or test started from pwsh) makes it
+    load the wrong Microsoft.PowerShell.Security, without Get-Acl or Get-AuthenticodeSignature: it is dropped."""
+    clean = {k: v for k, v in (env or os.environ).items() if k.upper() != "PSMODULEPATH"}
+    return subprocess.run(["powershell", "-NoProfile", "-Command", script], env=clean, capture_output=True, text=True,
+                          errors="replace", creationflags=NO_WINDOW)
+
+
+def launch_detached(cmd):
+    """Windows: a short-lived Python starts the app, so it is no descendant of the server and survives the engine's
+    stop (taskkill /T ends the whole tree when Berria Craft closes)."""
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    code = f"import subprocess, sys; subprocess.Popen(sys.argv[1:], creationflags={flags})"
+    subprocess.run([sys.executable, "-I", "-c", code, *cmd], creationflags=NO_WINDOW, timeout=60, check=True)
+
+
 def open_in_orca(stl):
     orca = orca_path()
     if not orca:
         raise PipelineError("OrcaSlicer est introuvable : ouvre l'assistant d'installation.")
     if IS_MAC:
         subprocess.Popen(["open", "-a", orca, stl])
+    elif IS_WIN:
+        launch_detached([orca, stl])
     else:
-        subprocess.Popen([orca, stl], creationflags=NO_WINDOW)
+        subprocess.Popen([orca, stl])
 
 
 def reveal(path):

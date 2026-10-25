@@ -103,7 +103,7 @@ def main():
         model.to(dev)
         with torch.no_grad():
             codes = model([Image.fromarray(image)], device=dev)
-        return model.extract_mesh(codes, False, resolution=args.mc_resolution)[0]
+        return model.extract_mesh(codes, True, resolution=args.mc_resolution)[0]
 
     t1 = time.time()
     try:
@@ -123,9 +123,11 @@ def main():
     half_turn = np.diag([-1.0, 1.0, -1.0])
     verts = np.asarray(mesh.vertices, dtype=np.float64) @ (half_turn @ ry @ rx).T
     faces = np.asarray(mesh.faces, dtype=np.int64) + 1
+    # "v x y z r g b": Blender's OBJ importer turns the colors into a color attribute, used for the colored preview
+    rgb = np.asarray(mesh.visual.vertex_colors, dtype=np.float64)[:, :3] / 255.0
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as f:
-        f.write("".join(f"v {x:.6f} {y:.6f} {z:.6f}\n" for x, y, z in verts))
+        f.write("".join(f"v {x:.6f} {y:.6f} {z:.6f} {r:.4f} {g:.4f} {b:.4f}\n" for (x, y, z), (r, g, b) in zip(verts, rgb)))
         f.write("".join(f"f {a} {b} {c}\n" for a, b, c in faces))
     print(f"[triposr] saved {args.out} total {time.time() - t0:.1f}s", flush=True)
 
