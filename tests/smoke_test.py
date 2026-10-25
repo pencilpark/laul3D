@@ -18,7 +18,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "suzanne_48")
 # the lines that explain the colors, which the end of the output alone often misses
-KEY_LINES = re.compile(r"TextureMesh|texture du scan|texture des photos|couleurs|photos placées|reconstruction|ERREUR")
+KEY_LINES = re.compile(r"points communs|TextureMesh|texture du scan|texture des photos|couleurs|photos placées|reconstruction|ERREUR")
 
 
 def glb_colors(path):
