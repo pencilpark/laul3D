@@ -314,6 +314,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
           <div class="labrow"><label for="filaments">Filaments pour l'impression en couleur</label><button type="button" class="tip" aria-label="Aide : filaments" aria-describedby="tipFil">?</button><span class="tip-text" role="tooltip" id="tipFil">Nombre de couleurs du 3MF peint et de l'OBJ en couleurs, une par bobine de ton imprimante. Les couleurs des photos sont regroupées en autant de teintes, ou moins si l'objet en a moins.</span></div>
           <select id="filaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
         </div>
+        <div class="field">
+          <div class="labrow"><span class="lab" id="exportsLab">Exports 3D hors impression</span><button type="button" class="tip" aria-label="Aide : exports 3D" aria-describedby="tipExports">?</button><span class="tip-text" role="tooltip" id="tipExports">Le modèle nettoyé pour d'autres usages que l'impression, à sa taille réelle en mètres, en plus des fichiers d'impression. Un zip par profil coché. Chacun allonge le calcul : environ 15 s pour Web ou Jeux et plus d'une minute pour Logiciels 3D sur un modèle simple, davantage sur un scan détaillé.</span></div>
+          <div role="group" aria-labelledby="exportsLab"><label class="check"><input id="eSoftware" type="checkbox"> Logiciels 3D : Blender, sculpture, animation (quads)</label><label class="check"><input id="eGame" type="checkbox"> Jeux : Unity, Unreal, Godot (3 niveaux de détail)</label><label class="check"><input id="eWeb" type="checkbox"> Web : GLB léger (three.js, model-viewer)</label></div>
+        </div>
         <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label><button type="button" class="tip" aria-label="Aide : pièces détachées" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
       </details>
       <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle 3D</button></div>
@@ -389,6 +393,14 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
           <button class="ghost" id="expZip">Enregistrer l'OBJ texturé (service couleur)</button>
         </div>
       </div>
+      <div class="hidden" id="exportBox">
+        <div class="labrow" style="margin-top:14px"><span class="lab">Exports 3D</span><button type="button" class="tip" aria-label="Aide : exports 3D" aria-describedby="tipExportBox">?</button><span class="tip-text" role="tooltip" id="tipExportBox">Taille réelle en mètres, Y vers le haut, base centrée sur l'origine. Logiciels 3D : quads, textures 4096, fichiers .blend, FBX et OBJ ; pour animer un personnage, une retopologie à la main reste utile. Jeux : triangles en 3 niveaux de détail (100, 50 et 25 %), textures 2048, FBX et GLB. Web : un GLB de quelques Mo, plus une version compressée Draco quand ce Blender la produit. Textures : les couleurs des photos, ombres comprises, et une normal map pour le relief fin.</span></div>
+        <div class="actions">
+          <button class="ghost" id="expSoftware">Enregistrer pour logiciels 3D</button>
+          <button class="ghost" id="expGame">Enregistrer pour jeux</button>
+          <button class="ghost" id="expWeb">Enregistrer pour le web</button>
+        </div>
+      </div>
       <details class="tech"><summary>Détails techniques</summary><table id="report"></table></details>
     </div>
 
@@ -411,6 +423,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       </div>
       <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
       <div class="field"><span class="lab" id="aColorFilesLab">Fichiers pour l'impression en couleur</span><div role="group" aria-labelledby="aColorFilesLab"><label class="check"><input id="a3mf" type="checkbox" checked> 3MF peint (OrcaSlicer, numéros de filament)</label><label class="check"><input id="aObj" type="checkbox" checked> OBJ en couleurs (OrcaSlicer, couleurs proposées)</label><label class="check"><input id="aTex" type="checkbox" checked> OBJ texturé (service d'impression couleur)</label></div></div>
+      <div class="field"><span class="lab" id="aExportsLab">Exports 3D hors impression</span><div role="group" aria-labelledby="aExportsLab"><label class="check"><input id="aSoftware" type="checkbox"> Logiciels 3D : Blender, sculpture, animation (quads)</label><label class="check"><input id="aGame" type="checkbox"> Jeux : Unity, Unreal, Godot (3 niveaux de détail)</label><label class="check"><input id="aWeb" type="checkbox"> Web : GLB léger (three.js, model-viewer)</label></div></div>
       <div class="field"><label for="aFilaments">Filaments pour l'impression en couleur</label><select id="aFilaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
       <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
       <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Recalculer avec ces réglages</button></div>
@@ -739,7 +752,8 @@ $("go").onclick = async () => {
   fd.append("mode", modeSeg.get());
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
     nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), filaments: +$("filaments").value,
-    color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked, rot_seq: "" }));
+    color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked,
+    ...exportChoice("e"), rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -883,6 +897,8 @@ async function poll(id, gen, failures) {
 }
 
 const COLOR_FILES = ["color_3mf", "color_obj", "color_texture"];
+const EXPORTS = { software: "Software", game: "Game", web: "Web" };
+const exportChoice = (pre) => Object.fromEntries(Object.entries(EXPORTS).map(([k, id]) => [`export_${k}`, $(pre + id).checked]));
 function staleReasons(j, level) {
   const r = j.results[level];
   if (!r) return [];
@@ -897,6 +913,7 @@ function staleReasons(j, level) {
   if ((r.filaments || r.obj_colors) && (a.filaments || 4) !== (b.filaments || 4)) out.push("filaments");
   // results from before these options have none of the files: they all count as unchecked
   if (r.colors && COLOR_FILES.some((k) => (a[k] ?? false) !== b[k])) out.push("fichiers couleur");
+  if (Object.keys(EXPORTS).some((k) => !!a[`export_${k}`] !== !!b[`export_${k}`])) out.push("exports 3D");
   if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
   if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("méthode");
   return out;
@@ -1010,6 +1027,13 @@ function renderResult(j) {
   $("orcaObj").classList.toggle("hidden", !r.obj_colors || tools?.orcaslicer === false);
   $("exp3mf").classList.toggle("hidden", !r.filaments);
   $("expObj").classList.toggle("hidden", !r.obj_colors);
+  $("exportBox").classList.toggle("hidden", !Object.keys(EXPORTS).some((k) => r[`export_${k}`]));
+  const names = { software: "logiciels 3D", game: "jeux", web: "le web" };
+  for (const [k, id] of Object.entries(EXPORTS)) {
+    const p = r.profiles?.[k];
+    $("exp" + id).classList.toggle("hidden", !r[`export_${k}`]);
+    if (p) $("exp" + id).textContent = `Enregistrer pour ${names[k]} (${p.faces.toLocaleString("fr-FR")} ${p.quads ? "quads" : "triangles"})`;
+  }
   $("expZip").classList.toggle("hidden", !r.texture);
   $("slicerHint").textContent = tools?.orcaslicer === false
     ? `Enregistre le fichier STL, puis ouvre-le dans ton logiciel de découpe avec l'imprimante « Creality Ender-3 V3 »${supports ? " et les supports activés" : ""}.`
@@ -1037,6 +1061,7 @@ function renderAdjust(j) {
     $("a3mf").checked = s.color_3mf !== false;
     $("aObj").checked = s.color_obj !== false;
     $("aTex").checked = s.color_texture !== false;
+    for (const [k, id] of Object.entries(EXPORTS)) $("a" + id).checked = !!s[`export_${k}`];
     syncFilaments("a");
   }
   aModeSeg.set(adjustMode || j.mode);
@@ -1097,7 +1122,7 @@ function updateRotConfirm() {
   $("rotConfirm").classList.toggle("hidden", !n);
   $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour, pas encore recalculé. Recalcule ou annule pour pouvoir imprimer.` : "";
   // never export a file that differs from what the preview shows
-  ["orca", "expStl", "expBlend", "orcaColor", "orcaObj", "exp3mf", "expObj", "expZip"].forEach((id) => ($(id).disabled = n > 0));
+  ["orca", "expStl", "expBlend", "orcaColor", "orcaObj", "exp3mf", "expObj", "expZip", "expSoftware", "expGame", "expWeb"].forEach((id) => ($(id).disabled = n > 0));
 }
 $("rotApply").onclick = async () => {
   if (!current || !pendingRot || runPending) return;
@@ -1119,7 +1144,7 @@ $("apply").onclick = () => {
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
   runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get(),
     filaments: +$("aFilaments").value, color_3mf: $("a3mf").checked, color_obj: $("aObj").checked,
-    color_texture: $("aTex").checked },
+    color_texture: $("aTex").checked, ...exportChoice("a") },
     adjustMode ? { mode: adjustMode } : {})
     .then((ok) => { if (ok) adjustDirty = false; });
 };
@@ -1128,6 +1153,7 @@ $("apply").onclick = () => {
 function syncFilaments(pre) {
   $(pre === "a" ? "aFilaments" : "filaments").disabled = !$(pre + "3mf").checked && !$(pre + "Obj").checked;
 }
+Object.values(EXPORTS).forEach((id) => $("a" + id).addEventListener("change", () => (adjustDirty = true)));
 ["c", "a"].forEach((pre) => ["3mf", "Obj", "Tex"].forEach((k) => $(pre + k).addEventListener("change", () => {
   if (pre === "a") adjustDirty = true;
   syncFilaments(pre);
@@ -1145,6 +1171,7 @@ $("expBlend").onclick = () => exportFile("blend");
 $("exp3mf").onclick = () => exportFile("3mf");
 $("expZip").onclick = () => exportFile("zip");
 $("expObj").onclick = () => exportFile("obj");
+for (const [k, id] of Object.entries(EXPORTS)) $("exp" + id).onclick = () => exportFile(k);
 ["3mf", "obj"].forEach((kind) => ($(kind === "3mf" ? "orcaColor" : "orcaObj").onclick = () => current
   && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel, kind }).catch((e) => showError(e.message))));
 $("orca").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel }).catch((e) => showError(e.message));
