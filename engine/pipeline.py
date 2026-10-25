@@ -335,7 +335,9 @@ def blender_prep(raw, out_dir, name, level, s, log):
     cmd = base + ["--input", raw, "--outdir", out_dir, "--name", name, "--level", level,
                   "--height-mm", str(s["height_mm"]), "--base-cut", str(s["base_cut"] / 100.0),
                   "--rot-seq", s.get("rot_seq") or "-", "--nozzle", str(s["nozzle"]), "--previews",
-                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors"]
+                  "--preview-engine", engine, "--save-blend", "--smooth", str(int(s.get("smooth", 0))), "--colors",
+                  "--filaments", str(int(s.get("filaments", 4))),
+                  "--color-files", ",".join(k for k in ("3mf", "obj", "texture") if s.get("color_" + k, True)) or "-"]
     if level == "lowpoly" and s.get("faces"):
         cmd += ["--faces", str(int(s["faces"]))]
     if s.get("keep_parts"):
@@ -379,13 +381,33 @@ def downloads_dir():
     return d
 
 
-def export_copy(path):
+def free_download_path(stem, ext):
     dest_dir = downloads_dir()
-    stem, ext = os.path.splitext(os.path.basename(path))
     dest, i = os.path.join(dest_dir, stem + ext), 2
     while os.path.exists(dest):
         dest, i = os.path.join(dest_dir, f"{stem} ({i}){ext}"), i + 1
+    return dest
+
+
+def export_copy(path):
+    dest = free_download_path(*os.path.splitext(os.path.basename(path)))
     shutil.copy2(path, dest)
+    return dest
+
+
+def export_obj(path):
+    """The OBJ and its MTL side by side in Downloads, under a name free for both: OrcaSlicer reads the MTL next to the
+    OBJ, never out of a zip. The first line, mtllib, follows the new name."""
+    stem, dest_dir, i = os.path.splitext(os.path.basename(path))[0], downloads_dir(), 2
+    name = stem
+    while any(os.path.exists(os.path.join(dest_dir, name + ext)) for ext in (".obj", ".mtl")):
+        name, i = f"{stem}_{i}", i + 1
+    dest = os.path.join(dest_dir, name + ".obj")
+    shutil.copy2(path[:-4] + ".mtl", dest[:-4] + ".mtl")
+    with open(path, encoding="utf-8") as src, open(dest, "w", encoding="utf-8", newline="\n") as out:
+        src.readline()
+        out.write(f"mtllib {name}.mtl\n")
+        shutil.copyfileobj(src, out)
     return dest
 
 
