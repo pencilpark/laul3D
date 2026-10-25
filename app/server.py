@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "engine"))
+import i18n  # noqa: E402
 import pipeline as pl  # noqa: E402
 import setup_ai  # noqa: E402
 import setup_tools  # noqa: E402
@@ -33,6 +34,7 @@ DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.
             "export_software": False, "export_game": False, "export_web": False}
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
+i18n.startup_language(pl.DATA)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 JOBS = {}
@@ -268,6 +270,21 @@ def load_projects():
 def startup():
     load_projects()
     threading.Thread(target=worker, daemon=True).start()
+
+
+@app.get("/api/prefs")
+def get_prefs():
+    return {"language": i18n.language(), "languages": i18n.LANGUAGES}
+
+
+@app.post("/api/prefs")
+def set_prefs(body: dict = Body(...)):
+    lang = body.get("language")
+    if lang not in i18n.LANGUAGES:
+        raise HTTPException(400, i18n.tr("srv.unknown_language"))
+    i18n.save_language(pl.DATA, lang)
+    os.environ["LOWPOLY_LANG"] = lang
+    return get_prefs()
 
 
 @app.get("/")
