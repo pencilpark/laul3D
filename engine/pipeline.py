@@ -198,11 +198,16 @@ def select_sharp(photos, keep_min=MIN_PHOTOGRAMMETRY):
     return keep, dropped
 
 
-def run(cmd, log, cwd=None, env=None):
+BELOW_NORMAL = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)  # Windows only
+
+
+def run(cmd, log, cwd=None, env=None, low_priority=False):
     log(f"$ {os.path.basename(cmd[0])} {' '.join(cmd[1:])}")
     env = dict(env or os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    # low priority: a long reconstruction on all cores leaves the computer usable, and runs as fast when it is idle
+    flags = NO_WINDOW | (BELOW_NORMAL if low_priority else 0)
     proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=NO_WINDOW)
+                            text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=flags)
     lines = []
     for line in proc.stdout:
         line = line.rstrip()

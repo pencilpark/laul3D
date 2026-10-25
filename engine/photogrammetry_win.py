@@ -22,6 +22,10 @@ COLMAP_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
 ORIENTATION, MAKE, MODEL, EXIF_IFD, FOCAL, FOCAL_35MM = 0x0112, 0x010F, 0x0110, 0x8769, 0x920A, 0xA405
 UNSEEN = 0xDCDCDC  # faces no photo shows: the solid preview's grey rather than OpenMVS's orange
 SCAN_VERSION = 2  # raised when the same photos give a different scan: older caches are computed again
+# COLMAP's CPU SIFT (VLFeat) keeps 22 float planes of the image doubled in both directions (first_octave -1):
+# 352 bytes per pixel of the scaled photo, plus a margin for the rest of the extractor
+SIFT_BYTES_PER_PIXEL = 400
+MEMORY_RESERVE = 1.5 * 2 ** 30  # left to Windows and the open apps
 # CPU time grows fast with image size: the levels follow Object Capture's preview / medium / full
 LEVELS = {"lowpoly": {"max_image": 1600, "resolution_level": 2},
           "medium": {"max_image": 2000, "resolution_level": 1},
@@ -81,6 +85,47 @@ def _private_dir(path):
                         "*S-1-5-18:(OI)(CI)F"], capture_output=True, creationflags=pl.NO_WINDOW)
     if r.returncode != 0:
         raise RuntimeError(f"le dossier de travail n'a pas pu être protégé (icacls, code {r.returncode})")
+
+
+def _free_memory():
+    """Physical memory available now, in bytes, or None when unknown."""
+    try:
+        if pl.IS_WIN:
+            import ctypes
+
+            class Status(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + \
+                           [(n, ctypes.c_ulonglong) for n in ("total", "avail", "page_total", "page_avail",
+                                                              "virt_total", "virt_avail", "ext_avail")]
+            s = Status()
+            s.length = ctypes.sizeof(s)
+            return s.avail if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(s)) else None
+        return os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def _sift_threads(photo_dir, photos, max_image):
+    """SIFT extraction threads that fit in free memory, with the free memory, or (None, None) when unknown.
+
+    COLMAP runs one single-threaded extractor per thread, each on a whole photo: fewer threads only lengthen
+    this step, the features found stay the same. By default it takes every core, and in the detailed level an
+    8 GB PC would page for minutes.
+    """
+    free = _free_memory()
+    if not free:
+        return None, None
+    pixels = 0.0
+    for p in photos:
+        try:
+            with Image.open(os.path.join(photo_dir, p["name"])) as im:
+                w, h = im.size
+        except Exception:  # noqa: BLE001  an unreadable photo is reported by COLMAP itself
+            continue
+        scale = min(1.0, max_image / max(w, h))
+        pixels = max(pixels, w * h * scale * scale)
+    per_thread = SIFT_BYTES_PER_PIXEL * (pixels or max_image * max_image * 0.75)
+    return max(1, min(os.cpu_count() or 1, int((free - MEMORY_RESERVE) // per_thread))), free
 
 
 def _natural(name):
@@ -234,15 +279,20 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
                     log(f"  {tool} : {line}")
 
     def step(what, cmd):
-        code, _ = run(cmd, log, cwd=w, env=env)
+        code, _ = run(cmd, log, cwd=w, env=env, low_priority=True)
         if code != 0:
             tool_log(os.path.splitext(os.path.basename(cmd[0]))[0])
             raise error_cls(f"La photogrammétrie a échoué ({what}). " + _advice(len(photos)))
 
     log(f"COLMAP + OpenMVS : {len(photos)} photos, {cameras} réglage(s) d'appareil, niveau {level}")
+    threads, free = _sift_threads(photo_dir, photos, cfg["max_image"])
+    if threads:
+        log(f"points communs : {threads} photo(s) à la fois sur {os.cpu_count()} cœur(s), "
+            f"pour {free / 2 ** 30:.1f} Go de mémoire libre")
     step("points communs", [colmap(), "feature_extractor", "--database_path", db, "--image_path", images,
                             "--ImageReader.single_camera_per_folder", "1", "--FeatureExtraction.use_gpu", "0",
-                            "--FeatureExtraction.max_image_size", str(cfg["max_image"])])
+                            "--FeatureExtraction.max_image_size", str(cfg["max_image"]),
+                            *(["--FeatureExtraction.num_threads", str(threads)] if threads else [])])
     step("appariement", [colmap(), "exhaustive_matcher", "--database_path", db, "--FeatureMatching.use_gpu", "0"])
     step("position des photos", [colmap(), "mapper", "--database_path", db, "--image_path", images, "--output_path", sparse])
     model = _largest_model(sparse)
@@ -271,7 +321,8 @@ def _reconstruct(photo_dir, photos, work_dir, level, log, run, error_cls, w):
     code, _ = run([openmvs("TextureMesh"), "-w", w, "-i", os.path.join(w, "scene_dense.mvs"), "-m", mesh,
                    "-o", os.path.join(w, "scene_texture.mvs"), "--export-type", "obj", "--empty-color", str(UNSEEN),
                    "--resolution-level", str(cfg["resolution_level"]), "--max-texture-size", "4096",
-                   "--global-seam-leveling", "0", "--local-seam-leveling", "0"], log, cwd=w, env=env)
+                   "--global-seam-leveling", "0", "--local-seam-leveling", "0"],
+                  log, cwd=w, env=env, low_priority=True)
     textured = [p for p in glob.glob(os.path.join(w, "scene_texture*")) if not p.endswith((".mvs", ".log"))]
     tool_log("TextureMesh")  # how many views and faces it textured
     if code != 0 or not any(p.endswith(".obj") for p in textured):

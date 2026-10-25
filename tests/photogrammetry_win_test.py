@@ -122,7 +122,8 @@ def test_texture_command():
     w = os.path.join(work, "colmap_lowpoly")
     calls = []
 
-    def fake_run(cmd, log, cwd=None, env=None):
+    def fake_run(cmd, log, cwd=None, env=None, low_priority=False):
+        assert low_priority, cmd
         calls.append([str(c) for c in cmd])
         tool = os.path.splitext(os.path.basename(str(cmd[0])))[0]
         if "mapper" in cmd:
@@ -139,12 +140,31 @@ def test_texture_command():
             open(os.path.join(w, "scene_texture.obj"), "w").close()
         return 0, []
 
-    out = pgw._reconstruct(src, photos, work, "lowpoly", lambda line: None, fake_run, RuntimeError, w)
+    with mock.patch.object(pgw, "_free_memory", return_value=8 * 2 ** 30):
+        out = pgw._reconstruct(src, photos, work, "lowpoly", lambda line: None, fake_run, RuntimeError, w)
+    sift = next(c for c in calls if "feature_extractor" in c)
+    assert int(sift[sift.index("--FeatureExtraction.num_threads") + 1]) >= 1, sift
     tex = next(c for c in calls if os.path.basename(c[0]).startswith("TextureMesh"))
     for opt in ("--global-seam-leveling", "--local-seam-leveling"):
         assert tex[tex.index(opt) + 1] == "0", tex
     assert out.endswith("scene_texture.obj") and pgw._cached(work, "lowpoly") == out, out
-    print("photogrammetry_win : TextureMesh sans nivellement des coutures (textures noires d'OpenMVS 2.4.0)")
+    print("photogrammetry_win : TextureMesh sans nivellement des coutures (textures noires d'OpenMVS 2.4.0), "
+          "COLMAP et OpenMVS en priorité basse")
+
+
+def test_sift_threads():
+    src = tempfile.mkdtemp(prefix="berria-pgw-sift-")
+    photos = [photo(src, "iphone.jpg", (4032, 3024)), {"name": "absente.jpg"}]
+    with mock.patch.object(pgw, "_free_memory", return_value=8 * 2 ** 30), mock.patch.object(os, "cpu_count", return_value=8):
+        counts = {lv: pgw._sift_threads(src, photos, cfg["max_image"])[0] for lv, cfg in pgw.LEVELS.items()}
+    assert counts == {"lowpoly": 8, "medium": 5, "detailed": 2}, counts
+    with mock.patch.object(pgw, "_free_memory", return_value=2 * 2 ** 30):
+        assert pgw._sift_threads(src, photos, 3200)[0] == 1
+    with mock.patch.object(pgw, "_free_memory", return_value=None):
+        assert pgw._sift_threads(src, photos, 3200) == (None, None)
+    if IS_WIN:  # the real reading, through GlobalMemoryStatusEx
+        assert (pgw._free_memory() or 0) > 2 ** 28, pgw._free_memory()
+    print("photogrammetry_win : extraction SIFT limitée à la mémoire libre (8 Go : 8, 5 et 2 photos à la fois)")
 
 
 def fake_blender(root, version, app):
@@ -267,6 +287,7 @@ def main():
     test_largest_model()
     test_cache()
     test_texture_command()
+    test_sift_threads()
     test_blender_version()
     test_vcredist_lock()
     if IS_WIN:
