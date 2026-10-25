@@ -6,9 +6,9 @@ Application de bureau pour Mac et Windows : on glisse des photos et on récupèr
 
 Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt), où GitHub remplace l'espace du nom par un point (`Berria.Craft_…`).
 
-Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.3.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.4.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
 
-Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.3.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
+Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.4.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
 Au premier lancement, l'app prépare son environnement de calcul (une minute au plus), puis propose dans une fenêtre les outils qui manquent : Blender (obligatoire), OrcaSlicer, et sous Windows la photogrammétrie COLMAP + OpenMVS. Le module « Une photo (IA) » s'installe à part, depuis l'en-tête. Sous Windows, COLMAP, OpenMVS et l'IA demandent les composants Microsoft Visual C++ : Windows demande alors une autorisation.
 
@@ -51,7 +51,7 @@ Rendu : la visionneuse s'ouvre en mode Rendu quand le modèle a des couleurs, ce
 4. Lissage éventuel (nœuds SDF d'OpenVDB), puis décimation au nombre de triangles du niveau. Si des auto-intersections apparaissent, la cible remonte de 40 % et l'app relance, jusqu'à 3 fois.
 5. Socle plat : coupe du bas (3 % par défaut) et fermeture de la section.
 6. Contrôles : arêtes non-manifold, auto-intersections, coques, parois plus fines que 2 × la buse, surplombs à plus de 45°, volume.
-7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu.
+7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu, en 3MF multi-filaments et en OBJ texturé (voir « Imprimer en couleur »).
 8. Export STL en mm, vérifié en relisant le nombre de triangles écrit, plus un `.blend` et 4 aperçus PNG.
 
 ## Bien photographier
@@ -64,6 +64,14 @@ Bouton « Préparer l'impression dans OrcaSlicer », puis :
 - profil Creality Ender-3 V3 ;
 - supports arborescents si le rapport signale des surplombs (menton, nez, oreilles) ;
 - socle à plat sur le plateau.
+
+## Imprimer en couleur
+
+Quand le modèle a des couleurs, le bloc « Impression en couleur » propose deux fichiers en plus du STL :
+- 3MF multi-filaments, pour une imprimante à plusieurs bobines (l'Ender-3 V3 seule n'en a qu'une). Les couleurs des photos sont regroupées en 4 teintes par défaut, de 2 à 8 avec le réglage « Filaments pour l'impression en couleur », et chaque face reçoit l'une d'elles. Un îlot de couleur plus petit que (4 × buse)², environ 2,6 mm² avec une buse de 0,4, prend la couleur voisine la plus proche ; deux teintes trop proches (écart Lab inférieur à 12) ne prennent pas deux bobines. La palette s'affiche avec le numéro et le code de chaque couleur. Le 3MF peint chaque face d'un numéro de filament (attribut `paint_color` d'OrcaSlicer et Bambu Studio) mais ne transmet pas les couleurs : dans OrcaSlicer, régler d'abord autant de filaments que la palette, dans le même ordre et aux mêmes couleurs, puis ouvrir le fichier. Ouvert avec moins de filaments, les faces des numéros manquants s'affichent au filament 1 et leur peinture se perd quand on ajoute des filaments ensuite. Fichier > Importer ajoute lui-même les filaments manquants, avec des couleurs à corriger.
+- OBJ texturé zippé (OBJ, MTL et PNG, en mm, Z en haut comme le STL), pour un service d'impression en couleurs réelles (Sculpteo, i.materialise…). La texture fait 2 048 px en LowPoly et 4 096 px en Moyen et Détaillé ; elle ajoute de quelques secondes à une minute au calcul.
+
+Les couleurs viennent des photos, ombres et reflets compris.
 
 ## Dossiers de l'app installée
 
@@ -94,4 +102,4 @@ $B -b --factory-startup --python-exit-code 1 -P engine/blender_lowpoly.py -- \
 .venv/bin/python engine/triposr_infer.py photo.jpg sortie/brut.obj
 ```
 
-Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py`.
+Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/couleurs_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py`.
