@@ -107,9 +107,44 @@ def test_cache():
     assert pgw._cached(work, "lowpoly") == out and not os.path.exists(partial)
     assert sorted(os.listdir(os.path.dirname(out))) == ["scene_texture.mtl", "scene_texture.obj",
                                                        "scene_texture.obj.orient.json", "scene_texture_material_00_map_Kd.jpg"]
+    with open(out + ".orient.json", "w", encoding="utf-8") as f:  # a scan from before the black texture fix
+        f.write('{"matrix": [[1, 0, 0], [0, 1, 0], [0, 0, 1]], "raw_axes": true}')
+    assert pgw._cached(work, "lowpoly") is None
     os.remove(out + ".orient.json")  # an older cache, without its orientation
     assert pgw._cached(work, "lowpoly") is None
-    print("photogrammetry_win : le cache n'apparaît que complet")
+    print("photogrammetry_win : le cache n'apparaît que complet, et les scans d'une version antérieure sont refaits")
+
+
+def test_texture_command():
+    src = tempfile.mkdtemp(prefix="berria-pgw-tex-")
+    photos = [photo(src, f"p{i}.jpg", (40, 30)) for i in range(3)]
+    work = tempfile.mkdtemp(prefix="berria-pgw-texwork-")
+    w = os.path.join(work, "colmap_lowpoly")
+    calls = []
+
+    def fake_run(cmd, log, cwd=None, env=None):
+        calls.append([str(c) for c in cmd])
+        tool = os.path.splitext(os.path.basename(str(cmd[0])))[0]
+        if "mapper" in cmd:
+            os.makedirs(os.path.join(w, "sparse", "0"))
+            with open(os.path.join(w, "sparse", "0", "images.bin"), "wb") as f:
+                f.write(struct.pack("<Q", 3))
+        elif "model_converter" in cmd:
+            with open(os.path.join(w, "poses", "images.txt"), "w", encoding="utf-8") as f:
+                for i in range(3):
+                    f.write(f"{i + 1} 1 0 0 0 {i} 0 5 1 cam1/img_000{i + 1}.jpg\n\n")
+        elif tool == "ReconstructMesh":
+            open(os.path.join(w, "scene_dense_mesh.ply"), "w").close()
+        elif tool == "TextureMesh":
+            open(os.path.join(w, "scene_texture.obj"), "w").close()
+        return 0, []
+
+    out = pgw._reconstruct(src, photos, work, "lowpoly", lambda line: None, fake_run, RuntimeError, w)
+    tex = next(c for c in calls if os.path.basename(c[0]).startswith("TextureMesh"))
+    for opt in ("--global-seam-leveling", "--local-seam-leveling"):
+        assert tex[tex.index(opt) + 1] == "0", tex
+    assert out.endswith("scene_texture.obj") and pgw._cached(work, "lowpoly") == out, out
+    print("photogrammetry_win : TextureMesh sans nivellement des coutures (textures noires d'OpenMVS 2.4.0)")
 
 
 def fake_blender(root, version, app):
@@ -231,6 +266,7 @@ def main():
     test_stage()
     test_largest_model()
     test_cache()
+    test_texture_command()
     test_blender_version()
     test_vcredist_lock()
     if IS_WIN:
