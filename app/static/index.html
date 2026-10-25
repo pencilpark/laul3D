@@ -26,6 +26,8 @@ h2 { font-size: 19px; font-weight: 500; line-height: 1.2; margin: 0 0 12px; lett
 b { font-weight: 600; }
 .sub { color: var(--muted); font-size: 14px; }
 .tools { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-end; }
+.headright { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; justify-content: flex-end; }
+select.langsel { width: auto; padding-top: 4px; padding-bottom: 3px; font-size: 13px; }
 .pill, .state { display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
 .pill::before, .state::before { content: ""; flex: none; width: 7px; height: 7px; background: currentColor; }
 .pill { color: var(--muted); }
@@ -229,7 +231,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
     <h1>Photos vers impression 3D</h1>
     <div class="sub">Pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm). Tout se calcule sur cet ordinateur, aucune photo ne part en ligne.</div>
   </div>
-  <div class="tools" id="tools"></div>
+  <div class="headright">
+    <div class="tools" id="tools"></div>
+    <select id="lang" class="langsel" aria-label="Language"></select>
+  </div>
 </header>
 <div class="setupbar hidden" id="toolsBar" role="status">
   <div class="setupbar-row"><span id="toolsText"></span><button type="button" class="ghost hidden" id="toolsRetry">Réessayer</button></div>
@@ -461,6 +466,43 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
+// translations: app/static/i18n/<lang>.json, shared with the engine (keys "srv."); English fills any gap
+const STRINGS = {}, PLURALS = {};
+let LANG = "en";
+const tr = (key, vars = {}) => {
+  let s = STRINGS[LANG]?.[key] ?? STRINGS.en?.[key] ?? key;
+  if (typeof s === "object") s = s[(PLURALS[LANG] ||= new Intl.PluralRules(LANG)).select(vars.n ?? 0)] ?? s.other;
+  return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+};
+const num = (v, opts) => Number(v).toLocaleString(LANG, opts);
+function applyI18n(root = document) {
+  root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-attr]").forEach((el) => el.dataset.i18nAttr.split(";").forEach((pair) => {
+    const [attr, key] = pair.split(":");
+    el.setAttribute(attr, tr(key));
+  }));
+  document.documentElement.lang = LANG;
+}
+async function loadLanguage(lang) {
+  for (const l of new Set(["en", lang])) {
+    STRINGS[l] ||= await fetch(`/static/i18n/${l}.json`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+  }
+  LANG = lang;
+  applyI18n();
+}
+async function initLanguage() {
+  const prefs = await fetch("/api/prefs").then((r) => r.json()).catch(() => ({ language: "en", languages: { en: "English" } }));
+  $("lang").replaceChildren(...Object.entries(prefs.languages).map(([code, name]) => new Option(name, code, false, code === prefs.language)));
+  await loadLanguage(prefs.language);
+}
+$("lang").onchange = async () => {
+  const lang = $("lang").value;
+  await post("/api/prefs", { language: lang }).catch(() => null);
+  await loadLanguage(lang);
+  if (current) render();
+  loadStatus();
+  loadHistory();
+};
 const LEVELS = { lowpoly: ["LowPoly", "grandes facettes, rapide"], medium: ["Moyen", "plus lisse"], detailed: ["Détaillé", "le plus fidèle, plus long"] };
 const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
 const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
@@ -1426,6 +1468,7 @@ async function showModel(url, flat, colorsUrl = null) {
   }
 }
 
+await initLanguage();
 loadStatus();
 loadHistory();
 </script>
