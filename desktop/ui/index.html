@@ -30,25 +30,140 @@ body.failed #error { display: block; }
 <body>
 <main>
   <p class="kick">Berria Craft</p>
-  <h1>Photos vers impression 3D</h1>
+  <h1 data-i18n="splash.tagline">Photos vers impression 3D</h1>
   <div id="wait" role="status">
-    <p id="step">Démarrage du moteur de calcul…</p>
+    <p id="step" data-i18n="splash.starting">Démarrage du moteur de calcul…</p>
     <div class="track"></div>
-    <p class="note" id="slow" hidden>La première ouverture prépare l'environnement de calcul sur cet ordinateur : une minute au plus.</p>
+    <p class="note" id="slow" data-i18n="splash.first_launch" hidden>La première ouverture prépare l'environnement de calcul sur cet ordinateur : une minute au plus.</p>
   </div>
   <div id="error" role="alert">
-    <h2>Le moteur de calcul n'a pas démarré</h2>
+    <h2 data-i18n="splash.error_title">Le moteur de calcul n'a pas démarré</h2>
     <p id="detail"></p>
-    <p class="note">Quitte Berria Craft (Cmd Q ou fermeture de la fenêtre) puis rouvre-le. Si le message revient, garde-le : il indique la cause.</p>
+    <p class="note" data-i18n="splash.error_hint">Quitte Berria Craft (Cmd Q ou fermeture de la fenêtre) puis rouvre-le. Si le message revient, garde-le : il indique la cause.</p>
   </div>
 </main>
 <script>
-window.setStep = (text) => { document.getElementById("step").textContent = text; };
-const error = new URLSearchParams(location.search).get("error");
-if (error) {
-  document.getElementById("detail").textContent = error.charAt(0).toUpperCase() + error.slice(1) + ".";
-  document.body.classList.add("failed");
+// Own dictionary: this page shows before the server, which serves the app's language files, has started.
+const STRINGS = {
+  "en": {
+    "splash.engine_stopped": "the computing engine stopped during startup",
+    "splash.error_hint": "Quit Berria Craft ({shortcut} or close the window), then open it again. If the message comes back, keep it: it tells you the cause.",
+    "splash.error_title": "The computing engine did not start",
+    "splash.first_launch": "The first launch sets up the computing environment on this computer: one minute at most.",
+    "splash.launch_failed": "could not launch the computing engine: {detail}",
+    "splash.starting": "Starting the computing engine…",
+    "splash.tagline": "Photos to 3D print",
+  },
+  "fr": {
+    "splash.engine_stopped": "le moteur de calcul s'est arrêté au démarrage",
+    "splash.error_hint": "Quitte Berria Craft ({shortcut} ou fermeture de la fenêtre) puis rouvre-le. Si le message revient, garde-le : il indique la cause.",
+    "splash.error_title": "Le moteur de calcul n'a pas démarré",
+    "splash.first_launch": "La première ouverture prépare l'environnement de calcul sur cet ordinateur : une minute au plus.",
+    "splash.launch_failed": "impossible de lancer le moteur de calcul : {detail}",
+    "splash.starting": "Démarrage du moteur de calcul…",
+    "splash.tagline": "Photos vers impression 3D",
+  },
+  "es": {
+    "splash.engine_stopped": "el motor de cálculo se detuvo al iniciarse",
+    "splash.error_hint": "Sal de Berria Craft ({shortcut} o cierra la ventana) y vuelve a abrirlo. Si el mensaje vuelve a aparecer, guárdalo: indica la causa.",
+    "splash.error_title": "El motor de cálculo no se inició",
+    "splash.first_launch": "El primer inicio prepara el entorno de cálculo en este equipo: un minuto como máximo.",
+    "splash.launch_failed": "no se pudo iniciar el motor de cálculo: {detail}",
+    "splash.starting": "Iniciando el motor de cálculo…",
+    "splash.tagline": "De fotos a impresión 3D",
+  },
+  "de": {
+    "splash.engine_stopped": "die Rechen-Engine hat sich beim Start beendet",
+    "splash.error_hint": "Beende Berria Craft ({shortcut} oder Fenster schließen) und öffne es dann wieder. Wenn die Meldung wiederkommt, behalte sie: Sie nennt die Ursache.",
+    "splash.error_title": "Die Rechen-Engine ist nicht gestartet",
+    "splash.first_launch": "Beim ersten Start wird die Rechenumgebung auf diesem Computer eingerichtet: höchstens eine Minute.",
+    "splash.launch_failed": "die Rechen-Engine konnte nicht gestartet werden: {detail}",
+    "splash.starting": "Rechen-Engine wird gestartet…",
+    "splash.tagline": "Fotos zum 3D-Druck",
+  },
+  "pt-BR": {
+    "splash.engine_stopped": "o motor de cálculo parou durante a inicialização",
+    "splash.error_hint": "Saia do Berria Craft ({shortcut} ou fechando a janela) e abra-o de novo. Se a mensagem voltar, guarde-a: ela indica a causa.",
+    "splash.error_title": "O motor de cálculo não iniciou",
+    "splash.first_launch": "A primeira execução prepara o ambiente de cálculo neste computador: um minuto no máximo.",
+    "splash.launch_failed": "não foi possível iniciar o motor de cálculo: {detail}",
+    "splash.starting": "Iniciando o motor de cálculo…",
+    "splash.tagline": "Fotos para impressão 3D",
+  },
+  "zh-CN": {
+    "splash.engine_stopped": "计算引擎在启动时停止了",
+    "splash.error_hint": "退出 Berria Craft（{shortcut} 或关闭窗口），然后重新打开。如果这条消息再次出现，请记下它：它说明了原因。",
+    "splash.error_title": "计算引擎没有启动",
+    "splash.first_launch": "首次启动会在这台电脑上准备计算环境：最多一分钟。",
+    "splash.launch_failed": "无法启动计算引擎：{detail}",
+    "splash.starting": "正在启动计算引擎…",
+    "splash.tagline": "从照片到 3D 打印",
+  },
+  "ja": {
+    "splash.engine_stopped": "計算エンジンが起動中に停止しました",
+    "splash.error_hint": "Berria Craftを終了し（{shortcut}またはウィンドウを閉じる）、もう一度開いてください。このメッセージが再び表示される場合は、内容を控えておいてください。原因が書かれています。",
+    "splash.error_title": "計算エンジンが起動しませんでした",
+    "splash.first_launch": "初回起動時は、このコンピューターに計算環境を準備します（長くても1分ほど）。",
+    "splash.launch_failed": "計算エンジンを起動できません：{detail}",
+    "splash.starting": "計算エンジンを起動中…",
+    "splash.tagline": "写真から3Dプリントへ",
+  },
+};
+const LANGS = ["en", "fr", "es", "de", "pt-BR", "zh-CN", "ja"];
+// error codes sent by the app (main.rs), the text after ":" is the detail
+const ERRORS = new Map([["@engine_stopped", "splash.engine_stopped"], ["@launch_failed", "splash.launch_failed"]]);
+const VARS = { shortcut: /Mac/.test(navigator.platform || navigator.userAgent) ? "Cmd Q" : "Alt F4" };
+const query = new URLSearchParams(location.search);
+const error = query.get("error");
+let LANG = "en";
+
+// same rules as match() in engine/i18n.py
+function match(tag) {
+  const t = String(tag || "").replace(/_/g, "-").split(".")[0].toLowerCase();
+  if (t.startsWith("zh")) return /hant|-tw|-hk|-mo/.test(t) ? "en" : "zh-CN";
+  if (t.startsWith("pt")) return "pt-BR";
+  const base = t.split("-")[0];
+  return LANGS.includes(base) ? base : "en";
 }
+
+function tr(key, vars = {}) {
+  const text = (STRINGS[LANG] || {})[key] ?? STRINGS.en[key] ?? key;
+  return text.replace(/\{(\w+)\}/g, (m, name) => (Object.hasOwn(vars, name) ? String(vars[name]) : m));
+}
+
+// a code from the app is translated; any other text (boot.py's, already translated, or the system's) is shown as is
+function errorText(raw) {
+  const cut = raw.indexOf(":");
+  const code = cut < 0 ? raw : raw.slice(0, cut);
+  const text = ERRORS.has(code) ? tr(ERRORS.get(code), { detail: cut < 0 ? "" : raw.slice(cut + 1) }) : raw;
+  const end = /[.!?…。！？]$/.test(text) ? "" : /[\u3040-\u30ff\u3400-\u9fff\uff00-\uffef]$/.test(text) ? "。" : ".";
+  return text.charAt(0).toUpperCase() + text.slice(1) + end;
+}
+
+function apply(code) {
+  LANG = match(code);
+  document.documentElement.lang = LANG;
+  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = tr(el.dataset.i18n, VARS);
+  if (error) document.getElementById("detail").textContent = errorText(error);
+}
+
+// the language boot.py decided, kept for the first frames of the next launch
+window.setLang = (code) => {
+  apply(code);
+  try { localStorage.setItem("berria.lang", LANG); } catch (e) { /* no storage: guessed again next time */ }
+};
+window.setStep = (text) => {
+  const step = document.getElementById("step");
+  step.removeAttribute("data-i18n");  // boot.py's text, already in its language
+  step.textContent = text;
+};
+
+let stored = null;
+try { stored = localStorage.getItem("berria.lang"); } catch (e) { /* storage unavailable */ }
+const decided = query.get("lang") || window.bootLang;
+if (decided) window.setLang(decided);
+else apply(stored || navigator.language);
+if (error) document.body.classList.add("failed");
 setTimeout(() => { document.getElementById("slow").hidden = false; }, 6000);
 </script>
 </body>

@@ -26,6 +26,8 @@ h2 { font-size: 19px; font-weight: 500; line-height: 1.2; margin: 0 0 12px; lett
 b { font-weight: 600; }
 .sub { color: var(--muted); font-size: 14px; }
 .tools { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-end; }
+.headright { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; justify-content: flex-end; }
+select.langsel { width: auto; padding-top: 4px; padding-bottom: 3px; font-size: 13px; }
 .pill, .state { display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
 .pill::before, .state::before { content: ""; flex: none; width: 7px; height: 7px; background: currentColor; }
 .pill { color: var(--muted); }
@@ -226,110 +228,117 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
 <header>
   <div>
     <p class="kick">Berria Craft</p>
-    <h1>Photos vers impression 3D</h1>
-    <div class="sub">Pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm). Tout se calcule sur cet ordinateur, aucune photo ne part en ligne.</div>
+    <h1 data-i18n="ui.title">Photos vers impression 3D</h1>
+    <div class="sub" data-i18n="ui.subtitle">Pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm). Tout se calcule sur cet ordinateur, aucune photo ne part en ligne.</div>
   </div>
-  <div class="tools" id="tools"></div>
+  <div class="headright">
+    <div class="tools" id="tools"></div>
+    <select id="lang" class="langsel" aria-label="Language"></select>
+  </div>
 </header>
 <div class="setupbar hidden" id="toolsBar" role="status">
-  <div class="setupbar-row"><span id="toolsText"></span><button type="button" class="ghost hidden" id="toolsRetry">Réessayer</button></div>
+  <div class="setupbar-row"><span id="toolsText"></span><button type="button" class="ghost hidden" id="toolsRetry" data-i18n="ui.retry">Réessayer</button></div>
   <div class="setupbar-track"><div class="setupbar-fill" id="toolsFill"></div></div>
 </div>
 <div class="setupbar hidden" id="aiBar" role="status">
-  <div class="setupbar-row"><span id="aiText"></span><button type="button" class="ghost hidden" id="aiRetry">Réessayer</button></div>
+  <div class="setupbar-row"><span id="aiText"></span><button type="button" class="ghost hidden" id="aiRetry" data-i18n="ui.retry">Réessayer</button></div>
   <div class="setupbar-track"><div class="setupbar-fill" id="aiFill"></div></div>
 </div>
 
 <main>
   <section class="stack side">
     <div class="card">
-      <p class="kick"><span>1</span> Photos</p>
-      <h2>Nouveau modèle 3D</h2>
+      <p class="kick"><span>1</span> <bdi data-i18n="ui.kick_photos">Photos</bdi></p>
+      <h2 data-i18n="ui.new_model_title">Nouveau modèle 3D</h2>
       <label id="drop" for="file">
         <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 20h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-        <span class="dz-line"><b>Dépose tes photos ici</b></span>
-        <span class="dz-line sub">ou clique pour les choisir (JPG, HEIC, PNG)</span>
+        <span class="dz-line"><b data-i18n="ui.drop_title">Dépose tes photos ici</b></span>
+        <span class="dz-line sub" data-i18n="ui.drop_sub">ou clique pour les choisir (JPG, HEIC, PNG)</span>
         <input id="file" type="file" multiple accept="image/*,.heic,.heif" class="vh">
       </label>
-      <div class="thumbs" id="localThumbs" role="group" aria-label="Photos ajoutées"></div>
-      <div class="photo-row hidden" id="photoTools"><span class="sub" id="photoCount"></span><button type="button" class="linkbtn" id="clearFiles">Retirer les photos</button></div>
+      <div class="thumbs" id="localThumbs" role="group" aria-label="Photos ajoutées" data-i18n-attr="aria-label:ui.added_photos"></div>
+      <div class="photo-row hidden" id="photoTools"><span class="sub" id="photoCount"></span><button type="button" class="linkbtn" id="clearFiles" data-i18n="ui.clear_photos">Retirer les photos</button></div>
       <div class="dropnote hidden" id="dropNote" role="status"></div>
       <div class="hint" id="routeHint"></div>
-      <button type="button" class="primary inline hidden" id="routeInstall">Installer le module IA</button>
+      <button type="button" class="primary inline hidden" id="routeInstall" data-i18n="ui.install_ai_module">Installer le module IA</button>
       <details class="howto">
-        <summary>Comment prendre de bonnes photos ?</summary>
+        <summary data-i18n="ui.howto_title">Comment prendre de bonnes photos ?</summary>
         <ul class="tips">
-          <li>Garde le sujet immobile, sous une lumière douce et égale, sans flash.</li>
-          <li>Commence par une photo de face, appareil tenu droit : le modèle sera tourné de ce côté.</li>
-          <li>Tourne autour du sujet en prenant une photo tous les quelques pas, sans laisser de trou dans le tour.</li>
-          <li>Refais un tour plus haut et un tour plus bas pour montrer le dessus et le dessous.</li>
-          <li>Le sujet entier doit être net et visible sur chaque photo.</li>
-          <li>50 photos ou plus pour un buste fidèle ; une seule photo donne une forme approximative.</li>
+          <li data-i18n="ui.photo_tip_1">Garde le sujet immobile, sous une lumière douce et égale, sans flash.</li>
+          <li data-i18n="ui.photo_tip_2">Commence par une photo de face, appareil tenu droit : le modèle sera tourné de ce côté.</li>
+          <li data-i18n="ui.photo_tip_3">Tourne autour du sujet en prenant une photo tous les quelques pas, sans laisser de trou dans le tour.</li>
+          <li data-i18n="ui.photo_tip_4">Refais un tour plus haut et un tour plus bas pour montrer le dessus et le dessous.</li>
+          <li data-i18n="ui.photo_tip_5">Le sujet entier doit être net et visible sur chaque photo.</li>
+          <li data-i18n="ui.photo_tip_6">50 photos ou plus pour un buste fidèle ; une seule photo donne une forme approximative.</li>
         </ul>
       </details>
 
-      <div class="field" style="margin-top:16px"><label for="name">Nom du projet</label><input id="name" type="text" value="buste"></div>
+      <div class="field" style="margin-top:16px"><label for="name" data-i18n="ui.project_name">Nom du projet</label><input id="name" type="text" value="buste" data-i18n-attr="value:ui.default_name"></div>
       <div class="field">
-        <div class="labrow"><span class="lab" id="levelLab">Niveau de détail</span><button type="button" class="tip" aria-label="Aide : niveau de détail" aria-describedby="tipLevel">?</button><span class="tip-text" role="tooltip" id="tipLevel">LowPoly : grandes facettes, le plus rapide. Moyen : plus lisse. Détaillé : le plus fidèle aux photos, le plus long. La première reconstruction prend d'une à plusieurs minutes selon les photos et l'ordinateur ; les autres niveaux se génèrent ensuite en un clic.</span></div>
+        <div class="labrow"><span class="lab" id="levelLab" data-i18n="ui.level_label">Niveau de détail</span><button type="button" class="tip" aria-label="Aide : niveau de détail" data-i18n-attr="aria-label:ui.help_level" aria-describedby="tipLevel">?</button><span class="tip-text" role="tooltip" id="tipLevel" data-i18n="ui.tip_level">LowPoly : grandes facettes, le plus rapide. Moyen : plus lisse. Détaillé : le plus fidèle aux photos, le plus long. La première reconstruction prend d'une à plusieurs minutes selon les photos et l'ordinateur ; les autres niveaux se génèrent ensuite en un clic.</span></div>
         <div class="seg" id="level" role="group" aria-labelledby="levelLab">
-          <button type="button" data-v="lowpoly" class="on" aria-pressed="true">LowPoly</button><button type="button" data-v="medium" aria-pressed="false">Moyen</button><button type="button" data-v="detailed" aria-pressed="false">Détaillé</button>
+          <button type="button" data-v="lowpoly" class="on" aria-pressed="true">LowPoly</button><button type="button" data-v="medium" aria-pressed="false" data-i18n="ui.level_medium">Moyen</button><button type="button" data-v="detailed" aria-pressed="false" data-i18n="ui.level_detailed">Détaillé</button>
         </div>
-        <div class="hint">Commence en LowPoly, le plus rapide, pour vérifier la forme, puis affine.</div>
+        <div class="hint" data-i18n="ui.level_hint">Commence en LowPoly, le plus rapide, pour vérifier la forme, puis affine.</div>
       </div>
       <div class="field">
-        <div class="labrow"><label for="height">Hauteur imprimée (mm)</label><button type="button" class="tip" aria-label="Aide : hauteur imprimée" aria-describedby="tipHeight">?</button><span class="tip-text" role="tooltip" id="tipHeight">Hauteur du modèle une fois imprimé. L'Ender-3 V3 imprime jusqu'à 245 mm de haut.</span></div>
+        <div class="labrow"><label for="height" data-i18n="ui.height_label">Hauteur imprimée (mm)</label><button type="button" class="tip" aria-label="Aide : hauteur imprimée" data-i18n-attr="aria-label:ui.help_height" aria-describedby="tipHeight">?</button><span class="tip-text" role="tooltip" id="tipHeight" data-i18n="ui.tip_height">Hauteur du modèle une fois imprimé. L'Ender-3 V3 imprime jusqu'à 245 mm de haut.</span></div>
         <input id="height" type="number" min="10" max="245" step="1" value="80" aria-describedby="heightErr"><div class="field-err hidden" id="heightErr"></div>
       </div>
       <details class="advanced">
-        <summary>Réglages avancés</summary>
+        <summary data-i18n="ui.advanced">Réglages avancés</summary>
         <div class="field">
-          <div class="labrow"><span class="lab" id="modeLab">Méthode</span><button type="button" class="tip" aria-label="Aide : méthode" aria-describedby="tipMode">?</button><span class="tip-text" role="tooltip" id="tipMode">Automatique choisit pour toi : avec 20 photos ou plus, le modèle est reconstruit à partir de toutes les photos ; avec moins, l'IA estime la forme à partir d'une seule photo.</span></div>
+          <div class="labrow"><span class="lab" id="modeLab" data-i18n="ui.method_label">Méthode</span><button type="button" class="tip" aria-label="Aide : méthode" data-i18n-attr="aria-label:ui.help_method" aria-describedby="tipMode">?</button><span class="tip-text" role="tooltip" id="tipMode" data-i18n="ui.tip_mode">Automatique choisit pour toi : avec 20 photos ou plus, le modèle est reconstruit à partir de toutes les photos ; avec moins, l'IA estime la forme à partir d'une seule photo.</span></div>
           <div class="seg" id="mode" role="group" aria-labelledby="modeLab">
-            <button type="button" data-v="auto" class="on" aria-pressed="true">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false">Une photo (IA)</button>
+            <button type="button" data-v="auto" class="on" aria-pressed="true" data-i18n="ui.mode_auto">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false" data-i18n="ui.mode_photogrammetry">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false" data-i18n="ui.mode_ia">Une photo (IA)</button>
           </div>
         </div>
         <div class="field" id="facesField">
-          <div class="labrow"><label for="faces">Facettes : <span id="facesVal">1000</span> triangles</label><button type="button" class="tip" aria-label="Aide : facettes" aria-describedby="tipFaces">?</button><span class="tip-text" role="tooltip" id="tipFaces">Nombre de facettes du style LowPoly. Moins de facettes donne un modèle plus anguleux.</span></div>
+          <div class="labrow"><label for="faces">Facettes : <span id="facesVal">1000</span> triangles</label><button type="button" class="tip" aria-label="Aide : facettes" data-i18n-attr="aria-label:ui.help_faces" aria-describedby="tipFaces">?</button><span class="tip-text" role="tooltip" id="tipFaces" data-i18n="ui.tip_faces">Nombre de facettes du style LowPoly. Moins de facettes donne un modèle plus anguleux.</span></div>
           <input id="faces" type="range" min="200" max="5000" step="100" value="1000" aria-valuetext="1000 triangles">
         </div>
         <div class="field">
-          <div class="labrow"><span class="lab" id="smoothLab">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" aria-describedby="tipSmooth">?</button><span class="tip-text" role="tooltip" id="tipSmooth">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée à chaque calcul. Tu peux aussi le changer après coup, dans « Ajuster ce modèle ».</span></div>
+          <div class="labrow"><span class="lab" id="smoothLab" data-i18n="ui.smooth_label">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" data-i18n-attr="aria-label:ui.help_smooth" aria-describedby="tipSmooth">?</button><span class="tip-text" role="tooltip" id="tipSmooth" data-i18n="ui.tip_smooth">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée à chaque calcul. Tu peux aussi le changer après coup, dans « Ajuster ce modèle ».</span></div>
           <div class="seg" id="smooth" role="group" aria-labelledby="smoothLab">
-            <button type="button" data-v="0" class="on" aria-pressed="true">Aucun</button><button type="button" data-v="1" aria-pressed="false">Léger</button><button type="button" data-v="2" aria-pressed="false">Moyen</button><button type="button" data-v="3" aria-pressed="false">Fort</button>
+            <button type="button" data-v="0" class="on" aria-pressed="true" data-i18n="ui.smooth_0">Aucun</button><button type="button" data-v="1" aria-pressed="false" data-i18n="ui.smooth_1">Léger</button><button type="button" data-v="2" aria-pressed="false" data-i18n="ui.smooth_2">Moyen</button><button type="button" data-v="3" aria-pressed="false" data-i18n="ui.smooth_3">Fort</button>
           </div>
         </div>
         <div class="field">
-          <div class="labrow"><label for="nozzle">Buse de l'imprimante</label><button type="button" class="tip" aria-label="Aide : buse" aria-describedby="tipNozzle">?</button><span class="tip-text" role="tooltip" id="tipNozzle">Diamètre de la buse. L'Ender-3 V3 est livrée avec 0,4 mm. Les parois plus fines que deux fois la buse sont signalées.</span></div>
-          <select id="nozzle"><option value="0.2">0,2 mm</option><option value="0.4" selected>0,4 mm (d'origine)</option><option value="0.6">0,6 mm</option><option value="0.8">0,8 mm</option></select>
+          <div class="labrow"><label for="nozzle" data-i18n="ui.nozzle_label">Buse de l'imprimante</label><button type="button" class="tip" aria-label="Aide : buse" data-i18n-attr="aria-label:ui.help_nozzle" aria-describedby="tipNozzle">?</button><span class="tip-text" role="tooltip" id="tipNozzle" data-i18n="ui.tip_nozzle">Diamètre de la buse. L'Ender-3 V3 est livrée avec 0,4 mm. Les parois plus fines que deux fois la buse sont signalées.</span></div>
+          <select id="nozzle"><option value="0.2" data-i18n="ui.nozzle_02">0,2 mm</option><option value="0.4" selected data-i18n="ui.nozzle_04">0,4 mm (d'origine)</option><option value="0.6" data-i18n="ui.nozzle_06">0,6 mm</option><option value="0.8" data-i18n="ui.nozzle_08">0,8 mm</option></select>
         </div>
         <div class="field">
-          <div class="labrow"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur</label><button type="button" class="tip" aria-label="Aide : socle plat" aria-describedby="tipBase">?</button><span class="tip-text" role="tooltip" id="tipBase">Coupe le bas du modèle à plat pour qu'il tienne debout sur le plateau. 3 % convient à un buste ; 0 garde le modèle entier.</span></div>
+          <div class="labrow"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur</label><button type="button" class="tip" aria-label="Aide : socle plat" data-i18n-attr="aria-label:ui.help_base" aria-describedby="tipBase">?</button><span class="tip-text" role="tooltip" id="tipBase" data-i18n="ui.tip_base">Coupe le bas du modèle à plat pour qu'il tienne debout sur le plateau. 3 % convient à un buste ; 0 garde le modèle entier.</span></div>
           <input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %">
         </div>
         <div class="field">
-          <div class="labrow"><span class="lab" id="colorFilesLab">Fichiers pour l'impression en couleur</span><button type="button" class="tip" aria-label="Aide : fichiers couleur" aria-describedby="tipColorFiles">?</button><span class="tip-text" role="tooltip" id="tipColorFiles">Calculés en plus du STL quand les photos donnent des couleurs. Seuls les fichiers cochés sont calculés ; la texture de l'OBJ texturé ajoute de quelques secondes à une minute.</span></div>
-          <div role="group" aria-labelledby="colorFilesLab"><label class="check"><input id="c3mf" type="checkbox" checked> 3MF peint (OrcaSlicer, numéros de filament)</label><label class="check"><input id="cObj" type="checkbox" checked> OBJ en couleurs (OrcaSlicer, couleurs proposées)</label><label class="check"><input id="cTex" type="checkbox" checked> OBJ texturé (service d'impression couleur)</label></div>
+          <div class="labrow"><span class="lab" id="colorFilesLab" data-i18n="ui.color_files_label">Fichiers pour l'impression en couleur</span><button type="button" class="tip" aria-label="Aide : fichiers couleur" data-i18n-attr="aria-label:ui.help_color_files" aria-describedby="tipColorFiles">?</button><span class="tip-text" role="tooltip" id="tipColorFiles" data-i18n="ui.tip_color_files">Calculés en plus du STL quand les photos donnent des couleurs. Seuls les fichiers cochés sont calculés ; la texture de l'OBJ texturé ajoute de quelques secondes à une minute.</span></div>
+          <div role="group" aria-labelledby="colorFilesLab"><label class="check"><input id="c3mf" type="checkbox" checked> <span data-i18n="ui.opt_3mf">3MF peint (OrcaSlicer, numéros de filament)</span></label><label class="check"><input id="cObj" type="checkbox" checked> <span data-i18n="ui.opt_obj">OBJ en couleurs (OrcaSlicer, couleurs proposées)</span></label><label class="check"><input id="cTex" type="checkbox" checked> <span data-i18n="ui.opt_tex">OBJ texturé (service d'impression couleur)</span></label></div>
         </div>
         <div class="field">
-          <div class="labrow"><label for="filaments">Filaments pour l'impression en couleur</label><button type="button" class="tip" aria-label="Aide : filaments" aria-describedby="tipFil">?</button><span class="tip-text" role="tooltip" id="tipFil">Nombre de couleurs du 3MF peint et de l'OBJ en couleurs, une par bobine de ton imprimante. Les couleurs des photos sont regroupées en autant de teintes, ou moins si l'objet en a moins.</span></div>
-          <select id="filaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
+          <div class="labrow"><label for="filaments" data-i18n="ui.filaments_label">Filaments pour l'impression en couleur</label><button type="button" class="tip" aria-label="Aide : filaments" data-i18n-attr="aria-label:ui.help_filaments" aria-describedby="tipFil">?</button><span class="tip-text" role="tooltip" id="tipFil" data-i18n="ui.tip_filaments">Nombre de couleurs du 3MF peint et de l'OBJ en couleurs, une par bobine de ton imprimante. Les couleurs des photos sont regroupées en autant de teintes, ou moins si l'objet en a moins.</span></div>
+          <select id="filaments"><option value="2">2</option><option value="3">3</option><option value="4" selected data-i18n="ui.filaments_4">4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
         </div>
-        <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label><button type="button" class="tip" aria-label="Aide : pièces détachées" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
+        <div class="field">
+          <div class="labrow"><span class="lab" id="exportsLab" data-i18n="ui.exports_label">Exports 3D hors impression</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExports">?</button><span class="tip-text" role="tooltip" id="tipExports" data-i18n="ui.tip_exports">Le modèle nettoyé pour d'autres usages que l'impression, à sa taille réelle en mètres, en plus des fichiers d'impression. Un zip par profil coché. Chacun allonge le calcul : environ 15 s pour Web ou Jeux et plus d'une minute pour Logiciels 3D sur un modèle simple, davantage sur un scan détaillé.</span></div>
+          <div role="group" aria-labelledby="exportsLab"><label class="check"><input id="eSoftware" type="checkbox"> <span data-i18n="ui.opt_software">Logiciels 3D : Blender, sculpture, animation (quads)</span></label><label class="check"><input id="eGame" type="checkbox"> <span data-i18n="ui.opt_game">Jeux : Unity, Unreal, Godot (3 niveaux de détail)</span></label><label class="check"><input id="eWeb" type="checkbox"> <span data-i18n="ui.opt_web">Web : GLB léger (three.js, model-viewer)</span></label></div>
+        </div>
+        <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> <span data-i18n="ui.keep_parts">Garder les pièces détachées</span></label><button type="button" class="tip" aria-label="Aide : pièces détachées" data-i18n-attr="aria-label:ui.help_parts" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts" data-i18n="ui.tip_parts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
       </details>
-      <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle 3D</button></div>
+      <div style="margin-top:16px"><button class="primary" id="go" data-i18n="ui.create_model" disabled>Créer le modèle 3D</button></div>
     </div>
 
     <div class="card">
-      <h2>Projets</h2>
-      <ul class="history" id="history"><li class="sub">Aucun projet pour l'instant. Ils s'afficheront ici.</li></ul>
+      <h2 data-i18n="ui.projects_title">Projets</h2>
+      <ul class="history" id="history"><li class="sub" data-i18n="ui.no_projects">Aucun projet pour l'instant. Ils s'afficheront ici.</li></ul>
     </div>
   </section>
 
   <section class="stage">
     <div class="card" id="jobCard">
-      <p class="kick"><span>2</span> Modèle 3D</p>
+      <p class="kick"><span>2</span> <bdi data-i18n="ui.kick_model">Modèle 3D</bdi></p>
       <div class="status">
-        <h2 style="margin:0" id="jobTitle" tabindex="-1">Aucun projet ouvert</h2>
+        <h2 style="margin:0" id="jobTitle" tabindex="-1" data-i18n="ui.no_project_open">Aucun projet ouvert</h2>
         <span class="state hidden" id="jobState"></span>
         <div class="spinner hidden" id="spin"></div>
         <span class="sub" id="jobStep"></span>
@@ -340,118 +349,181 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="alert ok hidden" id="notice" role="status"></div>
 
       <div class="pipeline" style="margin-top:16px">
-        <div class="labrow"><span class="lab" id="pipeLab">Niveaux de détail</span><button type="button" class="tip" aria-label="Aide : niveaux de détail" aria-describedby="tipPipe">?</button><span class="tip-text" role="tooltip" id="tipPipe">Chaque niveau part des mêmes photos. Vérifie la forme en LowPoly, puis génère plus de détail si elle te convient. Clique un niveau déjà calculé pour l'afficher.</span></div>
+        <div class="labrow"><span class="lab" id="pipeLab" data-i18n="ui.levels_label">Niveaux de détail</span><button type="button" class="tip" aria-label="Aide : niveaux de détail" data-i18n-attr="aria-label:ui.help_levels" aria-describedby="tipPipe">?</button><span class="tip-text" role="tooltip" id="tipPipe" data-i18n="ui.tip_levels">Chaque niveau part des mêmes photos. Vérifie la forme en LowPoly, puis génère plus de détail si elle te convient. Clique un niveau déjà calculé pour l'afficher.</span></div>
         <div class="levels" id="levels" role="group" aria-labelledby="pipeLab"></div>
       </div>
 
-      <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
-        <div class="viewbar" role="group" aria-label="Vues du modèle">
-          <button type="button" data-view="face">Face</button><button type="button" data-view="side">Profil</button><button type="button" data-view="top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer">−</button><button type="button" data-view="reset">Recentrer</button><button type="button" id="maxView" aria-pressed="false">Agrandir</button><span class="vsep" aria-hidden="true"></span><button type="button" id="viewSolid" aria-pressed="true">Solide</button><button type="button" id="viewRender" aria-pressed="false">Rendu</button>
+      <div style="margin-top:16px" id="viewer"><div class="empty" id="viewerEmpty" data-i18n="ui.viewer_empty">Dépose des photos à gauche, ou ouvre un projet de la liste.</div>
+        <div class="viewbar" role="group" aria-label="Vues du modèle" data-i18n-attr="aria-label:ui.views_label">
+          <button type="button" data-view="face" data-i18n="ui.view_front">Face</button><button type="button" data-view="side" data-i18n="ui.view_side">Profil</button><button type="button" data-view="top" data-i18n="ui.view_top">Dessus</button><button type="button" data-zoom="0.8" aria-label="Zoomer" data-i18n-attr="aria-label:ui.zoom_in">+</button><button type="button" data-zoom="1.25" aria-label="Dézoomer" data-i18n-attr="aria-label:ui.zoom_out">−</button><button type="button" data-view="reset" data-i18n="ui.view_reset">Recentrer</button><button type="button" id="maxView" aria-pressed="false" data-i18n="ui.maximize">Agrandir</button><span class="vsep" aria-hidden="true"></span><button type="button" id="viewSolid" aria-pressed="true" data-i18n="ui.view_solid">Solide</button><button type="button" id="viewRender" aria-pressed="false" data-i18n="ui.view_render">Rendu</button>
         </div>
-        <p class="navhelp" aria-hidden="true">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
-        <div class="gizmo-hit" title="Clique un axe pour regarder le modèle de ce côté"></div>
+        <p class="navhelp" aria-hidden="true" data-i18n="ui.nav_help">Glisser : tourner · Molette : zoomer · Clic droit : déplacer</p>
+        <div class="gizmo-hit" title="Clique un axe pour regarder le modèle de ce côté" data-i18n-attr="title:ui.gizmo_title"></div>
       </div>
       <div class="previews hidden" id="previews" style="margin-top:8px"></div>
 
       <div class="actions" style="margin-top:12px" id="rotateBar">
-        <div class="labrow rot-lab"><span class="lab">Redresser le modèle</span><button type="button" class="tip" aria-label="Aide : redresser le modèle" aria-describedby="tipRot">?</button><span class="tip-text" role="tooltip" id="tipRot">Le modèle est couché ou de travers ? Fais-le tourner d'un quart de tour : l'aperçu tourne tout de suite, puis clique « Recalculer avec cette orientation » pour l'appliquer.</span></div>
-        <button class="ghost" data-rot="x" disabled>Basculer vers l'avant</button><button class="ghost" data-rot="y" disabled>Pencher à droite</button><button class="ghost" data-rot="z" disabled>Pivoter</button>
-        <button class="ghost" id="rotReset" disabled>Orientation d'origine</button>
-        <div class="rotconfirm hidden" id="rotConfirm"><span id="rotMsg" role="status"></span><button type="button" class="primary inline" id="rotApply">Recalculer avec cette orientation</button><button type="button" class="ghost" id="rotCancel">Annuler</button></div>
+        <div class="labrow rot-lab"><span class="lab" data-i18n="ui.rotate_label">Redresser le modèle</span><button type="button" class="tip" aria-label="Aide : redresser le modèle" data-i18n-attr="aria-label:ui.help_rotate" aria-describedby="tipRot">?</button><span class="tip-text" role="tooltip" id="tipRot" data-i18n="ui.tip_rotate">Le modèle est couché ou de travers ? Fais-le tourner d'un quart de tour : l'aperçu tourne tout de suite, puis clique « Recalculer avec cette orientation » pour l'appliquer.</span></div>
+        <button class="ghost" data-rot="x" data-i18n="ui.rot_x" disabled>Basculer vers l'avant</button><button class="ghost" data-rot="y" data-i18n="ui.rot_y" disabled>Pencher à droite</button><button class="ghost" data-rot="z" data-i18n="ui.rot_z" disabled>Pivoter</button>
+        <button class="ghost" id="rotReset" data-i18n="ui.rot_reset" disabled>Orientation d'origine</button>
+        <div class="rotconfirm hidden" id="rotConfirm"><span id="rotMsg" role="status"></span><button type="button" class="primary inline" id="rotApply" data-i18n="ui.rot_apply">Recalculer avec cette orientation</button><button type="button" class="ghost" id="rotCancel" data-i18n="ui.cancel">Annuler</button></div>
       </div>
     </div>
   </section>
 
   <section class="stack inspector">
     <div class="card hidden" id="resultCard">
-      <p class="kick"><span>3</span> Impression</p>
-      <h2 class="verdict" id="resultTitle">Résultat</h2>
+      <p class="kick"><span>3</span> <bdi data-i18n="ui.kick_print">Impression</bdi></p>
+      <h2 class="verdict" id="resultTitle" data-i18n="ui.result">Résultat</h2>
       <p class="verdict-sub" id="verdictSub"></p>
       <ul class="checks" id="verdictList"></ul>
       <div class="actions" style="margin-top:14px">
-        <button class="primary" id="orca">Préparer l'impression dans OrcaSlicer</button>
+        <button class="primary" id="orca" data-i18n="ui.orca_prepare">Préparer l'impression dans OrcaSlicer</button>
       </div>
       <div class="hint" id="slicerHint"></div>
-      <div class="labrow" style="margin-top:14px"><span class="lab">Autres enregistrements</span><button type="button" class="tip" aria-label="Aide : autres enregistrements" aria-describedby="tipFiles">?</button><span class="tip-text" role="tooltip" id="tipFiles">STL : fichier standard de l'impression 3D, accepté par tous les logiciels de découpe. .blend : fichier Blender, pour retoucher le modèle. Les fichiers sont copiés dans Téléchargements.</span></div>
+      <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.other_saves">Autres enregistrements</span><button type="button" class="tip" aria-label="Aide : autres enregistrements" data-i18n-attr="aria-label:ui.help_other_saves" aria-describedby="tipFiles">?</button><span class="tip-text" role="tooltip" id="tipFiles" data-i18n="ui.tip_files">STL : fichier standard de l'impression 3D, accepté par tous les logiciels de découpe. .blend : fichier Blender, pour retoucher le modèle. Les fichiers sont copiés dans Téléchargements.</span></div>
       <div class="actions">
-        <button class="ghost" id="expStl">Enregistrer le STL</button>
-        <button class="ghost" id="expBlend">Enregistrer pour Blender</button>
-        <button class="ghost" id="finder">Afficher dans le Finder</button>
+        <button class="ghost" id="expStl" data-i18n="ui.save_stl">Enregistrer le STL</button>
+        <button class="ghost" id="expBlend" data-i18n="ui.save_blend">Enregistrer pour Blender</button>
+        <button class="ghost" id="finder" data-i18n="ui.show_finder">Afficher dans le Finder</button>
       </div>
       <div class="hidden" id="colorBox">
-        <div class="labrow" style="margin-top:14px"><span class="lab">Impression en couleur</span><button type="button" class="tip" aria-label="Aide : impression en couleur" aria-describedby="tipColor">?</button><span class="tip-text" role="tooltip" id="tipColor">Les deux premiers fichiers demandent une imprimante à plusieurs bobines ; l'Ender-3 V3 seule n'en a qu'une. 3MF peint : chaque face reçoit un numéro de filament, pas une couleur ; dans OrcaSlicer, règle d'abord autant de filaments que la palette, dans cet ordre et à ces couleurs, puis ouvre-le. Fichier > Importer ajoute les filaments manquants, couleurs à corriger. OBJ en couleurs : OrcaSlicer (2.1 ou plus récent) ouvre une fenêtre qui ajoute ces couleurs comme filaments, à quelques unités près ; garde le .mtl à côté du .obj. OBJ texturé : toutes les couleurs des photos, pour un service d'impression en couleur (Sculpteo, i.materialise…). Les couleurs viennent des photos, ombres comprises.</span></div>
-        <div class="palette" id="palette" role="list" aria-label="Couleurs des filaments"></div>
+        <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.color_print">Impression en couleur</span><button type="button" class="tip" aria-label="Aide : impression en couleur" data-i18n-attr="aria-label:ui.help_color_print" aria-describedby="tipColor">?</button><span class="tip-text" role="tooltip" id="tipColor" data-i18n="ui.tip_color">Les deux premiers fichiers demandent une imprimante à plusieurs bobines ; l'Ender-3 V3 seule n'en a qu'une. 3MF peint : chaque face reçoit un numéro de filament, pas une couleur ; dans OrcaSlicer, règle d'abord autant de filaments que la palette, dans cet ordre et à ces couleurs, puis ouvre-le. Fichier > Importer ajoute les filaments manquants, couleurs à corriger. OBJ en couleurs : OrcaSlicer (2.1 ou plus récent) ouvre une fenêtre qui ajoute ces couleurs comme filaments, à quelques unités près ; garde le .mtl à côté du .obj. OBJ texturé : toutes les couleurs des photos, pour un service d'impression en couleur (Sculpteo, i.materialise…). Les couleurs viennent des photos, ombres comprises.</span></div>
+        <div class="palette" id="palette" role="list" aria-label="Couleurs des filaments" data-i18n-attr="aria-label:ui.palette_label"></div>
         <div class="actions">
-          <button class="ghost" id="orcaColor">Ouvrir le 3MF peint dans OrcaSlicer</button>
-          <button class="ghost" id="orcaObj">Ouvrir l'OBJ en couleurs dans OrcaSlicer</button>
-          <button class="ghost" id="exp3mf">Enregistrer le 3MF peint</button>
-          <button class="ghost" id="expObj">Enregistrer l'OBJ en couleurs</button>
-          <button class="ghost" id="expZip">Enregistrer l'OBJ texturé (service couleur)</button>
+          <button class="ghost" id="orcaColor" data-i18n="ui.orca_3mf">Ouvrir le 3MF peint dans OrcaSlicer</button>
+          <button class="ghost" id="orcaObj" data-i18n="ui.orca_obj">Ouvrir l'OBJ en couleurs dans OrcaSlicer</button>
+          <button class="ghost" id="exp3mf" data-i18n="ui.save_3mf">Enregistrer le 3MF peint</button>
+          <button class="ghost" id="expObj" data-i18n="ui.save_obj">Enregistrer l'OBJ en couleurs</button>
+          <button class="ghost" id="expZip" data-i18n="ui.save_zip">Enregistrer l'OBJ texturé (service couleur)</button>
         </div>
       </div>
-      <details class="tech"><summary>Détails techniques</summary><table id="report"></table></details>
+      <div class="hidden" id="exportBox">
+        <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.exports_3d">Exports 3D</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExportBox">?</button><span class="tip-text" role="tooltip" id="tipExportBox" data-i18n="ui.tip_export_box">Taille réelle en mètres, Y vers le haut, base centrée sur l'origine. Logiciels 3D : quads, textures 4096, fichiers .blend, FBX et OBJ ; pour animer un personnage, une retopologie à la main reste utile. Jeux : triangles en 3 niveaux de détail (100, 50 et 25 %), textures 2048, FBX et GLB. Web : un GLB de quelques Mo, plus une version compressée Draco quand ce Blender la produit. Textures : les couleurs des photos, ombres comprises, et une normal map pour le relief fin.</span></div>
+        <div class="actions">
+          <button class="ghost" id="expSoftware" data-i18n="ui.save_software">Enregistrer pour logiciels 3D</button>
+          <button class="ghost" id="expGame" data-i18n="ui.save_game">Enregistrer pour jeux</button>
+          <button class="ghost" id="expWeb" data-i18n="ui.save_web">Enregistrer pour le web</button>
+        </div>
+      </div>
+      <details class="tech"><summary data-i18n="ui.tech_details">Détails techniques</summary><table id="report"></table></details>
     </div>
 
     <div class="card hidden" id="adjustCard">
-      <h2>Ajuster ce modèle</h2>
-      <div class="field"><span class="lab" id="aModeLab">Méthode</span>
+      <h2 data-i18n="ui.adjust_title">Ajuster ce modèle</h2>
+      <div class="field"><span class="lab" id="aModeLab" data-i18n="ui.method_label">Méthode</span>
         <div class="seg" id="aMode" role="group" aria-labelledby="aModeLab">
-          <button type="button" data-v="auto" aria-pressed="false">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false">Une photo (IA)</button>
+          <button type="button" data-v="auto" aria-pressed="false" data-i18n="ui.mode_auto">Automatique</button><button type="button" data-v="photogrammetry" aria-pressed="false" data-i18n="ui.mode_photogrammetry">Toutes les photos</button><button type="button" data-v="ia" aria-pressed="false" data-i18n="ui.mode_ia">Une photo (IA)</button>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
-        <div><label for="aHeight">Hauteur imprimée (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
-        <div><label for="aBase">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1" aria-describedby="aBaseErr"><div class="field-err hidden" id="aBaseErr"></div></div>
+        <div><label for="aHeight" data-i18n="ui.height_label">Hauteur imprimée (mm)</label><input id="aHeight" type="number" min="10" max="245" step="1" aria-describedby="aHeightErr"><div class="field-err hidden" id="aHeightErr"></div></div>
+        <div><label for="aBase" data-i18n="ui.base_pct_label">Socle plat (%)</label><input id="aBase" type="number" min="0" max="20" step="1" aria-describedby="aBaseErr"><div class="field-err hidden" id="aBaseErr"></div></div>
       </div>
       <div class="field">
-        <div class="labrow"><span class="lab" id="aSmoothLab">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" aria-describedby="tipASmooth">?</button><span class="tip-text" role="tooltip" id="tipASmooth">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée au recalcul.</span></div>
+        <div class="labrow"><span class="lab" id="aSmoothLab" data-i18n="ui.smooth_label">Lissage</span><button type="button" class="tip" aria-label="Aide : lissage" data-i18n-attr="aria-label:ui.help_smooth" aria-describedby="tipASmooth">?</button><span class="tip-text" role="tooltip" id="tipASmooth" data-i18n="ui.tip_smooth_adjust">Atténue les petites bosses et le grain du scan. Un lissage fort arrondit aussi les détails fins (nez, oreilles, mèches) ; l'épaisseur des parois est revérifiée au recalcul.</span></div>
         <div class="seg" id="aSmooth" role="group" aria-labelledby="aSmoothLab">
-          <button type="button" data-v="0" aria-pressed="false">Aucun</button><button type="button" data-v="1" aria-pressed="false">Léger</button><button type="button" data-v="2" aria-pressed="false">Moyen</button><button type="button" data-v="3" aria-pressed="false">Fort</button>
+          <button type="button" data-v="0" aria-pressed="false" data-i18n="ui.smooth_0">Aucun</button><button type="button" data-v="1" aria-pressed="false" data-i18n="ui.smooth_1">Léger</button><button type="button" data-v="2" aria-pressed="false" data-i18n="ui.smooth_2">Moyen</button><button type="button" data-v="3" aria-pressed="false" data-i18n="ui.smooth_3">Fort</button>
         </div>
       </div>
       <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
-      <div class="field"><span class="lab" id="aColorFilesLab">Fichiers pour l'impression en couleur</span><div role="group" aria-labelledby="aColorFilesLab"><label class="check"><input id="a3mf" type="checkbox" checked> 3MF peint (OrcaSlicer, numéros de filament)</label><label class="check"><input id="aObj" type="checkbox" checked> OBJ en couleurs (OrcaSlicer, couleurs proposées)</label><label class="check"><input id="aTex" type="checkbox" checked> OBJ texturé (service d'impression couleur)</label></div></div>
-      <div class="field"><label for="aFilaments">Filaments pour l'impression en couleur</label><select id="aFilaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
-      <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
-      <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Recalculer avec ces réglages</button></div>
-      <details style="margin-top:14px"><summary>Journal technique</summary><pre id="log"></pre></details>
+      <div class="field"><span class="lab" id="aColorFilesLab" data-i18n="ui.color_files_label">Fichiers pour l'impression en couleur</span><div role="group" aria-labelledby="aColorFilesLab"><label class="check"><input id="a3mf" type="checkbox" checked> <span data-i18n="ui.opt_3mf">3MF peint (OrcaSlicer, numéros de filament)</span></label><label class="check"><input id="aObj" type="checkbox" checked> <span data-i18n="ui.opt_obj">OBJ en couleurs (OrcaSlicer, couleurs proposées)</span></label><label class="check"><input id="aTex" type="checkbox" checked> <span data-i18n="ui.opt_tex">OBJ texturé (service d'impression couleur)</span></label></div></div>
+      <div class="field"><span class="lab" id="aExportsLab" data-i18n="ui.exports_label">Exports 3D hors impression</span><div role="group" aria-labelledby="aExportsLab"><label class="check"><input id="aSoftware" type="checkbox"> <span data-i18n="ui.opt_software">Logiciels 3D : Blender, sculpture, animation (quads)</span></label><label class="check"><input id="aGame" type="checkbox"> <span data-i18n="ui.opt_game">Jeux : Unity, Unreal, Godot (3 niveaux de détail)</span></label><label class="check"><input id="aWeb" type="checkbox"> <span data-i18n="ui.opt_web">Web : GLB léger (three.js, model-viewer)</span></label></div></div>
+      <div class="field"><label for="aFilaments" data-i18n="ui.filaments_label">Filaments pour l'impression en couleur</label><select id="aFilaments"><option value="2">2</option><option value="3">3</option><option value="4" selected data-i18n="ui.filaments_4">4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
+      <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab" data-i18n="ui.main_pick">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
+      <div style="margin-top:14px" class="actions"><button class="ghost" id="apply" data-i18n="ui.apply">Recalculer avec ces réglages</button></div>
+      <details style="margin-top:14px"><summary data-i18n="ui.tech_log">Journal technique</summary><pre id="log"></pre></details>
     </div>
   </section>
 </main>
 
 <dialog id="toolsDialog" class="modal" aria-labelledby="toolsDialogTitle">
-  <p class="kick">Installation</p>
-  <h2 id="toolsDialogTitle">Installer les outils de calcul</h2>
-  <p>Berria Craft s'appuie sur des logiciels libres. Coche ceux à installer : ils viennent de leurs sites officiels et restent sur cet ordinateur.</p>
+  <p class="kick" data-i18n="ui.tools_kick">Installation</p>
+  <h2 id="toolsDialogTitle" data-i18n="ui.tools_title">Installer les outils de calcul</h2>
+  <p data-i18n="ui.tools_intro">Berria Craft s'appuie sur des logiciels libres. Coche ceux à installer : ils viennent de leurs sites officiels et restent sur cet ordinateur.</p>
   <div id="toolsList"></div>
   <p class="hint" id="toolsTotal"></p>
-  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="toolsInstall">Installer</button><button type="button" class="ghost" id="toolsLater">Plus tard</button></div>
+  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="toolsInstall" data-i18n="ui.install">Installer</button><button type="button" class="ghost" id="toolsLater" data-i18n="ui.later">Plus tard</button></div>
 </dialog>
 
 <dialog id="aiDialog" class="modal" aria-labelledby="aiDialogTitle">
-  <p class="kick">Module complémentaire</p>
-  <h2 id="aiDialogTitle">Installer le module « Une photo (IA) »</h2>
-  <p>Il crée un modèle 3D à partir d'une seule photo, quand il n'y en a pas assez pour une reconstruction complète.</p>
+  <p class="kick" data-i18n="ui.ai_kick">Module complémentaire</p>
+  <h2 id="aiDialogTitle" data-i18n="ui.ai_title">Installer le module « Une photo (IA) »</h2>
+  <p data-i18n="ui.ai_intro">Il crée un modèle 3D à partir d'une seule photo, quand il n'y en a pas assez pour une reconstruction complète.</p>
   <ul class="tips">
     <li id="aiSize">Téléchargement d'environ 2,2 Go, une seule fois : bibliothèques Python et modèle d'IA TripoSR.</li>
-    <li>De quelques minutes à une demi-heure selon la connexion. L'app reste utilisable pendant ce temps.</li>
-    <li>Tout s'installe sur cet ordinateur ; les photos ne partent pas en ligne.</li>
+    <li data-i18n="ui.ai_time">De quelques minutes à une demi-heure selon la connexion. L'app reste utilisable pendant ce temps.</li>
+    <li data-i18n="ui.ai_local">Tout s'installe sur cet ordinateur ; les photos ne partent pas en ligne.</li>
   </ul>
-  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="aiInstall">Installer maintenant</button><button type="button" class="ghost" id="aiLater">Plus tard</button></div>
+  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="aiInstall" data-i18n="ui.install_now">Installer maintenant</button><button type="button" class="ghost" id="aiLater" data-i18n="ui.later">Plus tard</button></div>
 </dialog>
 
 <dialog id="delDialog" class="modal" aria-labelledby="delDialogTitle" aria-describedby="delText">
-  <h2 id="delDialogTitle">Supprimer ce projet ?</h2>
+  <h2 id="delDialogTitle" data-i18n="ui.delete_title">Supprimer ce projet ?</h2>
   <p id="delText"></p>
-  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="delConfirm">Supprimer</button><button type="button" class="ghost" id="delCancel">Annuler</button></div>
+  <div class="actions" style="margin-top:16px"><button type="button" class="primary inline" id="delConfirm" data-i18n="ui.delete">Supprimer</button><button type="button" class="ghost" id="delCancel" data-i18n="ui.cancel">Annuler</button></div>
 </dialog>
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
-const LEVELS = { lowpoly: ["LowPoly", "grandes facettes, rapide"], medium: ["Moyen", "plus lisse"], detailed: ["Détaillé", "le plus fidèle, plus long"] };
-const plural = (n, word) => `${n} ${word}${n > 1 ? "s" : ""}`;
-const SERVER_DOWN = "Le moteur de calcul ne répond pas.";
-const STATE_FR = { queued: "en attente", running: "en cours", done: "terminé", error: "erreur" };
+// translations: app/static/i18n/<lang>.json, shared with the engine (keys "srv."); English fills any gap
+const STRINGS = {}, PLURALS = {};
+let LANG = "en";
+const tr = (key, vars = {}) => {
+  let s = STRINGS[LANG]?.[key] ?? STRINGS.en?.[key] ?? key;
+  if (typeof s === "object") s = s[(PLURALS[LANG] ||= new Intl.PluralRules(LANG)).select(vars.n ?? 0)] ?? s.other;
+  return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+};
+const num = (v, opts) => Number(v).toLocaleString(LANG, opts);
+// "a, b" in English, "a、b" in Chinese: the separator of a plain list follows the language
+const list = (items) => new Intl.ListFormat(LANG, { style: "narrow", type: "conjunction" }).format(items);
+function applyI18n(root = document) {
+  root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-attr]").forEach((el) => el.dataset.i18nAttr.split(";").forEach((pair) => {
+    const [attr, key] = pair.split(":");
+    el.setAttribute(attr, tr(key));
+  }));
+  document.documentElement.lang = LANG;
+}
+async function loadLanguage(lang) {
+  for (const l of new Set(["en", lang])) {
+    STRINGS[l] ||= await fetch(`/static/i18n/${l}.json`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+  }
+  LANG = lang;
+  applyI18n();
+}
+async function initLanguage() {
+  const prefs = await fetch("/api/prefs").then((r) => r.json()).catch(() => ({ language: "en", languages: { en: "English" } }));
+  $("lang").replaceChildren(...Object.entries(prefs.languages).map(([code, name]) => new Option(name, code, false, code === prefs.language)));
+  await loadLanguage(prefs.language);
+}
+$("lang").onchange = async () => {
+  const lang = $("lang").value;
+  await post("/api/prefs", { language: lang }).catch(() => null);
+  await loadLanguage(lang);
+  refreshTexts();
+  if (current) render();
+  loadStatus();
+  loadHistory();
+};
+// a text or attribute set from code with a fixed key keeps that key, so applyI18n redoes it after a language change
+function setTr(el, key) { el.dataset.i18n = key; el.textContent = tr(key); }
+function setTrAttr(el, attr, key) { el.dataset.i18nAttr = `${attr}:${key}`; el.setAttribute(attr, tr(key)); }
+function setPlain(el, text) { delete el.dataset.i18n; el.textContent = text; }
+// texts written from code with values, which applyI18n cannot redo by itself
+function refreshTexts() {
+  Object.keys(RANGES).forEach(syncRange);
+  renderLocalThumbs();
+  renderDropNote();
+  renderAiSize();
+  updateRotConfirm();
+  for (const id of ["jobError", "notice"]) if (typeof shown[id] === "function") $(id).textContent = shown[id]();
+}
+// names and descriptions are looked up when drawn: the language file arrives after this module starts
+const LEVELS = { lowpoly: ["", "ui.level_lowpoly_sub"], medium: ["ui.level_medium", "ui.level_medium_sub"], detailed: ["ui.level_detailed", "ui.level_detailed_sub"] };
+const levelName = (k) => (LEVELS[k][0] ? tr(LEVELS[k][0]) : "LowPoly");
+const SERVER_DOWN = () => tr("ui.server_down");
+const STATES = { queued: "ui.state_queued", running: "ui.state_running", done: "ui.state_done", error: "ui.state_error" };
 let files = [], mainLocal = null, current = null, openId = null, viewLevel = null, pendingLevel = null, pollTimer = null, pollGen = 0, loadSeq = 0;
 let viewer = null, shownVersion = null, platform = "mac", tools = null, adjustMode = null, statusTimer = null, uploading = false, runPending = false, pendingRot = "", viewerInit = null, adjustDirty = false, aiState = null, toolsState = null, toolsAsked = false, lastToolIds = [], renderMode = "render";
 const doneAt = {};
@@ -487,7 +559,16 @@ const levelSeg = seg("level", (v) => $("facesField").classList.toggle("hidden", 
 const aModeSeg = seg("aMode", (v) => (adjustMode = v));
 const smoothSeg = seg("smooth");
 const aSmoothSeg = seg("aSmooth", () => (adjustDirty = true));
-const SMOOTH_NAMES = ["aucun", "léger", "moyen", "fort"];
+const SMOOTH_NAMES = ["ui.smooth_value_0", "ui.smooth_value_1", "ui.smooth_value_2", "ui.smooth_value_3"];
+// slider labels: the value keeps its own element inside the translated sentence
+const RANGES = { faces: ["facesVal", "ui.faces_label"], base: ["baseVal", "ui.base_label"], aFaces: ["aFacesVal", "ui.faces_label_adjust"] };
+function syncRange(id) {
+  const [valId, labelKey] = RANGES[id], val = $(valId), v = num($(id).value);
+  val.textContent = v;
+  const [before, after = ""] = tr(labelKey, { v: "\u0001" }).split("\u0001");
+  val.parentElement.replaceChildren(before, val, after);
+  $(id).setAttribute("aria-valuetext", tr(id === "base" ? "ui.percent" : "ui.n_triangles", { v }));
+}
 
 async function api(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
@@ -502,8 +583,16 @@ async function api(path, opts = {}) {
 }
 const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-function showError(msg) { $("notice").classList.add("hidden"); $("jobError").textContent = msg; $("jobError").classList.remove("hidden"); }
-function showNotice(msg) { $("jobError").classList.add("hidden"); $("notice").textContent = msg; $("notice").classList.remove("hidden"); }
+// a message given as a function is written again after a language change; server texts stay as they came
+const shown = {};
+function showMsg(id, other, msg) {
+  $(other).classList.add("hidden");
+  shown[id] = msg;
+  $(id).textContent = typeof msg === "function" ? msg() : msg;
+  $(id).classList.remove("hidden");
+}
+function showError(msg) { showMsg("jobError", "notice", msg); }
+function showNotice(msg) { showMsg("notice", "jobError", msg); }
 
 async function loadStatus() {
   clearTimeout(statusTimer);
@@ -512,32 +601,32 @@ async function loadStatus() {
     const s = await api("/api/status");
     tools = s.tools;
     platform = tools.platform;
-    $("finder").textContent = platform === "windows" ? "Afficher dans l'Explorateur" : "Afficher dans le Finder";
+    setTr($("finder"), platform === "windows" ? "ui.show_explorer" : "ui.show_finder");
     $("orca").classList.toggle("hidden", !tools.orcaslicer);
     $("expStl").className = tools.orcaslicer ? "ghost" : "primary";
     if (current) renderResult(current);
     // what each tool lets the user do, in plain words; the tool name stays in the tooltip
-    const items = [["Calcul 3D", "Blender", tools.blender, "blender"], ["Plusieurs photos", tools.photogrammetry_engine, tools.photogrammetry, "photogrammetry"],
-      ["Une photo (IA)", "TripoSR", tools.ia, "ia"], ["Impression", "OrcaSlicer", tools.orcaslicer, "orcaslicer"]];
+    const items = [[tr("ui.tool_compute"), "Blender", tools.blender, "blender"], [tr("ui.tool_photos"), tools.photogrammetry_engine, tools.photogrammetry, "photogrammetry"],
+      [tr("ui.mode_ia"), "TripoSR", tools.ia, "ia"], [tr("ui.tool_print"), "OrcaSlicer", tools.orcaslicer, "orcaslicer"]];
     const missing = items.filter(([, , ok]) => !ok);
     aiState = s.ai_install;
     toolsState = s.tools_setup;
     const aiBusy = aiState?.status === "running", toolsBusy = toolsState?.status === "running";
     const pill = ([n, t, , id]) => {
       if (id === "ia") {
-        return aiState?.unsupported ? `<span class="pill bad" title="Le module IA ne peut pas fonctionner sur cet ordinateur : ${escapeHtml(aiState.unsupported)}.">${escapeHtml(n)} : non disponible</span>`
-          : aiBusy ? `<span class="pill busy">${escapeHtml(n)} : installation…</span>`
-          : `<button type="button" class="pill bad pillbtn" data-install="ai">${escapeHtml(n)} : installer</button>`;
+        return aiState?.unsupported ? `<span class="pill bad" title="${escapeHtml(tr("ui.ai_unsupported_title", { reason: aiState.unsupported }))}">${escapeHtml(tr("ui.pill_unavailable", { name: n }))}</span>`
+          : aiBusy ? `<span class="pill busy">${escapeHtml(tr("ui.pill_installing", { name: n }))}</span>`
+          : `<button type="button" class="pill bad pillbtn" data-install="ai">${escapeHtml(tr("ui.pill_install", { name: n }))}</button>`;
       }
-      if (toolsBusy) return `<span class="pill busy">${escapeHtml(n)} : installation…</span>`;
+      if (toolsBusy) return `<span class="pill busy">${escapeHtml(tr("ui.pill_installing", { name: n }))}</span>`;
       return toolsState?.tools.some((x) => x.id === id && x.available)
-        ? `<button type="button" class="pill bad pillbtn" data-install="tools" title="${escapeHtml(t)}">${escapeHtml(n)} : installer</button>`
-        : `<span class="pill bad" title="${escapeHtml(t)} n'est pas installé">${escapeHtml(n)} : absent</span>`;
+        ? `<button type="button" class="pill bad pillbtn" data-install="tools" title="${escapeHtml(t)}">${escapeHtml(tr("ui.pill_install", { name: n }))}</button>`
+        : `<span class="pill bad" title="${escapeHtml(tr("ui.tool_not_installed", { tool: t }))}">${escapeHtml(tr("ui.pill_missing", { name: n }))}</span>`;
     };
     $("tools").innerHTML = missing.length ? missing.map(pill).join("")
-      : `<span class="pill ok" title="${escapeHtml(items.map(([, t]) => t).join(", "))}">Tout est prêt</span>`;
-    renderBar("tools", toolsState, "Installation des outils", "Outils installés : tout est prêt pour créer un modèle.");
-    renderBar("ai", aiState, "Installation du module IA", "Module IA installé : tu peux créer un modèle à partir d'une seule photo.");
+      : `<span class="pill ok" title="${escapeHtml(list(items.map(([, t]) => t)))}">${escapeHtml(tr("ui.all_ready"))}</span>`;
+    renderBar("tools", toolsState, { step: "ui.tools_bar_step", progress: "ui.tools_bar_progress", error: "ui.tools_bar_error", done: "ui.tools_bar_done" });
+    renderBar("ai", aiState, { step: "ui.ai_bar_step", progress: "ui.ai_bar_progress", error: "ui.ai_bar_error", done: "ui.ai_bar_done" });
     if (aiBusy || toolsBusy) next = 1500;
     // first launch without Blender: nothing can be computed, so the choice comes up by itself, once
     if (!toolsAsked && !tools.blender && toolsState?.status === "idle" && toolsState.tools.some((x) => x.id === "blender" && x.available)) {
@@ -545,12 +634,12 @@ async function loadStatus() {
       askInstallTools();
     }
     updateRoute();
-  } catch { $("tools").innerHTML = `<span class="pill bad">Moteur de calcul injoignable</span>`; next = 5000; }
+  } catch { $("tools").innerHTML = `<span class="pill bad">${escapeHtml(tr("ui.engine_unreachable"))}</span>`; next = 5000; }
   statusTimer = setTimeout(loadStatus, next);
 }
 
-const bytes = (n) => n >= 1e9 ? `${(n / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Go` : `${Math.round(n / 1e6).toLocaleString("fr-FR")} Mo`;
-function renderBar(key, st, label, doneText) {
+const bytes = (n) => n >= 1e9 ? tr("ui.size_gb", { v: num(n / 1e9, { maximumFractionDigits: 1 }) }) : tr("ui.size_mb", { v: num(Math.round(n / 1e6)) });
+function renderBar(key, st, keys) {
   if (st?.status === "done" && !doneAt[key]) doneAt[key] = Date.now();
   const show = st && st.status !== "idle" && !(st.status === "done" && Date.now() - doneAt[key] > 8000);
   $(key + "Bar").classList.toggle("hidden", !show);
@@ -558,29 +647,25 @@ function renderBar(key, st, label, doneText) {
   $(key + "Bar").classList.toggle("done", st.status === "done");
   $(key + "Bar").classList.toggle("error", st.status === "error");
   $(key + "Fill").style.width = `${st.status === "done" ? 100 : Math.min(100, Math.round(100 * st.done / (st.total || 1)))}%`;
-  $(key + "Text").textContent = st.status === "error" ? `${label} interrompue : ${st.error}.`
-    : st.status === "done" ? doneText
-    : `${label} : ${st.step}${st.done ? ` (${bytes(st.done)} sur ${bytes(st.total)})` : ""}`;
+  $(key + "Text").textContent = st.status === "error" ? tr(keys.error, { error: st.error })
+    : st.status === "done" ? tr(keys.done)
+    : st.done ? tr(keys.progress, { step: st.step, done: bytes(st.done), total: bytes(st.total) }) : tr(keys.step, { step: st.step });
   $(key + "Retry").classList.toggle("hidden", st.status !== "error");
 }
 
-const TOOL_HELP = {
-  blender: "Prépare chaque modèle pour l'impression. Obligatoire.",
-  photogrammetry: "Reconstruit un buste fidèle à partir de 20 photos ou plus. Recommandé.",
-  orcaslicer: "Prépare le fichier pour l'imprimante. Recommandé.",
-  ia: "Crée un modèle à partir d'une seule photo. Facultatif.",
-};
+const TOOL_HELP = { blender: "ui.tool_help_blender", photogrammetry: "ui.tool_help_photogrammetry", orcaslicer: "ui.tool_help_orcaslicer", ia: "ui.tool_help_ia" };
+const toolHelp = (id) => (TOOL_HELP[id] ? escapeHtml(tr(TOOL_HELP[id])) : "");
 function askInstallTools() {
   const rows = (toolsState?.tools || []).filter((t) => t.available || t.installed).map((t) => t.installed
-    ? `<div class="toolrow done"><span>${escapeHtml(t.label)} (${escapeHtml(t.role)}) : déjà installé</span></div>`
-    : `<label class="toolrow"><input type="checkbox" value="${t.id}" data-size="${t.size}" checked${t.required ? " disabled" : ""}><span>${escapeHtml(t.label)} (${escapeHtml(t.role)}), ${bytes(t.size)}<small>${TOOL_HELP[t.id]}</small></span></label>`);
+    ? `<div class="toolrow done"><span>${escapeHtml(tr("ui.tool_installed", { label: t.label, role: t.role }))}</span></div>`
+    : `<label class="toolrow"><input type="checkbox" value="${t.id}" data-size="${t.size}" checked${t.required ? " disabled" : ""}><span>${escapeHtml(tr("ui.tool_row", { label: t.label, role: t.role, size: bytes(t.size) }))}<small>${toolHelp(t.id)}</small></span></label>`);
   if (tools && !tools.ia && !aiState?.unsupported && aiState?.status !== "running") {
-    rows.push(`<label class="toolrow"><input type="checkbox" value="ia" data-size="${aiState?.total || 0}"><span>Module IA (Une photo), ${bytes(aiState?.total || 2.2e9)}<small>${TOOL_HELP.ia}</small></span></label>`);
+    rows.push(`<label class="toolrow"><input type="checkbox" value="ia" data-size="${aiState?.total || 0}"><span>${escapeHtml(tr("ui.ai_tool_row", { size: bytes(aiState?.total || 2.2e9) }))}<small>${toolHelp("ia")}</small></span></label>`);
   }
   $("toolsList").innerHTML = rows.join("");
   const total = () => {
     const sum = [...$("toolsList").querySelectorAll("input:checked")].reduce((a, i) => a + Number(i.dataset.size), 0);
-    $("toolsTotal").textContent = sum ? `Téléchargement total : environ ${bytes(sum)}, une seule fois. Tu pourras continuer à utiliser l'app pendant ce temps.` : "";
+    $("toolsTotal").textContent = sum ? tr("ui.tools_total", { size: bytes(sum) }) : "";
     $("toolsInstall").disabled = !sum;
   };
   $("toolsList").onchange = total;
@@ -601,8 +686,9 @@ $("toolsInstall").onclick = () => installTools([...$("toolsList").querySelectorA
 $("toolsLater").onclick = () => $("toolsDialog").close();
 $("toolsRetry").onclick = () => installTools(lastToolIds.length ? lastToolIds : (toolsState?.tools || []).filter((t) => t.available && !t.installed).map((t) => t.id));
 
+function renderAiSize() { $("aiSize").textContent = tr(aiState?.gpu ? "ui.ai_size_gpu" : "ui.ai_size", { size: bytes(aiState?.total || 2.2e9) }); }
 function askInstallAi() {
-  if (aiState?.total) $("aiSize").textContent = `Téléchargement d'environ ${bytes(aiState.total)}, une seule fois : bibliothèques Python et modèle d'IA TripoSR${aiState.gpu ? ", en version adaptée à ta carte graphique NVIDIA" : ""}.`;
+  renderAiSize();
   $("aiDialog").showModal(); $("aiInstall").focus();
 }
 async function installAi() {
@@ -619,6 +705,7 @@ $("tools").addEventListener("click", (e) => {
   else if (e.target.closest("[data-install='tools']")) askInstallTools();
 });
 
+let rejectedNames = [];
 function addFiles(list) {
   const rejected = [];
   for (const f of list) {
@@ -626,13 +713,17 @@ function addFiles(list) {
     if (files.some((x) => x.name === f.name && x.size === f.size)) continue;
     files.push(f);
   }
-  const n = rejected.length;
-  $("dropNote").textContent = n ? `${plural(n, "fichier")} ignoré${n > 1 ? "s" : ""}, format non pris en charge : ${rejected.slice(0, 3).join(", ")}${n > 3 ? "…" : ""}` : "";
-  $("dropNote").classList.toggle("hidden", !n);
+  rejectedNames = rejected;
+  renderDropNote();
   if (!mainLocal && files.length) mainLocal = files[0].name;
   renderLocalThumbs();
 }
-$("clearFiles").onclick = () => { files = []; mainLocal = null; $("dropNote").classList.add("hidden"); renderLocalThumbs(); $("file").focus(); };
+function renderDropNote() {
+  const n = rejectedNames.length;
+  $("dropNote").textContent = n ? tr("ui.files_ignored", { n, names: list(rejectedNames.slice(0, 3)) + (n > 3 ? "…" : "") }) : "";
+  $("dropNote").classList.toggle("hidden", !n);
+}
+$("clearFiles").onclick = () => { files = []; mainLocal = null; rejectedNames = []; renderDropNote(); renderLocalThumbs(); $("file").focus(); };
 
 function renderLocalThumbs() {
   const key = focusKey();
@@ -645,7 +736,7 @@ function renderLocalThumbs() {
     d.title = f.name;
     d.dataset.focus = "lt-" + f.name;
     d.setAttribute("aria-pressed", f.name === mainLocal);
-    d.setAttribute("aria-label", `${f.name}, photo principale`);
+    d.setAttribute("aria-label", tr("ui.thumb_label", { name: f.name }));
     if (/\.(heic|heif|tiff?)$/i.test(f.name)) {
       const n = document.createElement("div");
       n.className = "noimg"; n.textContent = f.name; d.appendChild(n);
@@ -655,27 +746,24 @@ function renderLocalThumbs() {
       img.onload = () => URL.revokeObjectURL(img.src);
       d.appendChild(img);
     }
-    if (f.name === mainLocal) { const s = document.createElement("span"); s.textContent = "principale"; d.appendChild(s); }
+    if (f.name === mainLocal) { const s = document.createElement("span"); s.textContent = tr("ui.main_badge"); d.appendChild(s); }
     d.onclick = () => { mainLocal = f.name; renderLocalThumbs(); };
     box.appendChild(d);
   });
   restoreFocus(key);
   $("photoTools").classList.toggle("hidden", !files.length);
-  $("photoCount").textContent = plural(files.length, "photo");
+  $("photoCount").textContent = tr("ui.n_photos", { n: files.length });
   updateRoute();
 }
 
 function updateRoute() {
   const n = files.length, mode = modeSeg.get();
-  const pgName = tools?.photogrammetry_engine || "photogrammétrie";
+  const pgName = tools?.photogrammetry_engine || tr("ui.photogrammetry");
   $("go").disabled = !n || uploading;
   $("routeInstall").classList.add("hidden");
   if (!n) {
     const noAi = tools?.ia === false, cannot = aiState?.unsupported, busyAi = aiState?.status === "running";
-    $("routeHint").textContent = !noAi ? "Une photo suffit pour un essai rapide. Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet."
-      : cannot ? "Prends au moins 20 photos, et 50 ou plus pour un buste ressemblant, en tournant autour du sujet."
-      : busyAi ? "Le module « Une photo (IA) » s'installe (barre en haut). En attendant, une reconstruction demande au moins 20 photos, et 50 ou plus pour un buste ressemblant."
-      : "Pour un essai avec une seule photo, installe d'abord le module « Une photo (IA) ». Pour un buste ressemblant, prends 50 photos ou plus en tournant autour du sujet.";
+    $("routeHint").textContent = tr(!noAi ? "ui.route_start" : cannot ? "ui.route_start_no_ai" : busyAi ? "ui.route_start_ai_installing" : "ui.route_start_install_ai");
     $("routeInstall").classList.toggle("hidden", !noAi || !!cannot || busyAi);
     return;
   }
@@ -684,18 +772,16 @@ function updateRoute() {
   if (eng === "ia" && tools?.ia === false) {
     $("go").disabled = true;
     const busyAi = aiState?.status === "running", cannot = aiState?.unsupported;
-    $("routeHint").textContent = cannot
-      ? `${plural(n, "photo")} : la création à partir d'une seule photo n'est pas disponible sur cet ordinateur (${cannot}). Ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`
-      : busyAi
-      ? `${plural(n, "photo")} : installation du module IA en cours, tu pourras créer le modèle dès qu'elle sera terminée.`
-      : `${plural(n, "photo")} : il faut le module « Une photo (IA) », pas encore installé. Sinon, ajoute des photos : au moins 20, et 50 ou plus pour un buste fidèle.`;
+    $("routeHint").textContent = cannot ? tr("ui.route_ia_unsupported", { n, reason: cannot })
+      : busyAi ? tr("ui.route_ia_installing", { n })
+      : tr("ui.route_ia_missing", { n });
     $("routeInstall").classList.toggle("hidden", busyAi || !!cannot);
     return;
   }
   $("routeHint").textContent = eng === "photogrammetry"
-    ? (n < 20 ? `${plural(n, "photo")} : trop peu pour une reconstruction, qui en demande au moins 20 (50 ou plus pour un buste fidèle). Ajoute des photos${tools?.ia ? " ou choisis « Une photo (IA) »" : ""}.`
-      : `${plural(n, "photo")} : le modèle sera reconstruit à partir de toutes les photos (${pgName}).${n < 50 ? " Pour un buste fidèle, vise 50 photos ou plus." : ""}`)
-    : `${plural(n, "photo")} : l'IA estime la forme à partir de la photo principale (encadrée). L'arrière est deviné.`;
+    ? (n < 20 ? tr(tools?.ia ? "ui.route_too_few_or_ia" : "ui.route_too_few", { n })
+      : tr(n < 50 ? "ui.route_photogrammetry_more" : "ui.route_photogrammetry", { n, engine: pgName }))
+    : tr("ui.route_ia", { n });
 }
 
 $("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
@@ -704,16 +790,14 @@ $("file").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
 $("drop").addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
 document.addEventListener("dragover", (e) => e.preventDefault());
 document.addEventListener("drop", (e) => { e.preventDefault(); if (!e.target.closest("#drop")) addFiles(e.dataTransfer.files); });
-$("faces").oninput = () => { $("facesVal").textContent = $("faces").value; $("faces").setAttribute("aria-valuetext", `${$("faces").value} triangles`); };
-$("base").oninput = () => { $("baseVal").textContent = $("base").value; $("base").setAttribute("aria-valuetext", `${$("base").value} %`); };
-$("aFaces").oninput = () => { $("aFacesVal").textContent = $("aFaces").value; $("aFaces").setAttribute("aria-valuetext", `${$("aFaces").value} triangles`); };
+Object.keys(RANGES).forEach((id) => ($(id).oninput = () => syncRange(id)));
 
-function fieldError(id, msg) {
-  $(id).setAttribute("aria-invalid", msg ? "true" : "false");
-  $(id + "Err").textContent = msg || "";
-  $(id + "Err").classList.toggle("hidden", !msg);
-  if (msg) $(id).focus();
-  return !!msg;
+function fieldError(id, key) {
+  $(id).setAttribute("aria-invalid", key ? "true" : "false");
+  if (key) setTr($(id + "Err"), key); else setPlain($(id + "Err"), "");
+  $(id + "Err").classList.toggle("hidden", !key);
+  if (key) $(id).focus();
+  return !!key;
 }
 ["height", "aHeight", "aBase"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, null)));
 // Escape hides help bubbles (WCAG 1.4.13); they come back on the next pointer move or focus change
@@ -728,18 +812,19 @@ document.querySelectorAll(".tip").forEach((t) => ["pointerenter", "focus"].forEa
 
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
-  if (fieldError("height", Number.isFinite(height) && height >= 10 && height <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
+  if (fieldError("height", Number.isFinite(height) && height >= 10 && height <= 245 ? null : "ui.height_error")) return;
   uploading = true;
   $("go").disabled = true;
-  $("go").textContent = "Envoi des photos…";
+  setTr($("go"), "ui.uploading");
   const sent = files.slice();
   const fd = new FormData();
   sent.forEach((f) => fd.append("files", f, f.name));
-  fd.append("name", $("name").value || "modele");
+  fd.append("name", $("name").value || tr("ui.fallback_name"));
   fd.append("mode", modeSeg.get());
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
     nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), filaments: +$("filaments").value,
-    color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked, rot_seq: "" }));
+    color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked,
+    ...exportChoice("e"), rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -750,7 +835,7 @@ $("go").onclick = async () => {
     loadHistory();
   } catch (e) { showError(e.message); }
   uploading = false;
-  $("go").textContent = "Créer le modèle";
+  setTr($("go"), "ui.create_model");
   renderLocalThumbs();
 };
 
@@ -764,7 +849,7 @@ async function loadHistory() {
     box.replaceChildren();
     if (!jobs.length) {
       const li = document.createElement("li");
-      li.className = "sub"; li.textContent = "Aucun projet pour l'instant. Ils s'afficheront ici.";
+      li.className = "sub"; li.textContent = tr("ui.no_projects");
       box.appendChild(li);
     }
     for (const j of jobs) {
@@ -772,17 +857,17 @@ async function loadHistory() {
       const b = document.createElement("button");
       b.type = "button"; b.className = "proj"; b.dataset.focus = "proj-" + j.id;
       if (j.id === openId) b.setAttribute("aria-current", "true");
-      const lv = Object.keys(j.results || {}).map((l) => LEVELS[l][0]).join(", ") || "aucun résultat";
+      const lv = list(Object.keys(j.results || {}).map((l) => levelName(l))) || tr("ui.no_result");
       b.innerHTML = `<b></b><span class="sub"></span>`;
       b.querySelector("b").textContent = j.name;
-      b.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
+      b.querySelector("span").textContent = `${new Date(j.created * 1000).toLocaleString(LANG, { dateStyle: "short", timeStyle: "short" })} · ${lv}`;
       b.onclick = () => openJob(j.id);
       const del = document.createElement("button");
       del.type = "button"; del.className = "proj-del"; del.dataset.focus = "del-" + j.id;
       del.innerHTML = TRASH_ICON;
-      del.setAttribute("aria-label", `Supprimer le projet ${j.name}`);
+      del.setAttribute("aria-label", tr("ui.delete_project_named", { name: j.name }));
       del.disabled = j.state === "running";
-      del.title = del.disabled ? "Calcul en cours : suppression possible à la fin" : "Supprimer le projet";
+      del.title = tr(del.disabled ? "ui.delete_busy" : "ui.delete_project");
       del.onclick = () => askDelete(j);
       li.append(b, del);
       box.appendChild(li);
@@ -794,8 +879,7 @@ async function loadHistory() {
 let deleting = null;
 function askDelete(j) {
   deleting = j;
-  $("delText").textContent = `« ${j.name} » : ses photos, ses modèles et ses fichiers de calcul seront effacés de cet ordinateur. `
-    + "Les fichiers déjà enregistrés dans Téléchargements restent.";
+  $("delText").textContent = tr("ui.delete_text", { name: j.name });
   $("delConfirm").disabled = false;
   $("delDialog").showModal(); $("delCancel").focus();
 }
@@ -818,7 +902,7 @@ $("delConfirm").onclick = async () => {
   await loadHistory();
   const left = document.querySelectorAll("#history .proj");
   (left[Math.min(Math.max(at, 0), left.length - 1)] || $("name")).focus();
-  showNotice(`Projet « ${j.name} » supprimé.`);
+  showNotice(() => tr("ui.project_deleted", { name: j.name }));
 };
 
 // back to the empty stage, as at startup
@@ -826,7 +910,7 @@ function closeJob() {
   clearTimeout(pollTimer);
   ++pollGen;
   openId = null; current = null; viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null; adjustDirty = false;
-  $("jobTitle").textContent = "Aucun projet ouvert";
+  setTr($("jobTitle"), "ui.no_project_open");
   $("jobState").className = "state hidden";
   $("spin").classList.add("hidden");
   $("jobStep").textContent = ""; $("jobMeta").textContent = ""; $("live").textContent = "";
@@ -834,7 +918,7 @@ function closeJob() {
   $("resultCard").classList.add("hidden"); $("adjustCard").classList.add("hidden");
   clearModel();
   $("viewer").classList.remove("loading");
-  $("viewerEmpty").textContent = "Dépose des photos à gauche, ou ouvre un projet de la liste.";
+  setTr($("viewerEmpty"), "ui.viewer_empty");
   $("jobError").classList.add("hidden");
 }
 
@@ -843,7 +927,7 @@ function clearModel() {
   dropModel();
   $("viewer").classList.remove("has-model");
   pendingRot = ""; updateRotConfirm();
-  $("viewerEmpty").textContent = "Chargement du modèle…";
+  setTr($("viewerEmpty"), "ui.loading_model");
   $("viewerEmpty").classList.remove("hidden");
   $("previews").classList.add("hidden");
 }
@@ -856,7 +940,7 @@ function openJob(id) {
   viewLevel = null; pendingLevel = null; shownVersion = null; adjustMode = null; adjustDirty = false;
   // until the new project arrives, nothing may act on the previous one
   current = null;
-  $("jobTitle").textContent = "Ouverture du projet…";
+  setTr($("jobTitle"), "ui.opening_project");
   $("levels").replaceChildren();
   $("resultCard").classList.add("hidden"); $("adjustCard").classList.add("hidden");
   clearModel();
@@ -869,8 +953,8 @@ async function poll(id, gen, failures) {
   try { job = await api(`/api/jobs/${encodeURIComponent(id)}`); }
   catch (e) {
     if (gen !== pollGen) return;
-    if (e.status === 404) { showError("Projet introuvable."); return; }
-    showError(`${SERVER_DOWN} Nouvelle tentative…`);
+    if (e.status === 404) { showError(() => tr("ui.project_not_found")); return; }
+    showError(SERVER_DOWN);
     pollTimer = setTimeout(() => poll(id, gen, failures + 1), Math.min(10000, 1500 * 2 ** failures));
     return;
   }
@@ -883,43 +967,48 @@ async function poll(id, gen, failures) {
 }
 
 const COLOR_FILES = ["color_3mf", "color_obj", "color_texture"];
+const EXPORTS = { software: "Software", game: "Game", web: "Web" };
+const exportChoice = (pre) => Object.fromEntries(Object.entries(EXPORTS).map(([k, id]) => [`export_${k}`, $(pre + id).checked]));
 function staleReasons(j, level) {
   const r = j.results[level];
   if (!r) return [];
   const a = r.settings || {}, b = j.settings, out = [];
-  if ((a.rot_seq || "") !== (b.rot_seq || "")) out.push("orientation");
-  if (Math.round(a.height_mm) !== Math.round(b.height_mm)) out.push("hauteur");
-  if (a.base_cut !== b.base_cut) out.push("socle");
-  if (a.nozzle !== b.nozzle) out.push("buse");
-  if (!!a.keep_parts !== !!b.keep_parts) out.push("pièces détachées");
-  if ((a.smooth || 0) !== (b.smooth || 0)) out.push("lissage");
-  if (level === "lowpoly" && a.faces !== b.faces) out.push("facettes");
-  if ((r.filaments || r.obj_colors) && (a.filaments || 4) !== (b.filaments || 4)) out.push("filaments");
+  if ((a.rot_seq || "") !== (b.rot_seq || "")) out.push("ui.stale_orientation");
+  if (Math.round(a.height_mm) !== Math.round(b.height_mm)) out.push("ui.stale_height");
+  if (a.base_cut !== b.base_cut) out.push("ui.stale_base");
+  if (a.nozzle !== b.nozzle) out.push("ui.stale_nozzle");
+  if (!!a.keep_parts !== !!b.keep_parts) out.push("ui.stale_parts");
+  if ((a.smooth || 0) !== (b.smooth || 0)) out.push("ui.stale_smooth");
+  if (level === "lowpoly" && a.faces !== b.faces) out.push("ui.stale_faces");
+  if ((r.filaments || r.obj_colors) && (a.filaments || 4) !== (b.filaments || 4)) out.push("ui.stale_filaments");
   // results from before these options have none of the files: they all count as unchecked
-  if (r.colors && COLOR_FILES.some((k) => (a[k] ?? false) !== b[k])) out.push("fichiers couleur");
-  if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
-  if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("méthode");
-  return out;
+  if (r.colors && COLOR_FILES.some((k) => (a[k] ?? false) !== b[k])) out.push("ui.stale_color_files");
+  if (Object.keys(EXPORTS).some((k) => !!a[`export_${k}`] !== !!b[`export_${k}`])) out.push("ui.stale_exports");
+  if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("ui.stale_main_photo");
+  if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("ui.stale_method");
+  return out.map((k) => tr(k));
 }
 
 function render() {
   const j = current, isBusy = busy(j), key = focusKey();
-  $("jobTitle").textContent = j.name;
+  setPlain($("jobTitle"), j.name);
   const st = $("jobState");
   st.className = "state " + j.state;
-  st.textContent = STATE_FR[j.state] || j.state;
+  const stateText = STATES[j.state] ? tr(STATES[j.state]) : j.state;
+  st.textContent = stateText;
   $("spin").classList.toggle("hidden", !isBusy);
   const elapsed = isBusy && j.started ? ` · ${Math.round(Date.now() / 1000 - j.started)} s` : "";
-  const step = isBusy ? `${j.step}${j.running_level ? " · " + LEVELS[j.running_level][0] : ""}` : "";
+  const step = isBusy ? `${j.step}${j.running_level ? " · " + levelName(j.running_level) : ""}` : "";
   $("jobStep").textContent = step + elapsed;
-  const announce = `${j.name} : ${step || STATE_FR[j.state] || j.state}`;
+  const announce = tr("ui.live_status", { name: j.name, status: step || stateText });
   if ($("live").textContent !== announce) $("live").textContent = announce;
   const nOk = (j.photos || []).filter((p) => !p.error).length;
-  const engineText = j.engine ? (j.engine === "photogrammetry" ? "reconstruit à partir de toutes les photos" : `forme estimée par l'IA à partir de ${j.main_photo || "la photo la plus nette"}`) : null;
+  const engineText = !j.engine ? null : j.engine === "photogrammetry" ? tr("ui.meta_photogrammetry")
+    : j.main_photo ? tr("ui.meta_ia", { photo: j.main_photo }) : tr("ui.meta_ia_sharpest");
   const turns = (j.settings.rot_seq || "").length;
-  $("jobMeta").textContent = [nOk ? plural(nOk, "photo") : null, engineText, turns ? `${plural(turns, "quart")} de tour appliqué${turns > 1 ? "s" : ""}` : null].filter(Boolean).join(" · ");
+  $("jobMeta").textContent = [nOk ? tr("ui.n_photos", { n: nOk }) : null, engineText, turns ? tr("ui.meta_turns", { n: turns }) : null].filter(Boolean).join(" · ");
   if (j.error) showError(j.error);
-  else if (!$("jobError").textContent.startsWith(SERVER_DOWN)) $("jobError").classList.add("hidden");
+  else if (shown.jobError !== SERVER_DOWN) $("jobError").classList.add("hidden");
 
   if (pendingLevel && !isBusy && j.results[pendingLevel]) { viewLevel = pendingLevel; pendingLevel = null; shownVersion = null; }
   if (!viewLevel || !j.results[viewLevel]) {
@@ -928,20 +1017,21 @@ function render() {
   }
   const box = $("levels");
   box.replaceChildren();
-  Object.entries(LEVELS).forEach(([k, [label, sub]], i) => {
+  Object.keys(LEVELS).forEach((k, i) => {
+    const label = levelName(k), sub = tr(LEVELS[k][1]);
     const r = j.results[k], running = isBusy && j.running_level === k, stale = staleReasons(j, k);
     const el = document.createElement("div");
     el.className = "level" + (viewLevel === k ? " sel" : "");
-    const name = `${i ? '<span class="arrow" aria-hidden="true">→ </span>' : ""}${label}`;
-    el.innerHTML = `<b>${r ? `<button type="button" class="lvl" data-focus="lvl-${k}" aria-pressed="${viewLevel === k}">${name}</button>` : name}</b><small>${sub}</small><div class="lstate"></div>`;
+    const name = `${i ? '<span class="arrow" aria-hidden="true">→ </span>' : ""}${escapeHtml(label)}`;
+    el.innerHTML = `<b>${r ? `<button type="button" class="lvl" data-focus="lvl-${k}" aria-pressed="${viewLevel === k}">${name}</button>` : name}</b><small>${escapeHtml(sub)}</small><div class="lstate"></div>`;
     const ls = el.querySelector(".lstate");
-    if (running) ls.innerHTML = `<span class="warn">calcul en cours</span>`;
+    if (running) ls.innerHTML = `<span class="warn">${escapeHtml(tr("ui.level_running"))}</span>`;
     else {
-      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}"${stale.length ? ` title="Réglage modifié : ${escapeHtml(stale.join(", "))}"` : ""}>${r.triangles.toLocaleString("fr-FR")} triangles${stale.length ? " · à recalculer" : ""}</span>`);
+      if (r) ls.insertAdjacentHTML("beforeend", `<span class="${stale.length ? "warn" : "good"}"${stale.length ? ` title="${escapeHtml(tr("ui.stale_title", { list: list(stale) }))}"` : ""}>${escapeHtml(tr(stale.length ? "ui.n_triangles_stale" : "ui.n_triangles", { v: num(r.triangles) }))}</span>`);
       if (!r || stale.length) {
         const b = document.createElement("button");
-        b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = r ? "Recalculer" : "Générer"; b.disabled = isBusy;
-        b.setAttribute("aria-label", `${b.textContent} le niveau ${label}`);
+        b.type = "button"; b.className = "ghost"; b.dataset.focus = "gen-" + k; b.textContent = tr(r ? "ui.recompute" : "ui.generate"); b.disabled = isBusy;
+        b.setAttribute("aria-label", tr(r ? "ui.recompute_level" : "ui.generate_level", { level: label }));
         b.onclick = (e) => { e.stopPropagation(); runLevel(k); };
         ls.appendChild(b);
       }
@@ -968,52 +1058,60 @@ function renderResult(j) {
   const r = viewLevel && j.results[viewLevel];
   $("resultCard").classList.toggle("hidden", !r);
   if (!r) return;
-  const yes = (ok, t, f) => `<span class="${ok ? "good" : "badc"}">${ok ? t : f}</span>`;
+  const yes = (ok, t, f) => `<span class="${ok ? "good" : "badc"}">${escapeHtml(ok ? t : f)}</span>`;
   const thinWarn = r.thin_faces > Math.max(5, r.triangles * 0.01);
-  const fr = (v) => String(v).replace(".", ",");
   const closed = r.non_manifold_edges === 0 && r.boundary_edges === 0;
   const supports = r.overhang_pct > 5;
-  const dims = r.dimensions_mm.map((v) => v.toLocaleString("fr-FR")).join(" × ") + " mm";
+  const dims = r.dimensions_mm.map((v) => num(v)).join(" × ") + " mm";
   // verdict in plain words first; the measures stay under "Détails techniques"
   // the headline follows every check, not only the topology flag behind r.printable
   const verdict = !r.printable || !closed || r.self_intersections ? "bad" : thinWarn || r.shells > 1 ? "warn" : "ok";
-  $("resultTitle").textContent = { bad: "À vérifier avant d'imprimer", warn: "Imprimable, avec des points à vérifier",
-    ok: supports ? "Prêt à imprimer, avec supports" : "Prêt à imprimer" }[verdict];
+  $("resultTitle").textContent = tr({ bad: "ui.verdict_bad", warn: "ui.verdict_warn",
+    ok: supports ? "ui.verdict_ok_supports" : "ui.verdict_ok" }[verdict]);
   $("resultTitle").classList.toggle("bad", verdict === "bad");
   $("resultTitle").classList.toggle("warn", verdict === "warn");
-  $("verdictSub").textContent = `Niveau ${LEVELS[viewLevel][0]} · ${dims} · volume du modèle : environ ${Math.round(r.volume_cm3).toLocaleString("fr-FR")} cm³`;
+  $("verdictSub").textContent = tr("ui.verdict_sub", { level: levelName(viewLevel), dims, volume: num(Math.round(r.volume_cm3)) });
   const notes = [];
-  if (!closed) notes.push(["bad", "Le modèle n'est pas complètement fermé : recalcule ce niveau ou essaie un autre niveau."]);
-  if (r.self_intersections) notes.push(["bad", "Des surfaces se croisent : recalcule ce niveau."]);
-  if (r.shells > 1) notes.push(["warn", `${r.shells} morceaux séparés. Normal seulement si « Garder les pièces détachées » est coché.`]);
-  if (thinWarn) notes.push(["warn", `Parois très fines par endroits (moins de ${fr(r.min_wall_mm)} mm) : agrandis le modèle ou choisis un niveau moins détaillé.`]);
-  if (supports) notes.push(["warn", `${fr(Math.round(r.overhang_pct))} % de la surface est en surplomb : il faudra des supports.`]);
-  if (!notes.length || (closed && !r.self_intersections && r.shells === 1 && !thinWarn)) notes.unshift(["ok", "Fermé, d'un seul morceau, sans paroi trop fine."]);
+  if (!closed) notes.push(["bad", tr("ui.note_not_closed")]);
+  if (r.self_intersections) notes.push(["bad", tr("ui.note_intersections")]);
+  if (r.shells > 1) notes.push(["warn", tr("ui.note_shells", { count: r.shells })]);
+  if (thinWarn) notes.push(["warn", tr("ui.note_thin", { mm: num(r.min_wall_mm) })]);
+  if (supports) notes.push(["warn", tr("ui.note_overhang", { pct: num(Math.round(r.overhang_pct)) })]);
+  if (!notes.length || (closed && !r.self_intersections && r.shells === 1 && !thinWarn)) notes.unshift(["ok", tr("ui.note_ok")]);
   $("verdictList").innerHTML = notes.map(([t, s]) => `<li class="${t}">${escapeHtml(s)}</li>`).join("");
+  const smooth = r.settings?.smooth || 0;
   const rows = [
-    ["Taille", dims],
-    ["Facettes (triangles)", r.triangles.toLocaleString("fr-FR")],
-    ["Volume", r.volume_cm3.toLocaleString("fr-FR") + " cm³"],
-    ["Fermé, sans trou", yes(closed, "oui", `non (${r.non_manifold_edges + r.boundary_edges} arêtes ouvertes)`)],
-    ["Surfaces qui se croisent", yes(r.self_intersections === 0, "aucune", r.self_intersections)],
-    ["Morceaux séparés", yes(r.shells === 1, "1", r.shells)],
-    [`Parois de moins de ${fr(r.min_wall_mm)} mm`, `<span class="${thinWarn ? "warn" : "good"}">${r.thin_faces} face(s)</span>`],
-    ["Surplombs (pente > 45°)", `<span class="${supports ? "warn" : "good"}">${fr(r.overhang_pct)} % de la surface</span>`],
-    ["Méthode", r.engine === "photogrammetry" ? `toutes les photos (${tools?.photogrammetry_engine || "photogrammétrie"})` : "IA sur une photo (TripoSR)"],
-    ["Lissage", SMOOTH_NAMES[r.settings?.smooth || 0]],
+    [tr("ui.row_size"), escapeHtml(dims)],
+    [tr("ui.row_faces"), escapeHtml(num(r.triangles))],
+    [tr("ui.row_volume"), escapeHtml(`${num(r.volume_cm3)} cm³`)],
+    [tr("ui.row_closed"), yes(closed, tr("ui.yes"), tr("ui.open_edges", { n: r.non_manifold_edges + r.boundary_edges }))],
+    [tr("ui.row_intersections"), yes(r.self_intersections === 0, tr("ui.none"), r.self_intersections)],
+    [tr("ui.row_shells"), yes(r.shells === 1, "1", r.shells)],
+    [tr("ui.row_thin", { mm: num(r.min_wall_mm) }), `<span class="${thinWarn ? "warn" : "good"}">${escapeHtml(tr("ui.n_faces", { n: r.thin_faces }))}</span>`],
+    [tr("ui.row_overhang"), `<span class="${supports ? "warn" : "good"}">${escapeHtml(tr("ui.pct_of_surface", { pct: num(r.overhang_pct) }))}</span>`],
+    [tr("ui.method_label"), escapeHtml(r.engine === "photogrammetry" ? tr("ui.row_method_photogrammetry", { engine: tools?.photogrammetry_engine || tr("ui.photogrammetry") }) : tr("ui.row_method_ia"))],
+    [tr("ui.smooth_label"), escapeHtml(SMOOTH_NAMES[smooth] ? tr(SMOOTH_NAMES[smooth]) : smooth)],
   ];
-  $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+  $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${escapeHtml(a)}</td><td>${b}</td></tr>`).join("");
   $("colorBox").classList.toggle("hidden", !r.filaments && !r.obj_colors && !r.texture);
   const hex = (c) => "#" + c.map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();
-  $("palette").innerHTML = (r.palette || []).map((c, i) => `<span class="swatch" role="listitem"><i style="background:${hex(c)}"></i>Filament ${i + 1} · ${hex(c)}</span>`).join("");
+  $("palette").innerHTML = (r.palette || []).map((c, i) => `<span class="swatch" role="listitem"><i style="background:${hex(c)}"></i>${escapeHtml(tr("ui.filament_swatch", { i: i + 1, hex: hex(c) }))}</span>`).join("");
   $("orcaColor").classList.toggle("hidden", !r.filaments || tools?.orcaslicer === false);
   $("orcaObj").classList.toggle("hidden", !r.obj_colors || tools?.orcaslicer === false);
   $("exp3mf").classList.toggle("hidden", !r.filaments);
   $("expObj").classList.toggle("hidden", !r.obj_colors);
+  $("exportBox").classList.toggle("hidden", !Object.keys(EXPORTS).some((k) => r[`export_${k}`]));
+  const saveKeys = { software: ["ui.save_software_quads", "ui.save_software_triangles"], game: ["ui.save_game_quads", "ui.save_game_triangles"],
+    web: ["ui.save_web_quads", "ui.save_web_triangles"] };
+  for (const [k, id] of Object.entries(EXPORTS)) {
+    const p = r.profiles?.[k];
+    $("exp" + id).classList.toggle("hidden", !r[`export_${k}`]);
+    if (p) $("exp" + id).textContent = tr(saveKeys[k][p.quads ? 0 : 1], { count: num(p.faces) });
+  }
   $("expZip").classList.toggle("hidden", !r.texture);
   $("slicerHint").textContent = tools?.orcaslicer === false
-    ? `Enregistre le fichier STL, puis ouvre-le dans ton logiciel de découpe avec l'imprimante « Creality Ender-3 V3 »${supports ? " et les supports activés" : ""}.`
-    : `OrcaSlicer s'ouvre avec ce modèle. Vérifie que l'imprimante choisie est « Creality Ender-3 V3 »${supports ? ", coche « Activer les supports »" : ""}, puis clique « Découper le plateau ».`;
+    ? tr(supports ? "ui.slicer_hint_stl_supports" : "ui.slicer_hint_stl")
+    : tr(supports ? "ui.slicer_hint_orca_supports" : "ui.slicer_hint_orca");
   const pv = $("previews");
   pv.replaceChildren(...(r.previews || []).map((p) => { const img = document.createElement("img"); img.alt = ""; img.src = fileUrl(p, r.version); return img; }));
   if (shownVersion !== `${viewLevel}:${r.version}`) {
@@ -1030,13 +1128,13 @@ function renderAdjust(j) {
     $("aHeight").value = Math.round(s.height_mm);
     $("aBase").value = s.base_cut;
     $("aFaces").value = s.faces;
-    $("aFacesVal").textContent = s.faces;
-    $("aFaces").setAttribute("aria-valuetext", `${s.faces} triangles`);
+    syncRange("aFaces");
     aSmoothSeg.set(String(s.smooth || 0));
     $("aFilaments").value = String(s.filaments || 4);
     $("a3mf").checked = s.color_3mf !== false;
     $("aObj").checked = s.color_obj !== false;
     $("aTex").checked = s.color_texture !== false;
+    for (const [k, id] of Object.entries(EXPORTS)) $("a" + id).checked = !!s[`export_${k}`];
     syncFilaments("a");
   }
   aModeSeg.set(adjustMode || j.mode);
@@ -1052,11 +1150,11 @@ function renderAdjust(j) {
       t.title = p.name;
       t.dataset.focus = "st-" + p.name;
       t.setAttribute("aria-pressed", p.name === j.main_photo);
-      t.setAttribute("aria-label", `${p.name}, photo principale`);
+      t.setAttribute("aria-label", tr("ui.thumb_label", { name: p.name }));
       t.disabled = busy(current);
       const img = document.createElement("img"); img.alt = ""; img.src = fileUrl("thumbs/" + p.thumb, 1);
       t.appendChild(img);
-      if (p.name === j.main_photo) { const s2 = document.createElement("span"); s2.textContent = "principale"; t.appendChild(s2); }
+      if (p.name === j.main_photo) { const s2 = document.createElement("span"); s2.textContent = tr("ui.main_badge"); t.appendChild(s2); }
       t.onclick = () => { if (!busy(current)) runLevel(viewLevel || "lowpoly", {}, { main_photo: p.name }); };
       box.appendChild(t);
     });
@@ -1095,9 +1193,9 @@ document.querySelectorAll("#rotateBar button[data-rot]").forEach((b) => (b.oncli
 function updateRotConfirm() {
   const n = pendingRot.length;
   $("rotConfirm").classList.toggle("hidden", !n);
-  $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour, pas encore recalculé. Recalcule ou annule pour pouvoir imprimer.` : "";
+  $("rotMsg").textContent = n ? tr("ui.rot_preview", { n }) : "";
   // never export a file that differs from what the preview shows
-  ["orca", "expStl", "expBlend", "orcaColor", "orcaObj", "exp3mf", "expObj", "expZip"].forEach((id) => ($(id).disabled = n > 0));
+  ["orca", "expStl", "expBlend", "orcaColor", "orcaObj", "exp3mf", "expObj", "expZip", "expSoftware", "expGame", "expWeb"].forEach((id) => ($(id).disabled = n > 0));
 }
 $("rotApply").onclick = async () => {
   if (!current || !pendingRot || runPending) return;
@@ -1115,11 +1213,11 @@ $("rotReset").onclick = () => { pendingRot = ""; updateRotConfirm(); if (current
 $("apply").onclick = () => {
   if (!current) return;
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
-  if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
-  if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
+  if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "ui.height_error")) return;
+  if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "ui.base_error")) return;
   runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get(),
     filaments: +$("aFilaments").value, color_3mf: $("a3mf").checked, color_obj: $("aObj").checked,
-    color_texture: $("aTex").checked },
+    color_texture: $("aTex").checked, ...exportChoice("a") },
     adjustMode ? { mode: adjustMode } : {})
     .then((ok) => { if (ok) adjustDirty = false; });
 };
@@ -1128,6 +1226,7 @@ $("apply").onclick = () => {
 function syncFilaments(pre) {
   $(pre === "a" ? "aFilaments" : "filaments").disabled = !$(pre + "3mf").checked && !$(pre + "Obj").checked;
 }
+Object.values(EXPORTS).forEach((id) => $("a" + id).addEventListener("change", () => (adjustDirty = true)));
 ["c", "a"].forEach((pre) => ["3mf", "Obj", "Tex"].forEach((k) => $(pre + k).addEventListener("change", () => {
   if (pre === "a") adjustDirty = true;
   syncFilaments(pre);
@@ -1136,8 +1235,7 @@ async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
     const r = await post(`/api/jobs/${encodeURIComponent(current.id)}/export`, { level: viewLevel, kind });
-    showNotice(kind === "obj" ? `OBJ et MTL enregistrés côte à côte dans Téléchargements : ${r.path}`
-      : `Fichier enregistré dans Téléchargements : ${r.path}`);
+    showNotice(() => tr(kind === "obj" ? "ui.saved_obj" : "ui.saved_file", { path: r.path }));
   } catch (e) { showError(e.message); }
 }
 $("expStl").onclick = () => exportFile("stl");
@@ -1145,6 +1243,7 @@ $("expBlend").onclick = () => exportFile("blend");
 $("exp3mf").onclick = () => exportFile("3mf");
 $("expZip").onclick = () => exportFile("zip");
 $("expObj").onclick = () => exportFile("obj");
+for (const [k, id] of Object.entries(EXPORTS)) $("exp" + id).onclick = () => exportFile(k);
 ["3mf", "obj"].forEach((kind) => ($(kind === "3mf" ? "orcaColor" : "orcaObj").onclick = () => current
   && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel, kind }).catch((e) => showError(e.message))));
 $("orca").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel }).catch((e) => showError(e.message));
@@ -1174,7 +1273,7 @@ async function createViewer() {
   const canvas = renderer.domElement;
   canvas.tabIndex = 0;
   canvas.setAttribute("role", "img");
-  canvas.setAttribute("aria-label", "Aperçu 3D du modèle. Les flèches du clavier déplacent la vue ; les boutons Face, Profil et Dessus la tournent.");
+  setTrAttr(canvas, "aria-label", "ui.viewer_label");
   box.prepend(canvas);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 4 / 3, 1, 5000);
@@ -1264,7 +1363,7 @@ document.querySelectorAll("#viewer [data-view]").forEach((b) => (b.onclick = () 
 function setMaximized(on) {
   document.body.classList.toggle("maxi", on);
   $("maxView").setAttribute("aria-pressed", on);
-  $("maxView").textContent = on ? "Réduire" : "Agrandir";
+  setTr($("maxView"), on ? "ui.minimize" : "ui.maximize");
 }
 $("maxView").onclick = () => setMaximized(!document.body.classList.contains("maxi"));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("maxi")) setMaximized(false); });
@@ -1300,8 +1399,7 @@ function dropModel() {
 function updateRenderButtons() {
   const has = !!viewer?.colorsUrl;
   $("viewRender").disabled = !has;
-  $("viewRender").title = has ? "Couleurs des photos posées sur le modèle (aperçu seulement : l'impression reste d'une couleur)"
-    : "Pas de couleurs pour ce modèle : le Journal technique dit pourquoi. Un modèle Windows calculé avant la version 0.2.0 les obtient avec « Recalculer avec ces réglages ».";
+  setTrAttr($("viewRender"), "title", has ? "ui.render_title" : "ui.render_title_none");
   $("viewSolid").setAttribute("aria-pressed", renderMode !== "render" || !has);
   $("viewRender").setAttribute("aria-pressed", renderMode === "render" && has);
 }
@@ -1338,7 +1436,7 @@ async function loadColors() {
     // only this model falls back to Solide: the next one opens in Rendu again
     if (seq === loadSeq) {
       if (v.colorsUrl === url) v.colorsUrl = null;
-      showError("Les couleurs de ce modèle n'ont pas pu être chargées ; l'aperçu reste en mode Solide.");
+      showError(() => tr("ui.colors_error"));
     }
   } finally {
     if (v.colorsLoad === job) v.colorsLoad = null;
@@ -1363,7 +1461,7 @@ async function showModel(url, flat, colorsUrl = null) {
   if (viewer) { dropColors(viewer); viewer.colorsUrl = null; }
   if (viewer?.mesh) { viewer.mesh.visible = false; viewer.requestRender(); }
   pendingRot = ""; updateRotConfirm();
-  $("viewerEmpty").textContent = "Chargement du modèle…";
+  setTr($("viewerEmpty"), "ui.loading_model");
   $("viewerEmpty").classList.remove("hidden");
   try {
     const v = await initViewer();
@@ -1391,14 +1489,15 @@ async function showModel(url, flat, colorsUrl = null) {
     dropModel();
     const missing = /404/.test(String(e?.message || e));
     const views = $("previews").children.length;
-    $("viewerEmpty").textContent = missing ? "Fichier du modèle introuvable : recalcule ce niveau."
-      : views ? "L'aperçu 3D n'est pas disponible sur cet ordinateur. Voici quatre vues du modèle."
-      : `L'aperçu 3D n'est pas disponible sur cet ordinateur. Le modèle est prêt : ${tools?.orcaslicer === false ? "enregistre le fichier STL" : "tu peux l'ouvrir dans OrcaSlicer"}.`;
+    setTr($("viewerEmpty"), missing ? "ui.model_missing" : views ? "ui.no_webgl_views"
+      : tools?.orcaslicer === false ? "ui.no_webgl_stl" : "ui.no_webgl_orca");
     $("viewerEmpty").classList.remove("hidden");
     $("previews").classList.toggle("hidden", missing || !views);
   }
 }
 
+await initLanguage();
+refreshTexts();
 loadStatus();
 loadHistory();
 </script>

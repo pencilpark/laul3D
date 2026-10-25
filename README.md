@@ -6,9 +6,9 @@ Application de bureau pour Mac et Windows : on glisse des photos et on récupèr
 
 Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt), où GitHub remplace l'espace du nom par un point (`Berria.Craft_…`).
 
-Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.4.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.5.0_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
 
-Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.4.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
+Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.5.0_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
 Au premier lancement, l'app prépare son environnement de calcul (une minute au plus), puis propose dans une fenêtre les outils qui manquent : Blender (obligatoire), OrcaSlicer, et sous Windows la photogrammétrie COLMAP + OpenMVS. Le module « Une photo (IA) » s'installe à part, depuis l'en-tête. Sous Windows, COLMAP, OpenMVS et l'IA demandent les composants Microsoft Visual C++ : Windows demande alors une autorisation.
 
@@ -53,6 +53,7 @@ Rendu : la visionneuse s'ouvre en mode Rendu quand le modèle a des couleurs, ce
 6. Contrôles : arêtes non-manifold, auto-intersections, coques, parois plus fines que 2 × la buse, surplombs à plus de 45°, volume.
 7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu, et, selon les cases cochées, en 3MF peint, OBJ en couleurs et OBJ texturé (voir « Imprimer en couleur »).
 8. Export STL en mm, vérifié en relisant le nombre de triangles écrit, plus un `.blend` et 4 aperçus PNG.
+9. Si des exports 3D hors impression sont cochés, un second Blender refait l'import, l'étanchéité, le tri des coques et le lissage, sans la décimation ni le socle, et produit les profils (voir « Exports 3D hors impression ») : un profil qui échoue ne touche pas aux fichiers d'impression.
 
 ## Bien photographier
 
@@ -77,12 +78,30 @@ Pour les deux premiers, les couleurs des photos sont regroupées en 4 teintes pa
 
 Les couleurs viennent des photos, ombres et reflets compris.
 
+## Exports 3D hors impression
+
+Trois cases dans Réglages avancés, et dans « Recalculer avec ces réglages », produisent le modèle nettoyé pour d'autres usages que l'impression. Elles sont décochées par défaut : sans elles, le calcul reste celui d'avant. Chaque profil donne un zip, à la taille réelle en mètres (tirée de la hauteur saisie), base centrée sur l'origine, Y vers le haut dans les GLB et FBX.
+
+- Logiciels 3D (Blender, sculpture, animation) : 20 000 quads environ par QuadriFlow, le remailleur de Blender, textures 4096, fichiers `.blend` (textures à côté, chemins relatifs), FBX et OBJ. Si QuadriFlow refuse le modèle, le profil sort en triangles et le journal le dit. Pour animer un personnage, une retopologie à la main reste utile : QuadriFlow aligne les quads sur la forme, sans tenir compte des articulations.
+- Jeux (Unity, Unreal, Godot) : 50 000 triangles et deux niveaux de détail à 50 et 25 %, en GLB et en FBX, couleur en JPEG et normal map en PNG, 2048 px.
+- Web (three.js, model-viewer) : un GLB de 50 000 triangles, textures JPEG 2048, environ 1,7 Mo sur le scan de test. Une version compressée Draco s'y ajoute quand le Blender installé contient la bibliothèque Draco, ce qui est le cas du Blender 5.2.3 officiel (vérifié dans la CI Windows) ; le fichier est contrôlé, car l'export de Blender réussit sans elle mais n'écrit alors rien de compressé.
+
+Pour chaque profil : morceaux détachés retirés, surface fermée et lissée comme pour l'impression, puis réduction, dépliage UV (Smart UV Project), couleurs des photos cuites dans une texture et relief du modèle lissé dans une normal map. Sans couleurs exploitables, seule la normal map est livrée. Durées mesurées sur un petit scan de test, processeur à 4 cœurs : 15 s environ pour Web ou Jeux, une minute environ pour Logiciels 3D ; davantage sur un scan détaillé. Ces fichiers portent des noms en anglais (`_software`, `_game`, `_web`).
+
+## Langues
+
+L'app existe en anglais (langue par défaut), français, espagnol, allemand, portugais du Brésil, chinois simplifié et japonais. Au premier lancement, elle prend la langue de l'interface du système, lue par le moteur Python (sous Windows, le navigateur intégré ne la donne pas de façon fiable) ; une langue absente de la liste donne l'anglais, le chinois traditionnel aussi. Le menu en haut à droite change de langue ; le choix est gardé dans `data/prefs.json`. L'installeur Windows s'affiche dans la langue du système parmi les sept.
+
+Les textes sont dans `app/static/i18n/<langue>.json`, partagés par l'interface (`tr()`) et par le moteur (`engine/i18n.py`, clés `srv.`). La page de démarrage en garde une copie : après une modification des clés `splash.`, lancer `python desktop/splash_strings.py`. `tests/i18n_test.py` vérifie que les sept fichiers ont les mêmes clés et les mêmes variables, et que le code n'utilise que des clés existantes. Les messages déjà enregistrés dans un projet (étapes, erreurs, journal) restent dans la langue où ils ont été écrits.
+
+Les fichiers produits ont des noms anglais pour tout le monde depuis la 0.5.0 (`_colors.glb`, `_colors_orca.obj`, `_colors_texture.zip`, vues `_front`, `_right`, `_back`, `_three_quarter`) ; ceux des projets déjà calculés gardent leur nom.
+
 ## Dossiers de l'app installée
 
 Données dans `~/Library/Application Support/com.pencilpark.berriacraft` (Mac) ou `%LOCALAPPDATA%\com.pencilpark.berriacraft` (Windows) :
 - `runtime`, `venv` : Python privé de l'app et ses bibliothèques ;
 - `data/tools` : Blender, COLMAP, OpenMVS, OrcaSlicer (Windows) installés par l'app ; `data/models` : modèles du module IA ;
-- `Projets/<date>-<nom>` : photos reçues, reconstructions en cache, exports par niveau ;
+- `Projects/<date>-<nom>` : photos reçues, reconstructions en cache, exports par niveau (le dossier `Projets` des versions précédentes est renommé au premier lancement de la 0.5.0) ;
 - `logs/serveur.log` : journal du moteur.
 
 Les STL enregistrés vont dans Téléchargements. Un projet se supprime depuis la liste des projets (corbeille, avec confirmation) : son dossier est effacé, sauf pendant un calcul ; les fichiers déjà enregistrés dans Téléchargements restent.
@@ -103,6 +122,8 @@ Mode développeur, dans un navigateur : `start.command`, puis http://127.0.0.1:8
 B=/Applications/Blender.app/Contents/MacOS/Blender
 $B -b --factory-startup --python-exit-code 1 -P engine/blender_lowpoly.py -- \
   --input scan.usdz --outdir sortie --name buste --level lowpoly --height-mm 80 --previews --colors --smooth 1
+# mêmes options et --profiles-only software,game,web : les profils d'export seuls
+.venv/bin/python engine/cli.py photos/ --niveau medium --exports game,web
 .venv/bin/python engine/triposr_infer.py photo.jpg sortie/brut.obj
 ```
 

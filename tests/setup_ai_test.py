@@ -15,6 +15,7 @@ REAL = "--real" in sys.argv
 if not REAL:
     os.environ["LOWPOLY_DATA"] = tempfile.mkdtemp(prefix="lowpoly3d-ai-data-")
 sys.path.insert(0, os.path.join(ROOT, "engine"))
+import i18n  # noqa: E402
 import pipeline as pl  # noqa: E402
 import setup_ai  # noqa: E402
 
@@ -67,14 +68,16 @@ def run_libraries(output, code=0, backend=None):
 
 
 def check_unsupported():
-    cases = [("darwin", "arm64", "26.2", None), ("darwin", "arm64", "14.0", None), ("darwin", "arm64", "13.6.1", "macOS 14"),
-             ("darwin", "x86_64", "14.5", "puce Apple"), ("win32", "AMD64", "", None), ("win32", "ARM64", "", "64 bits")]
+    cases = [("darwin", "arm64", "26.2", None), ("darwin", "arm64", "14.0", None),
+             ("darwin", "arm64", "13.6.1", i18n.tr("srv.ai_setup_needs_macos14", version="13.6.1")),
+             ("darwin", "x86_64", "14.5", i18n.tr("srv.ai_setup_needs_apple_silicon")), ("win32", "AMD64", "", None),
+             ("win32", "ARM64", "", i18n.tr("srv.ai_setup_needs_win64"))]
     for plat, machine, version, expect in cases:
         with mock.patch.object(pl, "IS_MAC", plat == "darwin"), mock.patch.object(pl, "IS_WIN", plat == "win32"), \
                 mock.patch("platform.machine", return_value=machine), \
                 mock.patch("platform.mac_ver", return_value=(version, ("", "", ""), "")):
             got = setup_ai.unsupported()
-        assert (got is None) if expect is None else expect in (got or ""), (plat, machine, version, got)
+        assert got == expect, (plat, machine, version, got)
 
 
 def check_backend():
@@ -113,7 +116,7 @@ def check_progress():
         run_libraries(UV_OFFLINE, code=2)
         raise AssertionError("an offline install must fail")
     except RuntimeError as e:
-        assert str(e) == setup_ai.NET_ERROR, e
+        assert str(e) == i18n.tr("srv.setup_net_error"), e
 
 
 def check_verify():
@@ -124,7 +127,8 @@ def check_verify():
             setup_ai._verify()
             raise AssertionError("a library that cannot load must stop the install")
         except RuntimeError as e:
-            assert "ne démarre pas" in str(e) and "fbgemm.dll" in str(e), e
+            detail = "OSError: [WinError 126] Le module spécifié est introuvable : fbgemm.dll"
+            assert str(e) == i18n.tr("srv.ai_setup_start_failed", detail=detail), e
 
 
 def check_not_ready_while_installing():
@@ -144,7 +148,9 @@ def check_disk_space():
             mock.patch.object(setup_ai, "unsupported", return_value=None), \
             mock.patch.object(setup_ai, "_libraries", side_effect=AssertionError("started without disk space")):
         setup_ai._install()
-    assert setup_ai.STATE["status"] == "error" and "espace libre" in setup_ai.STATE["error"], setup_ai.STATE
+    need = f"{(setup_ai.MODELS_BYTES + 3 * setup_ai.libs_bytes()) / 1e9:.0f}"
+    expected = i18n.tr("srv.setup_disk_space", gb=need)
+    assert setup_ai.STATE["status"] == "error" and setup_ai.STATE["error"] == expected, setup_ai.STATE
 
 
 def check_cache_fallback():
