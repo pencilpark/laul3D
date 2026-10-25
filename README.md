@@ -81,7 +81,7 @@ Mac : `desktop/build_mac.sh` (Rust, Node et uv requis). Il rassemble Python 3.11
 
 Windows : la CI `windows-installer` construit l'installeur à chaque envoi sur GitHub, l'installe en silence, vérifie le démarrage et l'arrêt du moteur et la fenêtre, puis le publie comme artefact `berria-craft-windows`. Sur une machine Windows : `desktop\build_windows.ps1`.
 
-Publier une version : monter la version dans `desktop/src-tauri/tauri.conf.json` et `Cargo.toml`, écrire `desktop/release-notes.md`, puis envoyer une étiquette `vX.Y.Z`. La CI `windows-installer` crée la release GitHub du même nom avec l'installeur testé. Le DMG, construit sur un Mac avec `desktop/build_mac.sh`, s'ajoute ensuite à cette release (`gh release upload vX.Y.Z "desktop/src-tauri/target/release/bundle/dmg/Berria Craft_X.Y.Z_aarch64.dmg"`).
+Publier une version : monter la version dans `desktop/src-tauri/tauri.conf.json` et `Cargo.toml`, écrire `desktop/release-notes.md`, puis lancer à la main la CI `windows-installer` sur `dev` (Actions, windows-installer, Run workflow, case « release » cochée) ou envoyer une étiquette `vX.Y.Z`. La CI crée la release GitHub `vX.Y.Z` avec l'installeur testé, et l'étiquette si elle manque. Le DMG, construit sur un Mac avec `desktop/build_mac.sh`, s'ajoute ensuite à cette release (`gh release upload vX.Y.Z "desktop/src-tauri/target/release/bundle/dmg/Berria Craft_X.Y.Z_aarch64.dmg"`).
 
 Mode développeur, dans un navigateur : `start.command`, puis http://127.0.0.1:8642.
 
