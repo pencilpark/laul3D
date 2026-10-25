@@ -109,6 +109,9 @@ dialog.modal .tips { color: var(--ink); }
 .checks li::before { content: ""; flex: none; width: 7px; height: 7px; margin-top: 7px; background: var(--ok); }
 .checks li.warn::before { background: var(--warn); }
 .checks li.bad::before { background: var(--bad); }
+.palette { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; font-size: 13px; color: var(--muted); }
+.swatch { display: flex; align-items: center; gap: 6px; }
+.swatch i { flex: none; width: 18px; height: 18px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
 .photo-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
 .linkbtn { padding: 4px 0; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 14px; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; cursor: pointer; }
 .linkbtn:hover { color: #fff; }
@@ -303,6 +306,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
           <div class="labrow"><label for="base">Socle plat : <span id="baseVal">3</span> % de la hauteur</label><button type="button" class="tip" aria-label="Aide : socle plat" aria-describedby="tipBase">?</button><span class="tip-text" role="tooltip" id="tipBase">Coupe le bas du modèle à plat pour qu'il tienne debout sur le plateau. 3 % convient à un buste ; 0 garde le modèle entier.</span></div>
           <input id="base" type="range" min="0" max="15" step="1" value="3" aria-valuetext="3 %">
         </div>
+        <div class="field">
+          <div class="labrow"><label for="filaments">Filaments pour l'impression en couleur</label><button type="button" class="tip" aria-label="Aide : filaments" aria-describedby="tipFil">?</button><span class="tip-text" role="tooltip" id="tipFil">Nombre de couleurs du fichier 3MF multi-filaments, une par bobine de ton imprimante. Les couleurs des photos sont regroupées en autant de teintes, ou moins si l'objet en a moins.</span></div>
+          <select id="filaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
+        </div>
         <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> Garder les pièces détachées</label><button type="button" class="tip" aria-label="Aide : pièces détachées" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
       </details>
       <div style="margin-top:16px"><button class="primary" id="go" disabled>Créer le modèle 3D</button></div>
@@ -367,6 +374,15 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         <button class="ghost" id="expBlend">Enregistrer pour Blender</button>
         <button class="ghost" id="finder">Afficher dans le Finder</button>
       </div>
+      <div class="hidden" id="colorBox">
+        <div class="labrow" style="margin-top:14px"><span class="lab">Impression en couleur</span><button type="button" class="tip" aria-label="Aide : impression en couleur" aria-describedby="tipColor">?</button><span class="tip-text" role="tooltip" id="tipColor">3MF multi-filaments : chaque face reçoit l'un des filaments ci-dessous, pour une imprimante à plusieurs bobines ; l'Ender-3 V3 seule n'en a qu'une. Le fichier donne à chaque face un numéro de filament, pas une couleur : dans OrcaSlicer, règle d'abord autant de filaments que la palette, dans cet ordre et à ces couleurs, puis ouvre-le. Fichier > Importer ajoute les filaments manquants, couleurs à corriger. OBJ texturé : toutes les couleurs des photos, pour un service d'impression en couleur (Sculpteo, i.materialise…). Les couleurs viennent des photos, ombres comprises.</span></div>
+        <div class="palette" id="palette" role="list" aria-label="Couleurs des filaments"></div>
+        <div class="actions">
+          <button class="ghost" id="orcaColor">Ouvrir en couleur dans OrcaSlicer</button>
+          <button class="ghost" id="exp3mf">Enregistrer le 3MF multi-filaments</button>
+          <button class="ghost" id="expZip">Enregistrer l'OBJ texturé (service couleur)</button>
+        </div>
+      </div>
       <details class="tech"><summary>Détails techniques</summary><table id="report"></table></details>
     </div>
 
@@ -388,6 +404,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         </div>
       </div>
       <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
+      <div class="field"><label for="aFilaments">Filaments pour l'impression en couleur</label><select id="aFilaments"><option value="2">2</option><option value="3">3</option><option value="4" selected>4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
       <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
       <div style="margin-top:14px" class="actions"><button class="ghost" id="apply">Recalculer avec ces réglages</button></div>
       <details style="margin-top:14px"><summary>Journal technique</summary><pre id="log"></pre></details>
@@ -714,7 +731,8 @@ $("go").onclick = async () => {
   fd.append("name", $("name").value || "modele");
   fd.append("mode", modeSeg.get());
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
-    nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), rot_seq: "" }));
+    nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), filaments: +$("filaments").value,
+    rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -868,6 +886,7 @@ function staleReasons(j, level) {
   if (!!a.keep_parts !== !!b.keep_parts) out.push("pièces détachées");
   if ((a.smooth || 0) !== (b.smooth || 0)) out.push("lissage");
   if (level === "lowpoly" && a.faces !== b.faces) out.push("facettes");
+  if (r.filaments && (a.filaments || 4) !== (b.filaments || 4)) out.push("filaments");
   if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("photo principale");
   if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("méthode");
   return out;
@@ -974,6 +993,12 @@ function renderResult(j) {
     ["Lissage", SMOOTH_NAMES[r.settings?.smooth || 0]],
   ];
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+  $("colorBox").classList.toggle("hidden", !r.filaments && !r.texture);
+  const hex = (c) => "#" + c.map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();
+  $("palette").innerHTML = (r.palette || []).map((c, i) => `<span class="swatch" role="listitem"><i style="background:${hex(c)}"></i>Filament ${i + 1} · ${hex(c)}</span>`).join("");
+  $("orcaColor").classList.toggle("hidden", !r.filaments || tools?.orcaslicer === false);
+  $("exp3mf").classList.toggle("hidden", !r.filaments);
+  $("expZip").classList.toggle("hidden", !r.texture);
   $("slicerHint").textContent = tools?.orcaslicer === false
     ? `Enregistre le fichier STL, puis ouvre-le dans ton logiciel de découpe avec l'imprimante « Creality Ender-3 V3 »${supports ? " et les supports activés" : ""}.`
     : `OrcaSlicer s'ouvre avec ce modèle. Vérifie que l'imprimante choisie est « Creality Ender-3 V3 »${supports ? ", coche « Activer les supports »" : ""}, puis clique « Découper le plateau ».`;
@@ -996,6 +1021,7 @@ function renderAdjust(j) {
     $("aFacesVal").textContent = s.faces;
     $("aFaces").setAttribute("aria-valuetext", `${s.faces} triangles`);
     aSmoothSeg.set(String(s.smooth || 0));
+    $("aFilaments").value = String(s.filaments || 4);
   }
   aModeSeg.set(adjustMode || j.mode);
   const ia = j.engine === "ia";
@@ -1055,7 +1081,7 @@ function updateRotConfirm() {
   $("rotConfirm").classList.toggle("hidden", !n);
   $("rotMsg").textContent = n ? `Aperçu : ${plural(n, "quart")} de tour, pas encore recalculé. Recalcule ou annule pour pouvoir imprimer.` : "";
   // never export a file that differs from what the preview shows
-  ["orca", "expStl", "expBlend"].forEach((id) => ($(id).disabled = n > 0));
+  ["orca", "expStl", "expBlend", "orcaColor", "exp3mf", "expZip"].forEach((id) => ($(id).disabled = n > 0));
 }
 $("rotApply").onclick = async () => {
   if (!current || !pendingRot || runPending) return;
@@ -1075,11 +1101,12 @@ $("apply").onclick = () => {
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
   if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "Entre 10 et 245 mm (plateau de 250 mm).")) return;
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "Entre 0 et 20 %.")) return;
-  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get() },
+  runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get(),
+    filaments: +$("aFilaments").value },
     adjustMode ? { mode: adjustMode } : {})
     .then((ok) => { if (ok) adjustDirty = false; });
 };
-["aHeight", "aBase", "aFaces"].forEach((id) => $(id).addEventListener("input", () => (adjustDirty = true)));
+["aHeight", "aBase", "aFaces", "aFilaments"].forEach((id) => $(id).addEventListener("input", () => (adjustDirty = true)));
 async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
@@ -1089,6 +1116,10 @@ async function exportFile(kind) {
 }
 $("expStl").onclick = () => exportFile("stl");
 $("expBlend").onclick = () => exportFile("blend");
+$("exp3mf").onclick = () => exportFile("3mf");
+$("expZip").onclick = () => exportFile("zip");
+$("orcaColor").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel, kind: "3mf" })
+  .catch((e) => showError(e.message));
 $("orca").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/orca`, { level: viewLevel }).catch((e) => showError(e.message));
 $("finder").onclick = () => current && post(`/api/jobs/${encodeURIComponent(current.id)}/reveal`, { level: viewLevel }).catch((e) => showError(e.message));
 
