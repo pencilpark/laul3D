@@ -1,8 +1,10 @@
 """End-to-end smoke test: headless CLI on synthetic photos, inside a folder with accents and spaces.
 
-python tests/smoke_test.py [--photogrammetry] [--ia] [--out results.json]
+python tests/smoke_test.py [--photogrammetry] [--ia] [--max] [--out results.json]
 Photos: tests/fixtures/suzanne_48, a Suzanne with colored cells (Blender renders, regenerate with
 tests/fixtures/render_views.py -- OUT --couleurs). The photogrammetry run must give a colored preview.
+--max: photo resolution Max on every other photo, the scan at the photos' full 1600 px, textures of 8192 or what the
+free memory allowed (the log says why).
 """
 import argparse
 import json
@@ -100,14 +102,39 @@ def check_export_files(summary):
     print(f"profils d'export : {summary['profiles']}, Draco {'oui' if summary['draco'] else 'non'}", flush=True)
 
 
+def png_width(z, suffix):
+    data = z.read(next(n for n in z.namelist() if n.endswith(suffix)))
+    return struct.unpack(">I", data[16:20])[0]
+
+
+def check_max(summary, out):
+    with open(os.path.join(out, "cli.log"), encoding="utf-8") as f:
+        log = f.read()
+    folder = os.path.join(out, "work", "scan_max")
+    meta = next(n for n in os.listdir(folder) if n.endswith(".orient.json"))
+    with open(os.path.join(folder, meta), encoding="utf-8") as f:
+        px = json.load(f)["px"]
+    assert px == 1600, (px, log[-3000:])  # High would have worked at 800 px on these photos
+    with zipfile.ZipFile(summary["texture"]) as z:
+        sizes = {"texture": png_width(z, ".png")}
+    with zipfile.ZipFile(summary["export_software"]) as z:
+        sizes["software"] = png_width(z, "_normal.png")
+    for kind, size in sizes.items():
+        # 8192 unless the free memory refused it, which the log states with both sizes
+        assert size == 8192 or (size in (6144, 4096) and re.search(rf"\b{size}\b.*\b8192\b", log)), (kind, size)
+    summary["max"] = {"px": px, **sizes}
+    print(f"Max : scan à {px} px, textures {sizes}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--photogrammetry", action="store_true")
     ap.add_argument("--ia", action="store_true")
+    ap.add_argument("--max", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument("--root", default=None, help="parent folder to keep outputs (CI artifacts)")
     a = ap.parse_args()
-    if not (a.photogrammetry or a.ia):
+    if not (a.photogrammetry or a.ia or a.max):
         a.photogrammetry = a.ia = True
 
     # Windows refuses trailing spaces in names, so the tricky part is the leading space and the accents.
@@ -126,6 +153,16 @@ def main():
         assert pg["colors_stats"]["black"] < 0.3 and pg["colors_stats"]["saturation"] > 0.06, pg["colors_stats"]
         check_color_files(pg)
         check_export_files(pg)
+    if a.max:
+        photos = os.path.join(base, "photos max")
+        os.makedirs(photos)
+        for name in sorted(os.listdir(FIXTURES))[::2]:
+            shutil.copy(os.path.join(FIXTURES, name), photos)
+        out = os.path.join(base, "sortie max")
+        results["max"] = run_cli(photos, out, ["--niveau", "medium", "--resolution", "max", "--moteur", "photogrammetry",
+                                               "--hauteur", "60", "--exports", "software"])
+        assert results["max"].get("colors"), "Max sans aperçu en couleurs"
+        check_max(results["max"], out)
     if a.ia:
         photo = os.path.join(base, "photo unique")
         os.makedirs(photo)
