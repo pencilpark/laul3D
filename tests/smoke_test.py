@@ -79,10 +79,11 @@ def check_color_files(summary):
     assert sorted(os.path.splitext(n)[1] for n in names) == [".mtl", ".obj", ".png"] and not any("/" in n for n in names), names
 
 
-def check_export_files(summary):
-    """The three profiles outside printing: one zip each, real size in meters with Y up in the GLB."""
-    expected = {"software": {".blend", ".fbx", ".obj", ".mtl", ".png"}, "game": {".glb", ".fbx", ".jpg", ".png"},
-                "web": {".glb"}}
+def check_export_files(summary, height_m):
+    """The three profiles outside printing: one zip each with its README, at the real height asked, in meters with Y
+    up and tangents in the GLB."""
+    expected = {"software": {".blend", ".fbx", ".obj", ".mtl", ".png", ".txt"},
+                "game": {".glb", ".fbx", ".jpg", ".png", ".txt"}, "web": {".glb", ".txt"}}
     for p, exts in expected.items():
         assert summary.get("export_" + p), (p, summary.get("profiles"))
         with zipfile.ZipFile(summary["export_" + p]) as z:
@@ -92,14 +93,19 @@ def check_export_files(summary):
             if glb:
                 data = z.read(glb)
                 doc = json.loads(data[20:20 + int.from_bytes(data[12:16], "little")])
-                top = doc["accessors"][doc["meshes"][0]["primitives"][0]["attributes"]["POSITION"]]["max"][1]
-                assert abs(top - 0.06) < 0.003, (p, top)  # 60 mm tall, Y up, in meters
-    assert sum(n.endswith("_LOD1.glb") or n.endswith("_LOD2.glb")
-               for n in zipfile.ZipFile(summary["export_game"]).namelist()) == 2
+                attributes = doc["meshes"][0]["primitives"][0]["attributes"]
+                top = doc["accessors"][attributes["POSITION"]]["max"][1]
+                assert abs(top - height_m) < 0.05 * height_m, (p, top)
+                assert "TANGENT" in attributes, (p, attributes)
+    game = zipfile.ZipFile(summary["export_game"]).namelist()
+    assert sum(n.endswith(("_LOD1.glb", "_LOD2.glb")) for n in game) == 2 and any(n.endswith("_normal_dx.png") for n in game)
     assert summary["profiles"]["software"]["quads"], summary["profiles"]
     # Draco depends on the library shipped with Blender: reported, not required
-    summary["draco"] = any(n.endswith("_draco.glb") for n in zipfile.ZipFile(summary["export_web"]).namelist())
-    print(f"profils d'export : {summary['profiles']}, Draco {'oui' if summary['draco'] else 'non'}", flush=True)
+    web = zipfile.ZipFile(summary["export_web"]).namelist()
+    summary["draco"] = any(n.endswith("_draco.glb") for n in web)
+    summary["meshopt"] = any(n.endswith("_meshopt.glb") for n in web)
+    print(f"profils d'export : {summary['profiles']}, Draco {'oui' if summary['draco'] else 'non'}, "
+          f"meshopt {'oui' if summary['meshopt'] else 'non'}", flush=True)
 
 
 def png_width(z, suffix):
@@ -120,8 +126,9 @@ def check_max(summary, out):
     with zipfile.ZipFile(summary["export_software"]) as z:
         sizes["software"] = png_width(z, "_normal.png")
     for kind, size in sizes.items():
-        # 8192 unless the free memory refused it, which the log states with both sizes
-        assert size == 8192 or (size in (6144, 4096) and re.search(rf"\b{size}\b.*\b8192\b", log)), (kind, size)
+        # 8192 unless the free memory refused it, which the log states with both sizes; a runner with about 5 GB free
+        # gets 4096 or 2048
+        assert size == 8192 or (size in (6144, 4096, 2048, 1024) and re.search(rf"\b{size}\b.*\b8192\b", log)), (kind, size)
     summary["max"] = {"px": px, **sizes}
     print(f"Max : scan à {px} px, textures {sizes}", flush=True)
 
@@ -146,13 +153,13 @@ def main():
         shutil.copytree(FIXTURES, photos)
         pg = run_cli(photos, os.path.join(base, "sortie pg"),
                      ["--niveau", "lowpoly", "--moteur", "photogrammetry", "--facettes", "500", "--hauteur", "60",
-                      "--exports", "software,game,web"])
+                      "--exports", "software,game,web", "--hauteur-reelle", "30"])
         results["photogrammetry"] = pg
         # black: OpenMVS 2.4.0 seam leveling; grey: faces without photos. The fixture's cells average to about 0.12
         assert pg.get("colors"), "photogrammétrie sans aperçu en couleurs"
         assert pg["colors_stats"]["black"] < 0.3 and pg["colors_stats"]["saturation"] > 0.06, pg["colors_stats"]
         check_color_files(pg)
-        check_export_files(pg)
+        check_export_files(pg, 0.30)
     if a.max:
         photos = os.path.join(base, "photos max")
         os.makedirs(photos)

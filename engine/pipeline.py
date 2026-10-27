@@ -17,11 +17,14 @@ from PIL import Image, ImageOps
 
 import i18n
 
-try:
-    import pillow_heif
-    pillow_heif.register_heif_opener()
-except ImportError:
-    pass
+# HEIC photos (iPhone): pi-heif reads them with libheif and libde265, both LGPL. pillow-heif, the GPL-licensed sibling
+# that also bundles the x265 encoder, may remain in an environment set up before 0.5.3
+for _heif in ("pi_heif", "pillow_heif"):
+    try:
+        importlib.import_module(_heif).register_heif_opener()
+        break
+    except ImportError:
+        continue
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IS_WIN = sys.platform == "win32"
@@ -362,6 +365,14 @@ def blender_prep(raw, out_dir, name, level, s, log, res=None):
         cmd += ["--faces", str(int(s["faces"]))]
     if res:
         cmd += ["--photo-res", res]
+    relief = s.get("relief", "auto")
+    if relief not in ("scan", "solid"):
+        # auto: the scan's own relief, except for a shape the AI guessed or a medium or strong smoothing asked for
+        relief = "scan" if res and int(s.get("smooth", 0)) < 2 else "solid"
+    cmd += ["--texture-size", str(s.get("texture_size", "auto")), "--bake-samples", str(int(s.get("bake_samples", 4))),
+            "--real-height-mm", str(float(s.get("real_height_cm", 0)) * 10), "--relief", relief,
+            "--finish", s.get("finish", "auto"), "--web-images", s.get("web_images", "jpeg"),
+            "--density", str(float(s.get("export_density", 1)))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
     try:  # photogrammetry_win: the scan stays in COLMAP's frame, this rotation stands it up

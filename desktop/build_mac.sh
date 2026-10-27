@@ -37,7 +37,7 @@ cp "$HELPER" "$RES/bin/HelloPhotogrammetry"
 
 echo "Moteur et interface"
 rsync -a --exclude __pycache__ --exclude .DS_Store "$ROOT/app" "$ROOT/engine" "$ROOT/vendor" "$RES/app/"
-cp "$ROOT/requirements-core.txt" "$ROOT/requirements-ai.txt" "$RES/app/"
+cp "$ROOT/requirements-core.txt" "$ROOT/requirements-ai.txt" "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$RES/app/"
 cp "$HERE/boot.py" "$RES/app/desktop/"
 
 cd "$HERE"

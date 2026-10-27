@@ -326,8 +326,27 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
           <select id="filaments"><option value="2">2</option><option value="3">3</option><option value="4" selected data-i18n="ui.filaments_4">4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
         </div>
         <div class="field">
-          <div class="labrow"><span class="lab" id="exportsLab" data-i18n="ui.exports_label">Exports 3D hors impression</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExports">?</button><span class="tip-text" role="tooltip" id="tipExports" data-i18n="ui.tip_exports">Le modèle nettoyé pour d'autres usages que l'impression, à sa taille réelle en mètres, en plus des fichiers d'impression. Un zip par profil coché. Chacun allonge le calcul : environ 15 s pour Web ou Jeux et plus d'une minute pour Logiciels 3D sur un modèle simple, davantage sur un scan détaillé.</span></div>
+          <div class="labrow"><span class="lab" id="exportsLab" data-i18n="ui.exports_label">Exports 3D hors impression</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExports">?</button><span class="tip-text" role="tooltip" id="tipExports" data-i18n="ui.tip_exports">Le modèle nettoyé pour d'autres usages que l'impression, en plus des fichiers d'impression : en mètres, à la hauteur imprimée ou à la hauteur réelle des réglages des exports. Un zip par profil coché, avec un README qui décrit ses fichiers. Chacun allonge le calcul : environ 15 s pour Web ou Jeux et plus d'une minute pour Logiciels 3D sur un modèle simple, davantage sur un scan détaillé ou en 8192.</span></div>
           <div role="group" aria-labelledby="exportsLab"><label class="check"><input id="eSoftware" type="checkbox"> <span data-i18n="ui.opt_software">Logiciels 3D : Blender, sculpture, animation (quads)</span></label><label class="check"><input id="eGame" type="checkbox"> <span data-i18n="ui.opt_game">Jeux : Unity, Unreal, Godot (3 niveaux de détail)</span></label><label class="check"><input id="eWeb" type="checkbox"> <span data-i18n="ui.opt_web">Web : GLB léger (three.js, model-viewer)</span></label></div>
+        </div>
+        <div class="field hidden" id="exportOpts">
+          <div class="labrow"><span class="lab" data-i18n="ui.export_opts_label">Réglages des exports 3D</span><button type="button" class="tip" aria-label="Aide : réglages des exports 3D" data-i18n-attr="aria-label:ui.help_export_opts" aria-describedby="tipExportOpts">?</button><span class="tip-text" role="tooltip" id="tipExportOpts" data-i18n="ui.tip_export_opts">Hauteur réelle : la taille de l'objet dans les exports, pour la réalité augmentée ou une scène à l'échelle ; vide, les exports gardent la hauteur imprimée. Maillage : le nombre de faces, de la moitié au quadruple. Relief : la normal map vient du scan (détails fins, grain compris) ou du modèle lissé ; Auto prend le scan, sauf pour l'IA et avec un lissage moyen ou fort. Finition : la rugosité ; Auto reprend celle du scan quand il en a une (Mac, résolution Haute) et donne une finition mate sinon. Images Web : WebP allège le GLB et les navigateurs récents le lisent.</span></div>
+          <div class="row">
+            <div><label for="realHeight" data-i18n="ui.real_height_label">Hauteur réelle (cm)</label><input id="realHeight" type="number" min="0.1" max="100000" step="any" placeholder="comme imprimé" data-i18n-attr="placeholder:ui.real_height_placeholder" aria-describedby="realHeightErr"><div class="field-err hidden" id="realHeightErr"></div></div>
+            <div><label for="density" data-i18n="ui.density_label">Maillage</label><select id="density"><option value="0.5" data-i18n="ui.density_05">Allégé (×0,5)</option><option value="1" selected data-i18n="ui.density_1">Standard</option><option value="2" data-i18n="ui.density_2">Dense (×2)</option><option value="4" data-i18n="ui.density_4">Très dense (×4)</option></select></div>
+          </div>
+          <div class="row">
+            <div><label for="relief" data-i18n="ui.relief_label">Relief</label><select id="relief"><option value="auto" selected data-i18n="ui.relief_auto">Auto</option><option value="scan" data-i18n="ui.relief_scan">Fin (scan)</option><option value="solid" data-i18n="ui.relief_solid">Lisse (modèle)</option></select></div>
+            <div><label for="finish" data-i18n="ui.finish_label">Finition</label><select id="finish"><option value="auto" selected data-i18n="ui.finish_auto">Auto</option><option value="matte" data-i18n="ui.finish_matte">Mate</option><option value="satin" data-i18n="ui.finish_satin">Satinée</option><option value="gloss" data-i18n="ui.finish_gloss">Brillante</option></select></div>
+          </div>
+          <div class="field"><label for="webImages" data-i18n="ui.web_images_label">Images du profil Web</label><select id="webImages"><option value="jpeg" selected data-i18n="ui.web_images_jpeg">JPEG, lu partout</option><option value="webp" data-i18n="ui.web_images_webp">WebP, plus léger</option></select></div>
+        </div>
+        <div class="field" id="textureOpts">
+          <div class="labrow"><span class="lab" data-i18n="ui.texture_opts_label">Textures cuites</span><button type="button" class="tip" aria-label="Aide : textures cuites" data-i18n-attr="aria-label:ui.help_textures" aria-describedby="tipTextures">?</button><span class="tip-text" role="tooltip" id="tipTextures" data-i18n="ui.tip_textures">Pour l'OBJ texturé et les exports 3D. Auto : 2048 ou 4096 selon le niveau et le profil, 8192 en résolution Max. Une taille que la mémoire libre ne permet pas descend d'un cran, et le journal technique le dit : 8192 demande environ 18 Go libres, 4096 environ 6 Go, 2048 environ 3 Go. Anticrénelage : plusieurs rayons par texel adoucissent les bords dans les textures, pour un peu plus de calcul.</span></div>
+          <div class="row">
+            <div><label for="texSize" data-i18n="ui.texture_size_label">Taille</label><select id="texSize"><option value="auto" selected data-i18n="ui.texture_auto">Auto</option><option value="1024">1024 px</option><option value="2048">2048 px</option><option value="4096">4096 px</option><option value="8192">8192 px</option></select></div>
+            <div><label for="bakeSamples" data-i18n="ui.samples_label">Anticrénelage</label><select id="bakeSamples"><option value="1" data-i18n="ui.samples_1">1 rayon (rapide)</option><option value="4" selected data-i18n="ui.samples_4">4 rayons</option><option value="16" data-i18n="ui.samples_16">16 rayons (fin)</option></select></div>
+          </div>
         </div>
         <div class="labrow"><label class="check"><input id="keepParts" type="checkbox"> <span data-i18n="ui.keep_parts">Garder les pièces détachées</span></label><button type="button" class="tip" aria-label="Aide : pièces détachées" data-i18n-attr="aria-label:ui.help_parts" aria-describedby="tipParts">?</button><span class="tip-text" role="tooltip" id="tipParts" data-i18n="ui.tip_parts">Par défaut, seul le plus gros morceau est gardé et les débris disparaissent. Coche si ton modèle compte plusieurs parties voulues.</span></div>
       </details>
@@ -406,7 +425,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
         </div>
       </div>
       <div class="hidden" id="exportBox">
-        <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.exports_3d">Exports 3D</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExportBox">?</button><span class="tip-text" role="tooltip" id="tipExportBox" data-i18n="ui.tip_export_box">Taille réelle en mètres, Y vers le haut, base centrée sur l'origine. Logiciels 3D : quads, textures 4096, fichiers .blend, FBX et OBJ ; pour animer un personnage, une retopologie à la main reste utile. Jeux : triangles en 3 niveaux de détail (100, 50 et 25 %), textures 2048, FBX et GLB. Web : un GLB de quelques Mo, plus une version compressée Draco quand ce Blender la produit. Textures : les couleurs des photos, ombres comprises, et une normal map pour le relief fin.</span></div>
+        <div class="labrow" style="margin-top:14px"><span class="lab" data-i18n="ui.exports_3d">Exports 3D</span><button type="button" class="tip" aria-label="Aide : exports 3D" data-i18n-attr="aria-label:ui.help_exports" aria-describedby="tipExportBox">?</button><span class="tip-text" role="tooltip" id="tipExportBox" data-i18n="ui.tip_export_box">En mètres, Y vers le haut, base centrée sur l'origine. Logiciels 3D : quads, textures 4096, fichiers .blend, FBX et OBJ ; pour animer un personnage, une retopologie à la main reste utile. Jeux : triangles en 3 niveaux de détail (100, 50 et 25 %), textures 2048, FBX et GLB, plus une normal map DirectX pour Unreal. Web : un GLB de quelques Mo, plus ses versions compressées Draco et meshopt quand ce Blender les produit. Textures : les couleurs des photos, ombres comprises, une normal map pour le relief fin et la rugosité du scan quand il en a une. Le README de chaque zip détaille ses fichiers.</span></div>
         <div class="actions">
           <button class="ghost" id="expSoftware" data-i18n="ui.save_software">Enregistrer pour logiciels 3D</button>
           <button class="ghost" id="expGame" data-i18n="ui.save_game">Enregistrer pour jeux</button>
@@ -442,6 +461,25 @@ input[aria-invalid="true"] { border-bottom-color: var(--bad); }
       <div class="field"><label for="aFaces">Facettes (LowPoly) : <span id="aFacesVal"></span> triangles</label><input id="aFaces" type="range" min="200" max="5000" step="100"></div>
       <div class="field"><span class="lab" id="aColorFilesLab" data-i18n="ui.color_files_label">Fichiers pour l'impression en couleur</span><div role="group" aria-labelledby="aColorFilesLab"><label class="check"><input id="a3mf" type="checkbox" checked> <span data-i18n="ui.opt_3mf">3MF peint (OrcaSlicer, numéros de filament)</span></label><label class="check"><input id="aObj" type="checkbox" checked> <span data-i18n="ui.opt_obj">OBJ en couleurs (OrcaSlicer, couleurs proposées)</span></label><label class="check"><input id="aTex" type="checkbox" checked> <span data-i18n="ui.opt_tex">OBJ texturé (service d'impression couleur)</span></label></div></div>
       <div class="field"><span class="lab" id="aExportsLab" data-i18n="ui.exports_label">Exports 3D hors impression</span><div role="group" aria-labelledby="aExportsLab"><label class="check"><input id="aSoftware" type="checkbox"> <span data-i18n="ui.opt_software">Logiciels 3D : Blender, sculpture, animation (quads)</span></label><label class="check"><input id="aGame" type="checkbox"> <span data-i18n="ui.opt_game">Jeux : Unity, Unreal, Godot (3 niveaux de détail)</span></label><label class="check"><input id="aWeb" type="checkbox"> <span data-i18n="ui.opt_web">Web : GLB léger (three.js, model-viewer)</span></label></div></div>
+      <div class="field hidden" id="aExportOpts">
+        <div class="labrow"><span class="lab" data-i18n="ui.export_opts_label">Réglages des exports 3D</span><button type="button" class="tip" aria-label="Aide : réglages des exports 3D" data-i18n-attr="aria-label:ui.help_export_opts" aria-describedby="tipAExportOpts">?</button><span class="tip-text" role="tooltip" id="tipAExportOpts" data-i18n="ui.tip_export_opts">Hauteur réelle : la taille de l'objet dans les exports, pour la réalité augmentée ou une scène à l'échelle ; vide, les exports gardent la hauteur imprimée. Maillage : le nombre de faces, de la moitié au quadruple. Relief : la normal map vient du scan (détails fins, grain compris) ou du modèle lissé ; Auto prend le scan, sauf pour l'IA et avec un lissage moyen ou fort. Finition : la rugosité ; Auto reprend celle du scan quand il en a une (Mac, résolution Haute) et donne une finition mate sinon. Images Web : WebP allège le GLB et les navigateurs récents le lisent.</span></div>
+        <div class="row">
+          <div><label for="aRealHeight" data-i18n="ui.real_height_label">Hauteur réelle (cm)</label><input id="aRealHeight" type="number" min="0.1" max="100000" step="any" placeholder="comme imprimé" data-i18n-attr="placeholder:ui.real_height_placeholder" aria-describedby="aRealHeightErr"><div class="field-err hidden" id="aRealHeightErr"></div></div>
+          <div><label for="aDensity" data-i18n="ui.density_label">Maillage</label><select id="aDensity"><option value="0.5" data-i18n="ui.density_05">Allégé (×0,5)</option><option value="1" selected data-i18n="ui.density_1">Standard</option><option value="2" data-i18n="ui.density_2">Dense (×2)</option><option value="4" data-i18n="ui.density_4">Très dense (×4)</option></select></div>
+        </div>
+        <div class="row">
+          <div><label for="aRelief" data-i18n="ui.relief_label">Relief</label><select id="aRelief"><option value="auto" selected data-i18n="ui.relief_auto">Auto</option><option value="scan" data-i18n="ui.relief_scan">Fin (scan)</option><option value="solid" data-i18n="ui.relief_solid">Lisse (modèle)</option></select></div>
+          <div><label for="aFinish" data-i18n="ui.finish_label">Finition</label><select id="aFinish"><option value="auto" selected data-i18n="ui.finish_auto">Auto</option><option value="matte" data-i18n="ui.finish_matte">Mate</option><option value="satin" data-i18n="ui.finish_satin">Satinée</option><option value="gloss" data-i18n="ui.finish_gloss">Brillante</option></select></div>
+        </div>
+        <div class="field"><label for="aWebImages" data-i18n="ui.web_images_label">Images du profil Web</label><select id="aWebImages"><option value="jpeg" selected data-i18n="ui.web_images_jpeg">JPEG, lu partout</option><option value="webp" data-i18n="ui.web_images_webp">WebP, plus léger</option></select></div>
+      </div>
+      <div class="field" id="aTextureOpts">
+        <div class="labrow"><span class="lab" data-i18n="ui.texture_opts_label">Textures cuites</span><button type="button" class="tip" aria-label="Aide : textures cuites" data-i18n-attr="aria-label:ui.help_textures" aria-describedby="tipATextures">?</button><span class="tip-text" role="tooltip" id="tipATextures" data-i18n="ui.tip_textures">Pour l'OBJ texturé et les exports 3D. Auto : 2048 ou 4096 selon le niveau et le profil, 8192 en résolution Max. Une taille que la mémoire libre ne permet pas descend d'un cran, et le journal technique le dit : 8192 demande environ 18 Go libres, 4096 environ 6 Go, 2048 environ 3 Go. Anticrénelage : plusieurs rayons par texel adoucissent les bords dans les textures, pour un peu plus de calcul.</span></div>
+        <div class="row">
+          <div><label for="aTexSize" data-i18n="ui.texture_size_label">Taille</label><select id="aTexSize"><option value="auto" selected data-i18n="ui.texture_auto">Auto</option><option value="1024">1024 px</option><option value="2048">2048 px</option><option value="4096">4096 px</option><option value="8192">8192 px</option></select></div>
+          <div><label for="aBakeSamples" data-i18n="ui.samples_label">Anticrénelage</label><select id="aBakeSamples"><option value="1" data-i18n="ui.samples_1">1 rayon (rapide)</option><option value="4" selected data-i18n="ui.samples_4">4 rayons</option><option value="16" data-i18n="ui.samples_16">16 rayons (fin)</option></select></div>
+        </div>
+      </div>
       <div class="field"><label for="aFilaments" data-i18n="ui.filaments_label">Filaments pour l'impression en couleur</label><select id="aFilaments"><option value="2">2</option><option value="3">3</option><option value="4" selected data-i18n="ui.filaments_4">4 (systèmes à 4 bobines)</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
       <div class="field hidden" id="mainPick"><span class="lab" id="mainPickLab" data-i18n="ui.main_pick">Photo utilisée par l'IA (clique pour en choisir une autre)</span><div class="thumbs" id="serverThumbs" role="group" aria-labelledby="mainPickLab"></div></div>
       <div style="margin-top:14px" class="actions"><button class="ghost" id="apply" data-i18n="ui.apply">Recalculer avec ces réglages</button></div>
@@ -821,7 +859,7 @@ function fieldError(id, key) {
   if (key) $(id).focus();
   return !!key;
 }
-["height", "aHeight", "aBase"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, null)));
+["height", "aHeight", "aBase", "realHeight", "aRealHeight"].forEach((id) => $(id).addEventListener("input", () => fieldError(id, null)));
 // Escape hides help bubbles (WCAG 1.4.13); they come back on the next pointer move or focus change
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.body.classList.add("hush"); });
 ["pointermove", "focusin"].forEach((ev) => document.addEventListener(ev, () => document.body.classList.remove("hush")));
@@ -835,6 +873,7 @@ document.querySelectorAll(".tip").forEach((t) => ["pointerenter", "focus"].forEa
 $("go").onclick = async () => {
   const height = $("height").valueAsNumber;
   if (fieldError("height", Number.isFinite(height) && height >= 10 && height <= 245 ? null : "ui.height_error")) return;
+  if (realHeightError("")) return;
   uploading = true;
   $("go").disabled = true;
   setTr($("go"), "ui.uploading");
@@ -846,7 +885,7 @@ $("go").onclick = async () => {
   fd.append("settings", JSON.stringify({ height_mm: height, level: levelSeg.get(), faces: +$("faces").value, base_cut: +$("base").value,
     nozzle: +$("nozzle").value, keep_parts: $("keepParts").checked, smooth: +smoothSeg.get(), filaments: +$("filaments").value,
     color_3mf: $("c3mf").checked, color_obj: $("cObj").checked, color_texture: $("cTex").checked,
-    ...exportChoice("e"), photo_res: photoResSeg.get(), rot_seq: "" }));
+    ...exportChoice("e"), ...exportSettings(""), photo_res: photoResSeg.get(), rot_seq: "" }));
   if (mainLocal) fd.append("main_photo", mainLocal);
   try {
     const job = await api("/api/jobs", { method: "POST", body: fd });
@@ -991,6 +1030,36 @@ async function poll(id, gen, failures) {
 const COLOR_FILES = ["color_3mf", "color_obj", "color_texture"];
 const EXPORTS = { software: "Software", game: "Game", web: "Web" };
 const exportChoice = (pre) => Object.fromEntries(Object.entries(EXPORTS).map(([k, id]) => [`export_${k}`, $(pre + id).checked]));
+// settings of the baked textures and the export profiles: field ids of the new model ("") and of the adjust card ("a")
+const XFIELDS = { realHeight: "real_height_cm", density: "export_density", relief: "relief", finish: "finish",
+  webImages: "web_images", texSize: "texture_size", bakeSamples: "bake_samples" };
+const xid = (pre, name) => (pre ? pre + name[0].toUpperCase() + name.slice(1) : name);
+const NUMERIC = new Set(["export_density", "bake_samples"]);
+const DEFAULT_X = { real_height_cm: 0, export_density: 1, relief: "auto", finish: "auto", web_images: "jpeg", texture_size: "auto", bake_samples: 4 };
+function exportSettings(pre) {
+  const out = {};
+  for (const [name, key] of Object.entries(XFIELDS)) {
+    const el = $(xid(pre, name));
+    out[key] = name === "realHeight" ? (el.value === "" || !Number.isFinite(el.valueAsNumber) ? 0 : el.valueAsNumber)
+      : NUMERIC.has(key) ? +el.value : el.value;
+  }
+  return out;
+}
+// the real height only counts, and is only checked, while a profile is checked and the field shows
+function realHeightError(pre) {
+  const el = $(xid(pre, "realHeight")), v = el.valueAsNumber;
+  const shown = !$(pre ? "aExportOpts" : "exportOpts").classList.contains("hidden");
+  return fieldError(el.id, shown && el.value !== "" && !(Number.isFinite(v) && v >= 0.1 && v <= 100000) ? "ui.real_height_error" : null);
+}
+// the export settings show once a profile is checked, the texture ones once something is baked into a texture
+function syncExportOpts(pre) {
+  const box = pre ? "a" : "e", any = Object.values(EXPORTS).some((id) => $(box + id).checked);
+  $(pre ? "aExportOpts" : "exportOpts").classList.toggle("hidden", !any);
+  $(pre ? "aTextureOpts" : "textureOpts").classList.toggle("hidden", !any && !$(pre ? "aTex" : "cTex").checked);
+}
+// what results computed before these settings were made with
+const LEGACY = { real_height_cm: 0, export_density: 1, relief: "solid", finish: "", web_images: "jpeg", texture_size: "auto", bake_samples: 1 };
+const changed = (a, b, keys) => keys.some((k) => String(a[k] ?? LEGACY[k]) !== String(b[k] ?? LEGACY[k]));
 function staleReasons(j, level) {
   const r = j.results[level];
   if (!r) return [];
@@ -1007,6 +1076,10 @@ function staleReasons(j, level) {
   // results from before these options have none of the files: they all count as unchecked
   if (r.colors && COLOR_FILES.some((k) => (a[k] ?? false) !== b[k])) out.push("ui.stale_color_files");
   if (Object.keys(EXPORTS).some((k) => !!a[`export_${k}`] !== !!b[`export_${k}`])) out.push("ui.stale_exports");
+  const exported = Object.keys(EXPORTS).some((k) => r[`export_${k}`]);
+  if ((r.texture || exported) && changed(a, b, ["texture_size", "bake_samples"])) out.push("ui.stale_textures");
+  if (exported && changed(a, b, ["real_height_cm", "export_density", "relief", "finish"])
+      || r.export_web && changed(a, b, ["web_images"])) out.push("ui.stale_export_settings");
   if (r.engine === "ia" && r.main_photo && j.main_photo && r.main_photo !== j.main_photo) out.push("ui.stale_main_photo");
   if (j.mode !== "auto" && r.engine && r.engine !== j.mode) out.push("ui.stale_method");
   return out.map((k) => tr(k));
@@ -1116,6 +1189,13 @@ function renderResult(j) {
     [tr("ui.smooth_label"), escapeHtml(SMOOTH_NAMES[smooth] ? tr(SMOOTH_NAMES[smooth]) : smooth)],
   ];
   if (r.scan) rows.push([tr("ui.res_label"), escapeHtml(scanText(r))]);
+  const rowKeys = { software: "ui.row_export_software", game: "ui.row_export_game", web: "ui.row_export_web" };
+  for (const k of Object.keys(EXPORTS)) {
+    const p = r.profiles?.[k];
+    // profiles computed before these details have no texture size
+    if (p?.size) rows.push([tr(rowKeys[k]), escapeHtml(tr(p.quads ? "ui.export_detail_quads" : "ui.export_detail_triangles",
+      { faces: num(p.faces), size: num(p.size), m: num(p.height_m) }))]);
+  }
   $("report").innerHTML = rows.map(([a, b]) => `<tr><td>${escapeHtml(a)}</td><td>${b}</td></tr>`).join("");
   $("colorBox").classList.toggle("hidden", !r.filaments && !r.obj_colors && !r.texture);
   const hex = (c) => "#" + c.map((v) => Number(v).toString(16).padStart(2, "0")).join("").toUpperCase();
@@ -1162,6 +1242,11 @@ function renderAdjust(j) {
     $("aTex").checked = s.color_texture !== false;
     for (const [k, id] of Object.entries(EXPORTS)) $("a" + id).checked = !!s[`export_${k}`];
     syncFilaments("a");
+    for (const [name, key] of Object.entries(XFIELDS)) {
+      const el = $(xid("a", name)), v = s[key] ?? DEFAULT_X[key];
+      el.value = name === "realHeight" ? (v > 0 ? String(v) : "") : String(v);
+    }
+    syncExportOpts("a");
   }
   aModeSeg.set(adjustMode || j.mode);
   const ia = j.engine === "ia";
@@ -1241,10 +1326,11 @@ $("apply").onclick = () => {
   const h = $("aHeight").valueAsNumber, base = $("aBase").valueAsNumber;
   if (fieldError("aHeight", Number.isFinite(h) && h >= 10 && h <= 245 ? null : "ui.height_error")) return;
   if (fieldError("aBase", Number.isFinite(base) && base >= 0 && base <= 20 ? null : "ui.base_error")) return;
+  if (realHeightError("a")) return;
   runLevel(viewLevel || "lowpoly", { height_mm: h, base_cut: base, faces: +$("aFaces").value, smooth: +aSmoothSeg.get(),
     photo_res: aPhotoResSeg.get(),
     filaments: +$("aFilaments").value, color_3mf: $("a3mf").checked, color_obj: $("aObj").checked,
-    color_texture: $("aTex").checked, ...exportChoice("a") },
+    color_texture: $("aTex").checked, ...exportChoice("a"), ...exportSettings("a") },
     adjustMode ? { mode: adjustMode } : {})
     .then((ok) => { if (ok) adjustDirty = false; });
 };
@@ -1257,7 +1343,10 @@ Object.values(EXPORTS).forEach((id) => $("a" + id).addEventListener("change", ()
 ["c", "a"].forEach((pre) => ["3mf", "Obj", "Tex"].forEach((k) => $(pre + k).addEventListener("change", () => {
   if (pre === "a") adjustDirty = true;
   syncFilaments(pre);
+  syncExportOpts(pre === "a" ? "a" : "");
 })));
+["e", "a"].forEach((box) => Object.values(EXPORTS).forEach((id) => $(box + id).addEventListener("change", () => syncExportOpts(box === "a" ? "a" : ""))));
+Object.keys(XFIELDS).forEach((name) => ["input", "change"].forEach((ev) => $(xid("a", name)).addEventListener(ev, () => (adjustDirty = true))));
 async function exportFile(kind) {
   if (!current || !viewLevel) return;
   try {
@@ -1526,6 +1615,7 @@ async function showModel(url, flat, colorsUrl = null) {
 
 await initLanguage();
 refreshTexts();
+syncExportOpts("");
 loadStatus();
 loadHistory();
 </script>

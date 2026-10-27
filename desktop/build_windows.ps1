@@ -39,7 +39,7 @@ foreach ($d in "app", "engine", "vendor") {
   if ($LASTEXITCODE -ge 8) { throw "copie de $d impossible (robocopy $LASTEXITCODE)" }
 }
 $global:LASTEXITCODE = 0
-Copy-Item "$Root\requirements-core.txt", "$Root\requirements-ai.txt" "$Res\app\"
+Copy-Item "$Root\requirements-core.txt", "$Root\requirements-ai.txt", "$Root\LICENSE", "$Root\THIRD_PARTY_NOTICES.md" "$Res\app\"
 Copy-Item "$Here\boot.py" "$Res\app\desktop\"
 
 Push-Location $Here

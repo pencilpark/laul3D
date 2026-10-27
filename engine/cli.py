@@ -2,7 +2,9 @@
 
 lowpoly3d PHOTOS [--niveau lowpoly|medium|detailed] [--resolution auto|low|mid|high|max] [--hauteur 80]
           [--moteur auto|photogrammetry|ia] [--facettes 1000] [--socle 3] [--buse 0.4] [--rotation zx]
-          [--photo-principale NAME] [--sortie FOLDER]
+          [--photo-principale NAME] [--sortie FOLDER] [--exports software,game,web] [--hauteur-reelle CM]
+          [--textures auto|1024|2048|4096|8192] [--anticrenelage 1|4|16] [--relief auto|scan|solid]
+          [--finition auto|matte|satin|gloss] [--images-web jpeg|webp] [--densite 0.5|1|2|4]
 """
 import argparse
 import json
@@ -34,6 +36,15 @@ def main(argv=None):
     ap.add_argument("--photo-principale", default=None, metavar="NAME", help=helptext("srv.cli_help_main_photo"))
     ap.add_argument("--sortie", default=None, metavar="FOLDER", help=helptext("srv.cli_help_output"))
     ap.add_argument("--exports", default="", metavar="PROFILES", help=helptext("srv.cli_help_exports"))
+    ap.add_argument("--hauteur-reelle", type=float, default=0.0, metavar="CM", help=helptext("srv.cli_help_real_height"))
+    ap.add_argument("--textures", choices=["auto", "1024", "2048", "4096", "8192"], default="auto",
+                    help=helptext("srv.cli_help_textures"))
+    ap.add_argument("--anticrenelage", type=int, choices=[1, 4, 16], default=4, help=helptext("srv.cli_help_samples"))
+    ap.add_argument("--relief", choices=["auto", "scan", "solid"], default="auto", help=helptext("srv.cli_help_relief"))
+    ap.add_argument("--finition", choices=["auto", "matte", "satin", "gloss"], default="auto",
+                    help=helptext("srv.cli_help_finish"))
+    ap.add_argument("--images-web", choices=["jpeg", "webp"], default="jpeg", help=helptext("srv.cli_help_web_images"))
+    ap.add_argument("--densite", type=float, choices=[0.5, 1, 2, 4], default=1, help=helptext("srv.cli_help_density"))
     a = ap.parse_args(argv)
 
     photos_dir = os.path.abspath(a.photos)
@@ -60,7 +71,9 @@ def main(argv=None):
         else:
             raw, _ = pl.triposr(photos_dir, photos, a.photo_principale, work, log)
         settings = {"height_mm": a.hauteur, "base_cut": a.socle, "rot_seq": a.rotation, "nozzle": a.buse,
-                    "faces": a.facettes, "keep_parts": False,
+                    "faces": a.facettes, "keep_parts": False, "real_height_cm": a.hauteur_reelle,
+                    "texture_size": a.textures, "bake_samples": a.anticrenelage, "relief": a.relief,
+                    "finish": a.finition, "web_images": a.images_web, "export_density": a.densite,
                     **{"export_" + k: True for k in a.exports.split(",") if k in ("software", "game", "web")}}
         name = f"{pl.slug(os.path.basename(photos_dir))}_{a.niveau}_{int(round(a.hauteur))}mm"
         report = pl.blender_prep(raw, out_dir, name, a.niveau, settings, log, scan and scan["res"])

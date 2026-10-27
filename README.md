@@ -1,149 +1,366 @@
 # Berria Craft
 
-Application de bureau pour Mac et Windows : on glisse des photos et on récupère un STL étanche, dimensionné pour la Creality Ender-3 V3 (plateau 220 × 220 × 250 mm), en LowPoly ou en version détaillée. Elle s'ouvre dans sa propre fenêtre, sans navigateur. Tout le calcul tourne sur l'ordinateur ; seuls les outils et le module IA se téléchargent, une fois, depuis leurs sites officiels.
+Desktop app for macOS and Windows: drop in photos of an object and get back a watertight STL sized for the Creality
+Ender-3 V3 (build volume 220 × 220 × 250 mm), from a faceted LowPoly look to a detailed model. It also writes color
+files for multi-filament printers and color print services, and cleaned-up models for 3D software, game engines and the
+web. It opens in its own window, without a browser. Everything is computed on the computer and no photo goes online;
+only the tools and the optional AI module are downloaded, once, from their official sites.
 
-## Installer
+The interface is in English, French, Spanish, German, Brazilian Portuguese, Simplified Chinese and Japanese.
 
-Les installeurs sont dans la release GitHub de chaque version (onglet Releases du dépôt), où GitHub remplace l'espace du nom par un point (`Berria.Craft_…`).
+## Install
 
-Mac (puce Apple, macOS 14 Sonoma ou plus récent) : ouvrir `Berria Craft_0.5.2_aarch64.dmg`, glisser Berria Craft dans Applications. L'app n'est pas notarisée : construite sur ce Mac, elle s'ouvre directement ; copiée sur un autre Mac, il faut l'autoriser une fois dans Réglages Système > Confidentialité et sécurité > « Ouvrir quand même ».
+The installers are attached to each [GitHub release](https://github.com/pencilpark/laul3D/releases), where GitHub
+replaces the space in the file name with a dot (`Berria.Craft_…`).
 
-Windows 10 ou 11, 64 bits : lancer `Berria Craft_0.5.2_x64-setup.exe`. L'installeur n'est pas signé : SmartScreen demande une fois « Informations complémentaires » puis « Exécuter quand même ». L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
+- macOS (Apple silicon, macOS 14 Sonoma or later): open `Berria Craft_0.5.3_aarch64.dmg` and drag Berria Craft into
+  Applications. The app is not notarized: downloaded on a Mac, it has to be allowed once in System Settings > Privacy &
+  Security > Open Anyway. Built on the same Mac, it opens directly.
+- Windows 10 or 11, 64-bit: run `Berria Craft_0.5.3_x64-setup.exe`. The installer is not signed: SmartScreen asks once
+  for More info, then Run anyway. It installs for the current user, without administrator rights.
 
-Au premier lancement, l'app prépare son environnement de calcul (une minute au plus), puis propose dans une fenêtre les outils qui manquent : Blender (obligatoire), OrcaSlicer, et sous Windows la photogrammétrie COLMAP + OpenMVS. Le module « Une photo (IA) » s'installe à part, depuis l'en-tête. Sous Windows, COLMAP, OpenMVS et l'IA demandent les composants Microsoft Visual C++ : Windows demande alors une autorisation.
+At first launch the app prepares its computing environment (a minute at most), then offers the missing tools in a
+window: Blender (required), OrcaSlicer, and on Windows the COLMAP + OpenMVS photogrammetry. The One photo (AI) module
+installs separately, from the header. On Windows, COLMAP, OpenMVS and the AI module need the Microsoft Visual C++
+runtime, which Windows asks permission to install.
 
-## Moteurs gratuits
+## Engines
 
-Plusieurs photos (20 et plus, 50 pour un buste fidèle) : la forme vient des photos, rien n'est inventé.
-- Mac : Apple Object Capture, via l'outil `HelloPhotogrammetry` fourni avec l'app.
-- Windows : COLMAP 4.2.1 place les photos, OpenMVS 2.4.0 construit le maillage et sa texture, sur le processeur. Le nivellement des coutures de TextureMesh est désactivé : en 2.4.0, il noircit les textures (issue OpenMVS #1257). COLMAP extrait les points d'autant de photos à la fois que la mémoire libre le permet (environ 0,8, 1,2 et 3,1 Go par photo en résolution Basse, Moyenne et Haute), au lieu d'une par cœur, pour que la résolution Haute ne fasse pas paginer Windows sur 8 Go ; les points trouvés restent les mêmes. COLMAP et OpenMVS tournent en priorité basse. COLMAP travaillant dans un repère arbitraire, l'app redresse le modèle d'après les photos : leur « haut » moyen donne la verticale, la première photo donne la face.
+Several photos (20 or more, 50 for a faithful bust): the shape comes from the photos, nothing is invented.
+- macOS: Apple Object Capture, through the `HelloPhotogrammetry` tool shipped with the app.
+- Windows: COLMAP 4.2.1 places the photos, OpenMVS 2.4.0 builds the mesh and its texture, on the CPU. TextureMesh's
+  seam leveling is turned off: in 2.4.0 it blackens textures (OpenMVS issue #1257). COLMAP extracts features from as
+  many photos at once as free memory allows (about 0.8, 1.2 and 3.1 GB per photo at Low, Medium and High resolution),
+  instead of one per core, so that High resolution does not make Windows page on 8 GB; the features found stay the
+  same. COLMAP and OpenMVS run at low priority. Since COLMAP works in an arbitrary frame, the app stands the model up
+  from the photos: their average "up" gives the vertical, the first photo gives the front.
 
-Une photo : l'IA TripoSR (Stability AI et Tripo, licence MIT) estime la forme et les couleurs à partir de la photo principale, détourée par rembg. L'arrière est deviné. Module facultatif d'environ 2,2 Go (4 à 4,7 Go sur un PC avec carte NVIDIA, où torch est pris en version CUDA).
+One photo: the TripoSR AI (Stability AI and Tripo, MIT license) estimates the shape and colors from the main photo,
+cut out by rembg. The back is guessed. The module is optional and weighs about 2.2 GB (4 to 4.7 GB on a PC with an
+NVIDIA card, where torch comes in its CUDA build).
 
-Moteurs écartés :
-- Hunyuan3D. La licence Tencent Hunyuan 3D n'accorde aucun droit dans l'UE, au Royaume-Uni ni en Corée du Sud (section 1.l, « Territory »), même pour un usage privé.
-- TRELLIS. Le portage Mac recommande 24 Go de mémoire unifiée ou plus, ce Mac en a 16.
-- Tripo, Rodin, Meshy et Hunyuan via MCP for Blender : payants ou réservés au Premium.
+Engines ruled out:
+- Hunyuan3D: the Tencent Hunyuan 3D license grants no rights in the EU, the UK or South Korea (section 1.l,
+  "Territory"), even for private use.
+- TRELLIS: its Mac port recommends 24 GB of unified memory or more.
+- Tripo, Rodin, Meshy and Hunyuan through MCP for Blender: paid or Premium-only.
 
-## Pipeline LowPoly vers détaillé
+## From LowPoly to detailed
 
-Chaque projet s'affine en trois niveaux. Les reconstructions déjà faites restent en cache.
+Each project is refined in three levels. Reconstructions already made stay in cache.
 
-| Niveau | Object Capture | Triangles visés | Voxel d'étanchéité | Usage |
+| Level | Object Capture | Target triangles | Watertight voxel | Use |
 |---|---|---|---|---|
-| LowPoly | `-d preview` | 200 à 5 000 (1 000 par défaut) | taille / 300 | valider forme et orientation vite, rendu facetté |
-| Moyen | `-d medium` | environ 20 000 | taille / 400 | impression courante |
-| Détaillé | `-d full` | jusqu'à 300 000 | taille / 650 | qualité maximale, plus long |
+| LowPoly | `-d preview` | 200 to 5,000 (1,000 by default) | size / 300 | check shape and orientation quickly, faceted look |
+| Medium | `-d medium` | about 20,000 | size / 400 | everyday printing |
+| Detailed | `-d full` | up to 300,000 | size / 650 | best quality, slower |
 
-Le voxel est borné entre 0,2 et 0,5 mm. Méthode conseillée : lancer en LowPoly, redresser si besoin avec les quarts de tour, puis générer Moyen ou Détaillé.
+The voxel stays between 0.2 and 0.5 mm. Suggested workflow: start in LowPoly, straighten the model with quarter turns
+if needed, then generate Medium or Detailed.
 
-### Résolution des photos
+### Photo resolution
 
-Le réglage « Résolution des photos », sous le niveau de détail et dans « Ajuster ce modèle », choisit la taille des photos que la photogrammétrie utilise, indépendamment du niveau. Auto, par défaut, garde le comportement d'avant : Basse pour LowPoly, Moyenne pour Moyen, Haute pour Détaillé. Basse, Moyenne, Haute ou Max s'appliquent à tous les niveaux, qui partagent alors le même scan. Sans effet sur « Une photo (IA) ».
+The Photo resolution setting, under the level of detail and in Adjust this model, picks the size of the photos the
+photogrammetry uses, independently of the level. Auto, the default, follows the level: Low for LowPoly, Medium for
+Medium, High for Detailed. Low, Medium, High or Max apply to every level, which then share the same scan. It has no
+effect on One photo (AI).
 
-| Résolution | Mac : Object Capture | Windows : COLMAP, puis OpenMVS | Texture du scan (Windows) |
+| Resolution | macOS: Object Capture | Windows: COLMAP, then OpenMVS | Scan texture (Windows) |
 |---|---|---|---|
-| Basse | `-d preview` | photos réduites à 1600 px, cartes de profondeur à 800 px | 4096 |
-| Moyenne | `-d medium` | 2000 px, puis 1000 px | 4096 |
-| Haute | `-d full` | 3200 px, puis 1600 px | 4096 |
-| Max | `-d raw` | pleine taille des photos, ajustée à la mémoire libre | 8192 |
+| Low | `-d preview` | photos reduced to 1600 px, depth maps at 800 px | 4096 |
+| Medium | `-d medium` | 2000 px, then 1000 px | 4096 |
+| High | `-d full` | 3200 px, then 1600 px | 4096 |
+| Max | `-d raw` | the photos' full size, fitted to free memory | 8192 |
 
-Max :
-- Mac : le détail `raw` d'Object Capture, que la documentation d'Apple décrit comme produit « at the highest resolution possible from the source images » (jusqu'à 30 millions de triangles et 16 textures 8192). macOS ne dit pas à l'avance si la mémoire suffit : si `raw` échoue, l'app refait le scan en `full` (Haute) et le journal le dit ; le projet ne retente plus `raw` ensuite (fichier `scan_raw.failed` dans son dossier de travail).
-- Windows : COLMAP et OpenMVS travaillent sur les photos entières (niveau de résolution 0 d'OpenMVS), texture du scan jusqu'à 8192. Avant le calcul, l'app estime la mémoire de chaque étape pour la taille et le nombre des photos (voir `MEMORY_MODEL` dans `engine/photogrammetry_win.py`) et réduit la taille par pas de 10 % jusqu'à tenir dans la mémoire libre, moins 1,5 Go laissés à Windows. Si la taille retenue ne dépasse pas celle de Haute, le scan se fait en Haute. Le journal donne la taille retenue et la mémoire libre ; les détails techniques du modèle aussi.
-- Blender : la texture de l'OBJ texturé et celles du profil Logiciels 3D passent de 4096 à 8192, ou à 6144 si la mémoire libre ne suffit pas à cuire 8192 (environ 150 octets par pixel d'après le code de cuisson de Blender 5, soit 10 Go pour 8192) ; LowPoly garde 2048.
-- Le STL imprimable reste plafonné par le niveau (300 000 triangles et voxel d'au moins 0,2 mm en Détaillé) : Max affine d'abord le scan, les couleurs et les textures. Le calcul est nettement plus long.
+Max:
+- macOS: Object Capture's `raw` detail, which Apple's documentation describes as made "at the highest resolution
+  possible from the source images" (up to 30 million triangles and 16 textures of 8192). macOS does not tell in advance
+  whether memory suffices: if `raw` fails, the app makes the scan again in `full` (High) and the log says so; the
+  project no longer tries `raw` afterwards (`scan_raw.failed` file in its work folder).
+- Windows: COLMAP and OpenMVS work on the whole photos (OpenMVS resolution level 0), with a scan texture up to 8192.
+  Before computing, the app estimates the memory of each step for the size and number of photos (see `MEMORY_MODEL` in
+  `engine/photogrammetry_win.py`) and lowers the size in 10 % steps until it fits in free memory, minus 1.5 GB left to
+  Windows. If the size kept is no larger than High's, the scan is made at High. The log gives the size kept and the
+  free memory; so do the model's technical details.
+- Blender: the textured OBJ's texture and those of the 3D software profile go from 4096 to 8192, brought down to 6144
+  or less when free memory is short (see Baked textures); LowPoly keeps 2048.
+- The printable STL stays capped by the level (300,000 triangles and a voxel of at least 0.2 mm in Detailed): Max
+  first refines the scan, the colors and the textures. Computing takes much longer.
 
-« Enregistrer le scan brut », dans Autres enregistrements, copie dans Téléchargements le maillage de la photogrammétrie tel qu'il est sorti, avant nettoyage, pour Blender : le `.usdz` d'Object Capture sur Mac, l'OBJ texturé d'OpenMVS zippé avec son MTL et ses textures sous Windows, redressé comme le modèle imprimable et Y vers le haut.
+Save the raw scan, under Other files, copies the photogrammetry mesh to Downloads as it came out, before cleanup, for
+Blender: Object Capture's `.usdz` on macOS, OpenMVS's textured OBJ zipped with its MTL and textures on Windows, stood
+up like the printable model and Y up.
 
-Lissage (aucun, léger, moyen, fort) : flou du volume du modèle sur 2 à 4 voxels (environ 0,4 à 0,8 mm pour un buste de 80 mm). Il efface le grain et les petites bosses ; au réglage fort, les détails fins du visage s'adoucissent aussi.
+Smoothing (None, Light, Medium, Strong): blur of the model's volume over 2 to 4 voxels (about 0.4 to 0.8 mm for an
+80 mm bust). It removes grain and small bumps; at Strong, the fine details of a face soften too.
 
-Rendu : la visionneuse s'ouvre en mode Rendu quand le modèle a des couleurs, celles des photos (une couleur par facette en LowPoly) ; le bouton « Solide / Rendu » bascule entre les deux. C'est un aperçu : le STL imprimé reste d'une couleur. Des couleurs inexploitables (noires, texture illisible, faces sans photo) sont écartées et le Journal technique en donne la raison.
+Render: the viewer opens in Render mode when the model has colors, those of the photos (one color per facet in
+LowPoly); the Solid / Render buttons switch between both. It is a preview: the printed STL stays one color. Unusable
+colors (black, unreadable texture, faces no photo shows) are dropped and the Technical log gives the reason.
 
-## Ce que fait la préparation (Blender headless)
+## What the preparation does (headless Blender)
 
-`engine/blender_lowpoly.py` est lancé avec `--factory-startup`, donc sans les add-ons de l'utilisateur : aucun second serveur MCP ne démarre sur le port 9876.
+`engine/blender_lowpoly.py` runs with `--factory-startup`, so without the user's add-ons: no second MCP server starts
+on port 9876.
 
-1. Import USDZ, OBJ, GLB, PLY ou STL, fusion en un objet, rotation demandée, mise à l'échelle en mm.
-2. Étanchéité : trous bouchés, puis remaillage voxel. Si le scan fuit trop, fermeture morphologique (dilatation en Geometry Nodes, coque extérieure, rétraction).
-3. Une seule coque gardée par défaut. L'option « Garder les pièces détachées » conserve les morceaux de plus de 2 %.
-4. Lissage éventuel (nœuds SDF d'OpenVDB), puis décimation au nombre de triangles du niveau. Si des auto-intersections apparaissent, la cible remonte de 40 % et l'app relance, jusqu'à 3 fois.
-5. Socle plat : coupe du bas (3 % par défaut) et fermeture de la section.
-6. Contrôles : arêtes non-manifold, auto-intersections, coques, parois plus fines que 2 × la buse, surplombs à plus de 45°, volume.
-7. Couleurs du scan projetées par Cycles sur le maillage final, exportées en GLB d'aperçu, et, selon les cases cochées, en 3MF peint, OBJ en couleurs et OBJ texturé (voir « Imprimer en couleur »).
-8. Export STL en mm, vérifié en relisant le nombre de triangles écrit, plus un `.blend` et 4 aperçus PNG.
-9. Si des exports 3D hors impression sont cochés, un second Blender refait l'import, l'étanchéité, le tri des coques et le lissage, sans la décimation ni le socle, et produit les profils (voir « Exports 3D hors impression ») : un profil qui échoue ne touche pas aux fichiers d'impression.
+1. Import of USDZ, OBJ, GLB, PLY or STL, merge into one object, requested rotation, scaling in mm.
+2. Watertightness: holes filled, then voxel remesh. If the scan leaks too much, morphological closing (dilation in
+   Geometry Nodes, outer shell, shrink back).
+3. One shell kept by default. The Keep separate parts option keeps pieces above 2 %.
+4. Optional smoothing (OpenVDB SDF nodes), then decimation to the level's triangle count. If self-intersections
+   appear, the target goes up by 40 % and the app tries again, up to 3 times.
+5. Flat base: cut at the bottom (3 % by default) and closing of the section.
+6. Checks: non-manifold edges, self-intersections, shells, walls thinner than 2 × the nozzle, overhangs beyond 45°,
+   volume.
+7. The scan's colors projected by Cycles onto the final mesh, exported as a preview GLB and, depending on the boxes
+   checked, as a painted 3MF, a colored OBJ and a textured OBJ (see Color printing).
+8. STL export in mm, checked by reading back the number of triangles written, plus a `.blend` and 4 PNG previews.
+9. If 3D exports beyond printing are checked, a second Blender redoes the import, watertightness, shell sorting and
+   smoothing, without the decimation or the base, and produces the profiles (see 3D exports): a profile that fails
+   leaves the print files untouched. It keeps the scan beside the solid to bake its colors, its roughness and, if
+   chosen, its relief.
 
-## Bien photographier
+## Taking good photos
 
-Sujet immobile, lumière égale sans flash, première photo de face, tour complet avec environ 70 % de recouvrement entre deux photos voisines, deux ou trois hauteurs, sujet entier dans chaque cadre. HEIC d'iPhone ou JPG. Les photos floues sont écartées automatiquement (netteté sous 35 % de la médiane).
+Still subject, even light without flash, first photo from the front, a full turn with about 70 % overlap between two
+neighboring photos, two or three heights, the whole subject in every frame. iPhone HEIC or JPG. Blurry photos are
+dropped automatically (sharpness below 35 % of the median).
 
-## Imprimer
+## Printing
 
-Bouton « Préparer l'impression dans OrcaSlicer », puis :
-- profil Creality Ender-3 V3 ;
-- supports arborescents si le rapport signale des surplombs (menton, nez, oreilles) ;
-- socle à plat sur le plateau.
+Prepare the print in OrcaSlicer, then:
+- Creality Ender-3 V3 profile;
+- tree supports if the report flags overhangs (chin, nose, ears);
+- base flat on the bed.
 
-## Imprimer en couleur
+## Color printing
 
-Dans Réglages avancés, et dans « Recalculer avec ces réglages » pour un modèle déjà calculé, trois cases choisissent les fichiers couleur calculés en plus du STL. Elles sont cochées par défaut ; décochées, le calcul et les fichiers restent ceux d'avant (STL, `.blend`, aperçu en couleur). Les fichiers n'existent que si les photos donnent des couleurs exploitables.
+In Advanced settings, and in Recompute with these settings for a model already computed, three boxes choose the color
+files computed on top of the STL. They are checked by default; unchecked, the computation and the files stay as before
+(STL, `.blend`, colored preview). The files only exist when the photos give usable colors.
 
-- 3MF peint, pour une imprimante à plusieurs bobines (l'Ender-3 V3 seule n'en a qu'une). Chaque face porte un numéro de filament (attribut `paint_color` d'OrcaSlicer et Bambu Studio), pas une couleur : dans OrcaSlicer, régler d'abord autant de filaments que la palette, dans le même ordre et aux mêmes couleurs, puis ouvrir le fichier. Ouvert avec moins de filaments, les faces des numéros manquants s'affichent au filament 1 et leur peinture se perd quand on ajoute des filaments ensuite. Fichier > Importer ajoute lui-même les filaments manquants, avec des couleurs à corriger.
-- OBJ en couleurs (OBJ et MTL côte à côte, en mm, Z en haut comme le STL), pour la même imprimante. À l'ouverture, OrcaSlicer 2.1 ou plus récent affiche une fenêtre qui ajoute les couleurs de la palette comme nouveaux filaments, après ceux déjà réglés. Les faces gardent exactement leur filament, mais OrcaSlicer recalcule les couleurs : elles peuvent s'écarter de quelques unités des codes affichés, et l'ordre des filaments ajoutés peut différer de celui de la palette. Le `.mtl` doit rester à côté du `.obj` : depuis un zip, OrcaSlicer ne lit que l'OBJ et l'ouvre sans couleur. « Enregistrer l'OBJ en couleurs » copie donc les deux fichiers dans Téléchargements.
-- OBJ texturé zippé (OBJ, MTL et PNG, en mm, Z en haut), pour un service d'impression en couleurs réelles (Sculpteo, i.materialise…). La texture fait 2 048 px en LowPoly et 4 096 px en Moyen et Détaillé ; elle ajoute de quelques secondes à une minute au calcul.
+- Painted 3MF, for a printer with several spools (the Ender-3 V3 alone has one). Each face carries a filament number
+  (OrcaSlicer and Bambu Studio's `paint_color` attribute), not a color: in OrcaSlicer, first set as many filaments as
+  the palette, in the same order and colors, then open the file. Opened with fewer filaments, the faces of the missing
+  numbers show with filament 1 and lose their paint when filaments are added later. File > Import adds the missing
+  filaments itself, with colors to correct.
+- Colored OBJ (OBJ and MTL side by side, in mm, Z up like the STL), for the same printer. On opening, OrcaSlicer 2.1 or
+  later shows a window that adds the palette's colors as new filaments, after those already set. Faces keep exactly
+  their filament, but OrcaSlicer recomputes the colors: they can differ by a few units from the codes shown, and the
+  order of the added filaments can differ from the palette's. The `.mtl` has to stay beside the `.obj`: from a zip,
+  OrcaSlicer only reads the OBJ and opens it without color. Save the colored OBJ therefore copies both files to
+  Downloads.
+- Zipped textured OBJ (OBJ, MTL and PNG, in mm, Z up), for a true-color print service (Sculpteo, i.materialise...).
+  The texture is 2048 px in LowPoly and 4096 px in Medium and Detailed, or the size chosen in Baked textures; areas no
+  photo shows (under the model, holes in the scan) take the color of their surroundings instead of black. It adds a
+  few seconds to a minute to the computation.
 
-Pour les deux premiers, les couleurs des photos sont regroupées en 4 teintes par défaut, de 2 à 8 avec le réglage « Filaments pour l'impression en couleur ». Un îlot de couleur plus petit que (4 × buse)², environ 2,6 mm² avec une buse de 0,4, prend la couleur voisine la plus proche ; deux teintes trop proches (écart Lab inférieur à 12) ne prennent pas deux bobines. La palette s'affiche avec le numéro et le code de chaque couleur.
+For the first two, the photo colors are grouped into 4 hues by default, from 2 to 8 with the Filaments for color
+printing setting. A color island smaller than (4 × nozzle)², about 2.6 mm² with a 0.4 nozzle, takes the closest
+neighboring color; two hues too close to each other (Lab distance below 12) do not take two spools. The palette shows
+each color's number and code.
 
-Les couleurs viennent des photos, ombres et reflets compris.
+The colors come from the photos, shadows and reflections included.
 
-## Exports 3D hors impression
+## 3D exports
 
-Trois cases dans Réglages avancés, et dans « Recalculer avec ces réglages », produisent le modèle nettoyé pour d'autres usages que l'impression. Elles sont décochées par défaut : sans elles, le calcul reste celui d'avant. Chaque profil donne un zip, à la taille réelle en mètres (tirée de la hauteur saisie), base centrée sur l'origine, Y vers le haut dans les GLB et FBX.
+Three boxes in Advanced settings, and in Recompute with these settings, produce the cleaned-up model for uses other than
+printing. They are unchecked by default: without them, the computation stays as before. Each profile gives a zip in
+meters, base centered on the origin, Y up in the GLB and FBX files, with a `README.txt` in the app's language that
+describes its files and their conventions.
 
-- Logiciels 3D (Blender, sculpture, animation) : 20 000 quads environ par QuadriFlow, le remailleur de Blender, textures 4096, fichiers `.blend` (textures à côté, chemins relatifs), FBX et OBJ. Si QuadriFlow refuse le modèle, le profil sort en triangles et le journal le dit. Pour animer un personnage, une retopologie à la main reste utile : QuadriFlow aligne les quads sur la forme, sans tenir compte des articulations.
-- Jeux (Unity, Unreal, Godot) : 50 000 triangles et deux niveaux de détail à 50 et 25 %, en GLB et en FBX, couleur en JPEG et normal map en PNG, 2048 px.
-- Web (three.js, model-viewer) : un GLB de 50 000 triangles, textures JPEG 2048, environ 1,7 Mo sur le scan de test. Une version compressée Draco s'y ajoute quand le Blender installé contient la bibliothèque Draco, ce qui est le cas du Blender 5.2.3 officiel (vérifié dans la CI Windows) ; le fichier est contrôlé, car l'export de Blender réussit sans elle mais n'écrit alors rien de compressé.
+- 3D software (Blender, sculpting, animation): about 20,000 quads by QuadriFlow, Blender's remesher, PNG textures of
+  4096, `.blend` (textures beside it, relative paths), FBX and OBJ files. If QuadriFlow refuses the model, the profile
+  comes out in triangles and the log says so. To animate a character, a manual retopology is still useful: QuadriFlow
+  follows the shape, not the joints.
+- Games (Unity, Unreal, Godot): 50,000 triangles and two levels of detail at 50 and 25 %, as GLB and FBX, color in JPEG
+  (quality 95), normal map and roughness in PNG, 2048 px. `_normal_dx.png` is the normal map with green flipped, for
+  Unreal with the FBX: Unreal 5.7's glTF import flips green itself (`InterchangeGltfTranslator.cpp`), its FBX import
+  does not.
+- Web (three.js, model-viewer): a GLB of 50,000 triangles, JPEG textures (color at quality 90, normal map at 95) or
+  WebP, 2048 px: 3.0 MB on the 507,000-face test bust. A Draco-compressed version (UVs on 14 bits instead of 12, which
+  round them to half a texel of a 2048 texture) and a meshopt-compressed version are added, 1.6 and 2.0 MB on the same
+  scan, when the installed Blender has their libraries, as the official Blender 5.2 does. Each file is checked:
+  Blender's export succeeds without the library but then writes nothing compressed.
 
-Pour chaque profil : morceaux détachés retirés, surface fermée et lissée comme pour l'impression, puis réduction, dépliage UV (Smart UV Project), couleurs des photos cuites dans une texture et relief du modèle lissé dans une normal map. Sans couleurs exploitables, seule la normal map est livrée. Durées mesurées sur un petit scan de test, processeur à 4 cœurs : 15 s environ pour Web ou Jeux, une minute environ pour Logiciels 3D ; davantage sur un scan détaillé. Ces fichiers portent des noms en anglais (`_software`, `_game`, `_web`).
+For each profile: detached pieces removed, surface closed and smoothed as for printing, reduction, then UV unwrap by
+Smart UV Project and packing of the islands by their real outline, at any angle (on the test bust, 62 % of the texture
+used instead of 55 %, and 8.7 texels between islands at the first percentile instead of 4.6, which mipmaps need).
+Cycles then bakes, with several rays per texel (Antialiasing setting):
+- the photos' colors; areas no photo shows (under the bust, holes in the scan) take the color of their surroundings
+  instead of black;
+- the relief, into a MikkTSpace tangent-space normal map, from the scan or from the smoothed model (Relief setting);
+- the scan's roughness when it has one (Object Capture at High), otherwise a fixed value (Finish setting), without
+  metal.
 
-## Langues
+The GLB and FBX files carry the tangents of the bake. Without them, three.js r160 derives its own frame from screen
+derivatives (`GLTFLoader.js`); on a close-up of the test bust, the measured difference stays small (at most 16/255, on
+0.04 % of the pixels). The GLB files are single-sided (no `doubleSided`), the solid being closed. FBX has no slot for
+roughness: Blender's exporter puts it in the Phong shininess slot, which Unreal 5.7's FBX import (Interchange, ufbx)
+treats as such. The FBX therefore gets the map's mean, and `_roughness.png` stays beside it to plug in by hand; the GLB
+carries it. Without usable colors, only the normal map is delivered.
 
-L'app existe en anglais (langue par défaut), français, espagnol, allemand, portugais du Brésil, chinois simplifié et japonais. Au premier lancement, elle prend la langue de l'interface du système, lue par le moteur Python (sous Windows, le navigateur intégré ne la donne pas de façon fiable) ; une langue absente de la liste donne l'anglais, le chinois traditionnel aussi. Le menu en haut à droite change de langue ; le choix est gardé dans `data/prefs.json`. L'installeur Windows s'affiche dans la langue du système parmi les sept.
+Times measured on an M2 Ultra with 24 cores, after 9 s of import and cleanup: on the test bust (507,000 faces, 8192
+texture, Max resolution), 6 s for Web, 7 s for Games and 48 s for 3D software at 8192; on the small scan of the
+end-to-end test (Suzanne photos), 4, 5 and 18 s.
 
-Les textes sont dans `app/static/i18n/<langue>.json`, partagés par l'interface (`tr()`) et par le moteur (`engine/i18n.py`, clés `srv.`). La page de démarrage en garde une copie : après une modification des clés `splash.`, lancer `python desktop/splash_strings.py`. `tests/i18n_test.py` vérifie que les sept fichiers ont les mêmes clés et les mêmes variables, et que le code n'utilise que des clés existantes. Les messages déjà enregistrés dans un projet (étapes, erreurs, journal) restent dans la langue où ils ont été écrits.
+### 3D export settings
 
-Les fichiers produits ont des noms anglais pour tout le monde depuis la 0.5.0 (`_colors.glb`, `_colors_orca.obj`, `_colors_texture.zip`, vues `_front`, `_right`, `_back`, `_three_quarter`) ; ceux des projets déjà calculés gardent leur nom.
+Under the profile boxes, once a profile is checked:
 
-## Dossiers de l'app installée
+| Setting | Choices | Effect |
+|---|---|---|
+| Real height | empty, or 0.1 to 100,000 cm | size of the object in the exports; empty, the printed height (80 mm gives an 8 cm GLB). COLMAP works in a frame without scale, and Object Capture only finds one when the HEIC photos carry depth: the real size comes from the user |
+| Mesh | Light (×0.5), Standard, Dense (×2), Very dense (×4) | face count of each profile |
+| Relief | Auto, Fine (scan), Smooth (model) | source of the normal map; Auto takes the scan for photogrammetry, the smoothed model for the AI or with Medium or Strong smoothing |
+| Finish | Auto, Matte (0.9), Satin (0.6), Glossy (0.3) | roughness; Auto bakes the scan's if it has one, otherwise 0.9, Object Capture's value for a scan without a map |
+| Web profile images | JPEG, WebP | WebP makes the GLB lighter (`EXT_texture_webp` extension, read by three.js and model-viewer) |
 
-Données dans `~/Library/Application Support/com.pencilpark.berriacraft` (Mac) ou `%LOCALAPPDATA%\com.pencilpark.berriacraft` (Windows) :
-- `runtime`, `venv` : Python privé de l'app et ses bibliothèques ;
-- `data/tools` : Blender, COLMAP, OpenMVS, OrcaSlicer (Windows) installés par l'app ; `data/models` : modèles du module IA ;
-- `Projects/<date>-<nom>` : photos reçues, reconstructions en cache, exports par niveau (le dossier `Projets` des versions précédentes est renommé au premier lancement de la 0.5.0) ;
-- `logs/serveur.log` : journal du moteur.
+### Baked textures
 
-Les STL enregistrés vont dans Téléchargements. Un projet se supprime depuis la liste des projets (corbeille, avec confirmation) : son dossier est effacé, sauf pendant un calcul ; les fichiers déjà enregistrés dans Téléchargements restent.
+Once the textured OBJ or a profile is checked, for color printing as for the exports:
 
-## Construire les installeurs
+| Setting | Choices | Effect |
+|---|---|---|
+| Size | Auto, 1024, 2048, 4096, 8192 px | Auto: 2048 in LowPoly and for Web and Games, 4096 otherwise, 8192 at Max resolution. Any size is brought down to the largest one free memory can bake, and the log says so |
+| Antialiasing | 1, 4 or 16 rays per texel | Cycles spreads the rays over the texel, which softens edges; 4 by default. On the test bust, the Web profile takes 5.7 s with 1 ray, 6.0 s with 4 and 7.4 s with 16 (M2 Ultra) |
 
-Mac : `desktop/build_mac.sh` (Rust, Node et uv requis). Il rassemble Python 3.11.14, uv 0.13.5 (SHA-256 vérifié), les roues du socle pour macOS 14 arm64, `HelloPhotogrammetry` et le moteur, puis Tauri produit l'app et le DMG dans `desktop/src-tauri/target/release/bundle/`.
+The memory of a bake was measured with Blender 5.2.2 on the 3D software profile of the test bust: peaks of 3.3 GB at
+1024, 4.0 at 2048, 7.0 at 4096 and 18.8 at 8192, so 235 more bytes per texel. The app counts 240 bytes per texel and
+leaves 1.5 GiB to the system: about 18 GB free for 8192, 6 for 4096 and 3 for 2048. On an 8 GB Mac, 4096 therefore
+needs more than 5.6 GB free. `LOWPOLY_FREE_MEMORY_GB` (in GiB) replaces the measured free memory, to try on a large
+machine what a small one would do (`LOWPOLY_FREE_MEMORY_GB=3`) or to keep memory for other work.
 
-Windows : la CI `windows-installer` construit l'installeur à chaque envoi sur GitHub, l'installe en silence, vérifie le démarrage et l'arrêt du moteur et la fenêtre, puis le publie comme artefact `berria-craft-windows`. Sur une machine Windows : `desktop\build_windows.ps1`.
+## Languages
 
-Publier une version : monter la version dans `desktop/src-tauri/tauri.conf.json` et `Cargo.toml`, écrire `desktop/release-notes.md`, puis lancer à la main la CI `windows-installer` sur `dev` (Actions, windows-installer, Run workflow, case « release » cochée) ou envoyer une étiquette `vX.Y.Z`. La CI crée la release GitHub `vX.Y.Z` avec l'installeur testé, et l'étiquette si elle manque. Le DMG, construit sur un Mac avec `desktop/build_mac.sh`, s'ajoute ensuite à cette release (`gh release upload vX.Y.Z "desktop/src-tauri/target/release/bundle/dmg/Berria Craft_X.Y.Z_aarch64.dmg"`).
+The app comes in English (the default), French, Spanish, German, Brazilian Portuguese, Simplified Chinese and
+Japanese. At first launch it takes the system's interface language, read by the Python engine (on Windows, the built-in
+browser does not report it reliably); a language outside the list gives English, and so does Traditional Chinese. The
+menu at the top right changes the language; the choice is kept in `data/prefs.json`. The Windows installer shows in the
+system language among the seven.
 
-Mode développeur, dans un navigateur : `start.command`, puis http://127.0.0.1:8642.
+The texts live in `app/static/i18n/<language>.json`, shared by the interface (`tr()`) and the engine
+(`engine/i18n.py`, `srv.` keys). The start page keeps a copy of its own: after changing `splash.` keys, run
+`python desktop/splash_strings.py`. `tests/i18n_test.py` checks that the seven files have the same keys and
+placeholders, and that the code only uses existing keys. Messages already saved in a project (steps, errors, log) stay
+in the language they were written in.
 
-## Ligne de commande
+Output files have English names for everyone since 0.5.0 (`_colors.glb`, `_colors_orca.obj`, `_colors_texture.zip`,
+views `_front`, `_right`, `_back`, `_three_quarter`, profiles `_software`, `_game`, `_web`); those of projects computed
+earlier keep their names.
+
+## Folders of the installed app
+
+Data in `~/Library/Application Support/com.pencilpark.berriacraft` (macOS) or
+`%LOCALAPPDATA%\com.pencilpark.berriacraft` (Windows):
+- `runtime`, `venv`: the app's private Python and its libraries;
+- `data/tools`: Blender, COLMAP, OpenMVS, OrcaSlicer (Windows) installed by the app; `data/models`: the AI module's
+  models;
+- `Projects/<date>-<name>`: photos received, cached reconstructions, exports per level (the `Projets` folder of earlier
+  versions is renamed at the first launch of 0.5.0);
+- `logs/serveur.log`: the engine's log.
+
+Saved files go to Downloads. A project is deleted from the project list (trash icon, with confirmation): its folder is
+erased, except during a computation; files already saved to Downloads stay.
+
+## Build from source
+
+### macOS
+
+Requires an Apple silicon Mac with macOS 14 or later, Xcode, Rust, Node.js and uv.
+
+1. Build Apple's sample code [Creating a photogrammetry command-line app](https://developer.apple.com/documentation/realitykit/creating-a-photogrammetry-command-line-app)
+   in Release with Xcode, and copy its `HelloPhotogrammetry` executable to `~/.local/bin` (or point `LOWPOLY_HELPER` at
+   it). `HelloPhotogrammetry --help` must list the `-d` option with `raw`.
+2. Run `zsh desktop/build_mac.sh`. It gathers Python 3.11.14, uv 0.13.5 (SHA-256 checked), the core wheels for macOS 14
+   arm64, `HelloPhotogrammetry`, the engine, `LICENSE` and `THIRD_PARTY_NOTICES.md`, then Tauri builds the app and the
+   DMG in `desktop/src-tauri/target/release/bundle/`.
+
+The DMG step lays out its window through the Finder, so the terminal app needs the Automation permission for Finder
+(System Settings > Privacy & Security > Automation). While macOS waits for that consent, the build fails with
+`AppleEvent timed out (-1712)`. `CI=true zsh desktop/build_mac.sh` skips the window layout.
+
+### Windows
+
+The `windows-installer` workflow builds the installer on every push, installs it silently, checks that the engine
+starts and stops and that the window loads, then uploads it as the `berria-craft-windows` artifact. On a Windows
+machine with Rust (MSVC toolchain), Node.js and uv: `desktop\build_windows.ps1`.
+
+### Releasing a version
+
+1. Bump the version in `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/Cargo.toml` and
+   `desktop/src-tauri/Cargo.lock`, and write `desktop/release-notes.md`.
+2. Run the `windows-installer` workflow by hand on `dev` (Actions > windows-installer > Run workflow, with "release"
+   ticked), or push a `vX.Y.Z` tag. The workflow creates the GitHub release `vX.Y.Z` with the tested installer, and the
+   tag if it is missing.
+3. Build the DMG on a Mac and add it to the release:
+   `gh release upload vX.Y.Z "desktop/src-tauri/target/release/bundle/dmg/Berria Craft_X.Y.Z_aarch64.dmg"`.
+
+## Development
+
+```sh
+uv venv .venv --python 3.11
+uv pip install --python .venv/bin/python -r requirements-core.txt   # add -r requirements-ai.txt for the AI module
+./start.command                                                     # then http://127.0.0.1:8642
+```
+
+The engine looks for Blender 5.0 or later in the app's tools folder, then in `/Applications` and `~/Applications`
+(macOS) or Program Files (Windows), and for `HelloPhotogrammetry` in `~/.local/bin`.
+
+| Variable | Effect |
+|---|---|
+| `LOWPOLY_BLENDER` | Blender executable to use |
+| `LOWPOLY_PHOTOGRAMMETRY` | Object Capture tool (`HelloPhotogrammetry`) |
+| `LOWPOLY_ORCA` | OrcaSlicer |
+| `LOWPOLY_DATA`, `LOWPOLY_PROJECTS`, `LOWPOLY_DOWNLOADS` | data, projects and saved-files folders |
+| `LOWPOLY_HOME` | root of the installed app's data (launcher) |
+| `LOWPOLY_LANG` | language: `en`, `fr`, `es`, `de`, `pt-BR`, `zh-CN` or `ja` |
+| `LOWPOLY_FREE_MEMORY_GB` | free memory to assume, in GiB |
+| `LOWPOLY_PREVIEW_ENGINE` | `cycles` renders the previews on the CPU |
+| `LOWPOLY_DEVICE` | TripoSR device: `cuda`, `mps` or `cpu` |
+| `LOWPOLY_TRIPOSR_WEIGHTS`, `LOWPOLY_DINO_CONFIG` | local AI model files |
+| `LOWPOLY_HELPER` | `HelloPhotogrammetry` to bundle (`desktop/build_mac.sh`) |
+
+### Command line
 
 ```sh
 B=/Applications/Blender.app/Contents/MacOS/Blender
 $B -b --factory-startup --python-exit-code 1 -P engine/blender_lowpoly.py -- \
-  --input scan.usdz --outdir sortie --name buste --level lowpoly --height-mm 80 --previews --colors --smooth 1
-# mêmes options et --profiles-only software,game,web : les profils d'export seuls
+  --input scan.usdz --outdir out --name bust --level lowpoly --height-mm 80 --previews --colors --smooth 1
+# same options plus --profiles-only software,game,web: the export profiles only
 .venv/bin/python engine/cli.py photos/ --niveau medium --resolution max --exports game,web
-.venv/bin/python engine/triposr_infer.py photo.jpg sortie/brut.obj
+.venv/bin/python engine/cli.py photos/ --exports web --hauteur-reelle 30 --textures 4096 --anticrenelage 16 --images-web webp
+.venv/bin/python engine/triposr_infer.py photo.jpg out/raw.obj
 ```
 
-Tests : `tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`, `tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/couleurs_test.py`, `tests/photo_res_test.py`, `tests/preview_fallback_test.py`, `tests/smoke_test.py` (`--max` : un calcul complet en résolution Max).
+`engine/cli.py --help` lists every option, in the app's language.
+
+### Tests
+
+`tests/setup_ai_test.py`, `tests/setup_tools_test.py`, `tests/orientation_test.py`, `tests/photogrammetry_win_test.py`,
+`tests/boot_test.py`, `tests/save_race_test.py`, `tests/delete_project_test.py`, `tests/couleurs_test.py`,
+`tests/photo_res_test.py`, `tests/i18n_test.py`, `tests/preview_fallback_test.py`, `tests/exports_test.py` (needs
+Blender) and `tests/smoke_test.py` (end to end on the fixture photos; `--max` for a full run at Max resolution). The
+Windows workflow runs all of them on every push except `tests/save_race_test.py` and `tests/preview_fallback_test.py`.
+
+### Layout
+
+- `app/`: the local server (`server.py`, FastAPI) and the interface (`static/index.html`, a three.js viewer,
+  translations in `static/i18n/`).
+- `engine/`: the pipeline (`pipeline.py`), the headless Blender step (`blender_lowpoly.py`), the Windows photogrammetry
+  (`photogrammetry_win.py`), the tool and AI installers, the command line.
+- `desktop/`: the Tauri shell (`src-tauri/`), the launcher (`boot.py`), the start page (`ui/`), the build scripts.
+- `vendor/TripoSR/`: the TripoSR source, unmodified.
+- `tests/`: the tests and their fixtures.
+
+## Contributing
+
+Issues and pull requests are welcome. Run `python tests/i18n_test.py` and the tests that match your change; the Windows
+workflow runs most of them on every push.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The installers bundle, and the app downloads, third-party software under its own
+licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Berria Craft is made by Frédéric BERRIA (Pencil Park).
