@@ -1,7 +1,9 @@
 [package]
 name = "berria-craft"
-version = "0.5.2"
-description = "Photos vers impression 3D"
+version = "0.5.3"
+description = "Photos to printable 3D models"
+license = "MIT"
+repository = "https://github.com/pencilpark/laul3D"
 edition = "2021"
 
 [build-dependencies]
