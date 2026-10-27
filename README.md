@@ -1,10 +1,10 @@
 # Berria Craft
 
 Desktop app for macOS and Windows: drop in photos of an object and get back a watertight STL sized for the Creality
-Ender-3 V3 (build volume 220 × 220 × 250 mm), from a faceted LowPoly look to a detailed model. It also writes color
-files for multi-filament printers and color print services, and cleaned-up models for 3D software, game engines and the
-web. It opens in its own window, without a browser. Everything is computed on the computer and no photo goes online;
-only the tools and the optional AI module are downloaded, once, from their official sites.
+Ender-3 V3 (build volume 220 × 220 × 250 mm), turning a faceted Low-Poly look into a detailed model. It also writes colour
+files for multi-filament printers and colour print services, and cleaned-up models for 3D software, game engines and the
+web. It opens in its own window, without a browser. Everything is computed on the computer, and no photo goes online;You download 
+only the tools and the optional AI module once from their official sites.
 
 The interface is in English, French, Spanish, German, Brazilian Portuguese, Simplified Chinese and Japanese.
 
@@ -13,29 +13,29 @@ The interface is in English, French, Spanish, German, Brazilian Portuguese, Simp
 The installers are attached to each [GitHub release](https://github.com/pencilpark/laul3D/releases), where GitHub
 replaces the space in the file name with a dot (`Berria.Craft_…`).
 
-- macOS (Apple silicon, macOS 14 Sonoma or later): open `Berria Craft_0.5.3_aarch64.dmg` and drag Berria Craft into
-  Applications. The app is not notarized: downloaded on a Mac, it has to be allowed once in System Settings > Privacy &
+- macOS (Apple Silicon, macOS 14 Sonoma or later): open `Berria Craft_0.5.3_aarch64.dmg` and drag Berria Craft into
+  Applications. The app is not notarised: downloaded on a Mac, it has to be allowed once in System Settings > Privacy &
   Security > Open Anyway. Built on the same Mac, it opens directly.
 - Windows 10 or 11, 64-bit: run `Berria Craft_0.5.3_x64-setup.exe`. The installer is not signed: SmartScreen asks once
   for More info, then Run anyway. It installs for the current user, without administrator rights.
 
-At first launch the app prepares its computing environment (a minute at most), then offers the missing tools in a
+At first launch, the app prepares its computing environment (a minute at most), then offers the missing tools in a
 window: Blender (required), OrcaSlicer, and on Windows the COLMAP + OpenMVS photogrammetry. The One photo (AI) module
-installs separately, from the header. On Windows, COLMAP, OpenMVS and the AI module need the Microsoft Visual C++
+installs separately from the header. On Windows, COLMAP, OpenMVS and the AI module need the Microsoft Visual C++
 runtime, which Windows asks permission to install.
 
 ## Engines
 
-Several photos (20 or more, 50 for a faithful bust): the shape comes from the photos, nothing is invented.
+Several photos (20 or more, 50 for a faithful bust): the shape comes from the photos; nothing is invented.
 - macOS: Apple Object Capture, through the `HelloPhotogrammetry` tool shipped with the app.
-- Windows: COLMAP 4.2.1 places the photos, OpenMVS 2.4.0 builds the mesh and its texture, on the CPU. TextureMesh's
-  seam leveling is turned off: in 2.4.0 it blackens textures (OpenMVS issue #1257). COLMAP extracts features from as
+- Windows: COLMAP 4.2.1 places the photos; OpenMVS 2.4.0 builds the mesh and its texture on the CPU. TextureMesh's
+  seam levelling is turned off: in 2.4.0 it blackens textures (OpenMVS issue #1257). COLMAP extracts features from as
   many photos at once as free memory allows (about 0.8, 1.2 and 3.1 GB per photo at Low, Medium and High resolution),
   instead of one per core, so that High resolution does not make Windows page on 8 GB; the features found stay the
   same. COLMAP and OpenMVS run at low priority. Since COLMAP works in an arbitrary frame, the app stands the model up
   from the photos: their average "up" gives the vertical, the first photo gives the front.
 
-One photo: the TripoSR AI (Stability AI and Tripo, MIT license) estimates the shape and colors from the main photo,
+One photo: the TripoSR AI (Stability AI and Tripo, MIT license) estimates the shape and colours from the main photo,
 cut out by rembg. The back is guessed. The module is optional and weighs about 2.2 GB (4 to 4.7 GB on a PC with an
 NVIDIA card, where torch comes in its CUDA build).
 
@@ -63,7 +63,7 @@ if needed, then generate Medium or Detailed.
 The Photo resolution setting, under the level of detail and in Adjust this model, picks the size of the photos the
 photogrammetry uses, independently of the level. Auto, the default, follows the level: Low for LowPoly, Medium for
 Medium, High for Detailed. Low, Medium, High or Max apply to every level, which then share the same scan. It has no
-effect on One photo (AI).
+effect on One Photo (AI).
 
 | Resolution | macOS: Object Capture | Windows: COLMAP, then OpenMVS | Scan texture (Windows) |
 |---|---|---|---|
