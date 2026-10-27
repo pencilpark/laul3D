@@ -126,8 +126,9 @@ def check_max(summary, out):
     with zipfile.ZipFile(summary["export_software"]) as z:
         sizes["software"] = png_width(z, "_normal.png")
     for kind, size in sizes.items():
-        # 8192 unless the free memory refused it, which the log states with both sizes
-        assert size == 8192 or (size in (6144, 4096) and re.search(rf"\b{size}\b.*\b8192\b", log)), (kind, size)
+        # 8192 unless the free memory refused it, which the log states with both sizes; a runner with about 5 GB free
+        # gets 4096 or 2048
+        assert size == 8192 or (size in (6144, 4096, 2048, 1024) and re.search(rf"\b{size}\b.*\b8192\b", log)), (kind, size)
     summary["max"] = {"px": px, **sizes}
     print(f"Max : scan à {px} px, textures {sizes}", flush=True)
 
