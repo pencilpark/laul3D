@@ -17,11 +17,14 @@ from PIL import Image, ImageOps
 
 import i18n
 
-try:
-    import pillow_heif
-    pillow_heif.register_heif_opener()
-except ImportError:
-    pass
+# HEIC photos (iPhone): pi-heif reads them with libheif and libde265, both LGPL. pillow-heif, the GPL-licensed sibling
+# that also bundles the x265 encoder, may remain in an environment set up before 0.5.3
+for _heif in ("pi_heif", "pillow_heif"):
+    try:
+        importlib.import_module(_heif).register_heif_opener()
+        break
+    except ImportError:
+        continue
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IS_WIN = sys.platform == "win32"
