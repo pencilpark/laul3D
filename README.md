@@ -1,5 +1,7 @@
 # Berria Craft
 
+**[Download Berria Craft for macOS and Windows](https://demo.pencil-park.com/berriacraft/)** · [Watch the demo video](https://demo.pencil-park.com/berriacraft/demo.mp4) (MP4, 47 MB)
+
 Desktop app for macOS and Windows: drop in photos of an object and get back a watertight STL sized for the Creality
 Ender-3 V3 (build volume 220 × 220 × 250 mm), turning a faceted Low-Poly look into a detailed model. It also writes colour
 files for multi-filament printers and colour print services, and cleaned-up models for 3D software, game engines and the
@@ -10,8 +12,9 @@ The interface is in English, French, Spanish, German, Brazilian Portuguese, Simp
 
 ## Install
 
-The installers are attached to each [GitHub release](https://github.com/pencilpark/laul3D/releases), where GitHub
-replaces the space in the file name with a dot (`Berria.Craft_…`).
+Download the installers from [demo.pencil-park.com/berriacraft](https://demo.pencil-park.com/berriacraft/), or from
+each [GitHub release](https://github.com/pencilpark/laul3D/releases), where GitHub replaces the space in the file
+name with a dot (`Berria.Craft_…`).
 
 - macOS (Apple Silicon, macOS 14 Sonoma or later): open `Berria Craft_0.5.3_aarch64.dmg` and drag Berria Craft into
   Applications. The app is not notarised: downloaded on a Mac, it has to be allowed once in System Settings > Privacy &
