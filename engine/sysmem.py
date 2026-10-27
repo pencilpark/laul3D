@@ -9,7 +9,14 @@ import sys
 
 
 def free_memory():
-    """Bytes of physical memory available now, or None when unknown."""
+    """Bytes of physical memory available now, or None when unknown. LOWPOLY_FREE_MEMORY_GB stands in for the
+    measure: to try what an 8 GB computer would get, or to leave memory to other work."""
+    forced = os.environ.get("LOWPOLY_FREE_MEMORY_GB")
+    if forced:
+        try:
+            return float(forced) * 2 ** 30
+        except ValueError:
+            pass
     try:
         if sys.platform == "win32":
             import ctypes

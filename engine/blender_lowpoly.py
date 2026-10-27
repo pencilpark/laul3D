@@ -4,6 +4,7 @@ Blender -b --factory-startup --python-exit-code 1 -P blender_lowpoly.py -- --inp
 --factory-startup keeps user add-ons (MCP servers on port 9876) from loading in this background instance.
 """
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -35,11 +36,13 @@ LEVELS = {
 SMOOTH = {1: (2, 1), 2: (3, 1), 3: (4, 2)}
 # texture for the color print services, per level: the facets of LowPoly need less
 TEXTURE_SIZE = {"lowpoly": 2048, "medium": 4096, "detailed": 4096}
-# photos at Max resolution: the textured OBJ and the 3D software profile get the largest of these textures whose bake
-# fits in free memory. Per pixel, from Blender 5's bake code: two BakePixel arrays (72 B), the float result and mask,
-# Cycles' primitive, differential and output passes (about 52 B), the image
+# photos at Max resolution: the textured OBJ and the 3D software profile ask for 8192. Every bake gets the largest
+# size up to the one asked whose bake fits in free memory. Per texel, measured with Blender 5.2.2 on the 3D software
+# profile of a 507,000-face scan: peaks of 3.3, 4.0, 7.0 and 18.8 GB from 1024 to 8192, 235 B more per texel
 HIRES_TEXTURES = (8192, 6144)
-BAKE_BYTES_PER_PIXEL = 150
+TEXTURE_STEPS = (8192, 6144, 4096, 2048, 1024)
+POWERS_OF_TWO = (8192, 4096, 2048, 1024)  # games and the web: mipmaps everywhere
+BAKE_BYTES_PER_PIXEL = 240
 MEMORY_RESERVE = 1.5 * 2 ** 30
 # export profiles outside printing: (faces, quads, texture px, extra levels of detail as fractions of the faces).
 # software comes last: it empties the scene to save its .blend
@@ -48,6 +51,9 @@ PROFILES = {
     "game": (50000, False, 2048, (0.5, 0.25)),
     "software": (20000, True, 4096, ()),
 }
+# roughness of each finish; matte is also what Object Capture gives a scan without a roughness map
+FINISHES = {"matte": 0.9, "satin": 0.6, "gloss": 0.3}
+IMAGE_EXT = {"PNG": "png", "JPEG": "jpg", "WEBP": "webp"}
 
 
 def parse_args():
@@ -82,6 +88,19 @@ def parse_args():
     ap.add_argument("--orient", type=float, nargs=9, help="row-major 3x3 rotation applied first (stands a COLMAP scan up)")
     ap.add_argument("--raw-axes", action="store_true", help="import OBJ coordinates as they are, without the Y-up conversion")
     ap.add_argument("--photo-res", default="", help="resolution of the photos behind the scan: max enlarges the textures")
+    ap.add_argument("--texture-size", choices=["auto", "1024", "2048", "4096", "8192"], default="auto",
+                    help="baked textures, lowered to what the free memory allows; auto: by level and profile, "
+                    "8192 for the textured OBJ and 3D software with --photo-res max")
+    ap.add_argument("--bake-samples", type=int, default=4, help="rays per texel of the texture bakes, spread over the "
+                    "texel: 1 gives jagged edges, 4 and up smooth them (antialiasing) for more time")
+    ap.add_argument("--real-height-mm", type=float, default=0.0, help="export profiles: the object's real height, "
+                    "0 = the printed height")
+    ap.add_argument("--relief", choices=["scan", "solid"], default="scan", help="export profiles: normal map baked "
+                    "from the scan (its fine relief, and its grain) or from the smoothed solid")
+    ap.add_argument("--finish", choices=["auto"] + list(FINISHES), default="auto", help="export profiles: roughness; "
+                    "auto bakes the scan's roughness map, matte without one")
+    ap.add_argument("--web-images", choices=["jpeg", "webp"], default="jpeg")
+    ap.add_argument("--density", type=float, default=1.0, help="export profiles: their faces times this")
     return ap.parse_args(argv)
 
 
@@ -89,14 +108,100 @@ def log(msg):
     print(f"[blender] {msg}", flush=True)
 
 
-def texture_size(a, size):
-    if a.photo_res != "max" or size < 4096:  # LowPoly's facets keep their 2048
-        return size
+def texture_size(a, size, steps=TEXTURE_STEPS):
+    """The size asked, or with auto the level's or profile's (8192 with Max photos, LowPoly's facets keeping their
+    2048), lowered to the largest step whose bake fits in free memory."""
+    if a.texture_size != "auto":
+        size = int(a.texture_size)
+    elif a.photo_res == "max" and size >= 4096:
+        size = HIRES_TEXTURES[0]
     free = sysmem.free_memory()
-    fit = next((t for t in HIRES_TEXTURES if free is None or t * t * BAKE_BYTES_PER_PIXEL + MEMORY_RESERVE <= free), size)
-    if fit != HIRES_TEXTURES[0]:
-        log(i18n.tr("srv.bl_texture_memory", size=max(fit, size), gb=f"{free / 2 ** 30:.1f}"))
-    return max(fit, size)
+    fit = next((t for t in steps if t <= size and (free is None or t * t * BAKE_BYTES_PER_PIXEL + MEMORY_RESERVE <= free)),
+               steps[-1])
+    if fit < size:
+        log(i18n.tr("srv.bl_texture_memory", size=fit, wanted=size, gb=f"{free / 2 ** 30:.1f}"))
+    return fit
+
+
+def new_image(name, size, data=False, color=(0.0, 0.0, 0.0, 0.0)):
+    """A bake target. Alpha 0 marks the texels no ray reaches: the bake writes alpha 1 where it hits."""
+    img = bpy.data.images.new(name, size, size, alpha=True, is_data=data)
+    img.generated_color = color
+    return img
+
+
+def save_image(img, path, fmt, quality):
+    img.filepath_raw = path
+    img.file_format = fmt
+    img.save(quality=quality)
+
+
+def _halve(c, w):
+    """Sums of 2 x 2 texels, the weights clamped to 1: a fully seen block counts as one texel at the next level."""
+    if c.shape[0] % 2 or c.shape[1] % 2:
+        pad = ((0, c.shape[0] % 2), (0, c.shape[1] % 2))
+        c, w = np.pad(c, pad + ((0, 0),)), np.pad(w, pad)
+    c = c[0::2, 0::2] + c[1::2, 0::2] + c[0::2, 1::2] + c[1::2, 1::2]
+    w = w[0::2, 0::2] + w[1::2, 0::2] + w[0::2, 1::2] + w[1::2, 1::2]
+    k = np.minimum(w, 1.0) / np.maximum(w, 1e-12)
+    return c * k[..., None], w * k
+
+
+def _double(x):
+    """Bilinear, twice the size: 9/16 of the nearest texel, 3/16 of each side neighbor, 1/16 of the corner."""
+    p = np.pad(x, ((1, 1), (1, 1), (0, 0)), mode="edge")
+    out = np.empty((2 * x.shape[0], 2 * x.shape[1], x.shape[2]), dtype=x.dtype)
+    for i, rows in ((0, slice(0, -2)), (1, slice(2, None))):
+        for j, cols in ((0, slice(0, -2)), (1, slice(2, None))):
+            out[i::2, j::2] = (9 * p[1:-1, 1:-1] + 3 * p[rows, 1:-1] + 3 * p[1:-1, cols] + p[rows, cols]) / 16
+    return out
+
+
+def fill_unseen(img, blue=None):
+    """Texels no ray reached, holes of the scan (under a bust, a missed armpit) and gaps between UV islands, take the
+    colors around them, spread by push-pull over halved copies, instead of black. blue, if given, then fills that
+    channel. Returns the mean of channel 0 over the texels seen."""
+    w, h = img.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    px = px.reshape(h, w, 4)
+    seen = px[..., 3] > 0.5
+    if not seen.any():
+        return 0.0
+    mean = float(px[..., 0][seen].mean())
+    if not seen.all():
+        # the first level by slices: no full-size premultiplied copy of an 8192 image
+        s = seen.astype(np.float32)
+        c = sum(px[i::2, j::2, :3] * s[i::2, j::2, None] for i in (0, 1) for j in (0, 1))
+        wt = sum(s[i::2, j::2] for i in (0, 1) for j in (0, 1))
+        k = np.minimum(wt, 1.0) / np.maximum(wt, 1e-12)
+        pyramid = [(c * k[..., None], wt * k)]
+        del s, c, wt, k
+        while max(pyramid[-1][1].shape) > 1:
+            pyramid.append(_halve(*pyramid[-1]))
+        c, wt = pyramid.pop()
+        out = c / np.maximum(wt, 1e-12)[..., None]
+        while pyramid:
+            c, wt = pyramid.pop()
+            out = c + (1.0 - wt)[..., None] * _double(out)[:wt.shape[0], :wt.shape[1]]
+        unseen = ~seen
+        px[..., :3][unseen] = _double(out)[:h, :w][unseen]
+    px[..., 3] = 1.0
+    if blue is not None:
+        px[..., 2] = blue
+    img.pixels.foreach_set(px.ravel())
+    return mean
+
+
+def flipped_green(img, name):
+    """The normal map in DirectX's convention, green inverted: Unreal Engine reads FBX normal maps that way."""
+    w, h = img.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    px[1::4] = 1.0 - px[1::4]
+    dx = bpy.data.images.new(name, w, h, alpha=True, is_data=True)
+    dx.pixels.foreach_set(px)
+    return dx
 
 
 def clear_scene():
@@ -487,34 +592,23 @@ def split_filaments(obj, count, min_island_area):
     return verts.reshape(-1, 3), tris, labels, palette
 
 
-def bake_texture(target, sources, reach, size, path):
+def bake_texture(target, sources, reach, size, path, samples):
     """The preview's projection again, into an image laid out by Smart UV Project: color print services print a
     texture, much finer than one color per vertex."""
-    for o in bpy.context.view_layer.objects:
-        o.select_set(o is target)
-    bpy.context.view_layer.objects.active = target
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.002)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    img = bpy.data.images.new("texture", size, size)
+    unwrap(target, size)
+    img = new_image("texture", size)
     mat = bpy.data.materials.new("texture")
     if mat.node_tree is None:
         mat.use_nodes = True
     nodes = mat.node_tree.nodes
     tex = nodes.new("ShaderNodeTexImage")
     tex.image = img
-    nodes.active = tex  # the bake writes into the active image node
     mat.node_tree.links.new(tex.outputs["Color"], next(n for n in nodes if n.type == "BSDF_PRINCIPLED").inputs[0])
     target.data.materials.clear()
     target.data.materials.append(mat)
-    for o in bpy.context.view_layer.objects:
-        o.select_set(o in sources or o is target)
-    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True, margin=8,
-                        cage_extrusion=reach, max_ray_distance=2 * reach, target="IMAGE_TEXTURES")
-    img.filepath_raw = path
-    img.file_format = "PNG"
-    img.save()
+    bake_image(target, sources, "DIFFUSE", img, reach, samples)
+    fill_unseen(img)
+    save_image(img, path, "PNG", 100)
 
 
 def export_textured(obj, outdir, name, png):
@@ -664,21 +758,30 @@ def retopo_quads(obj, faces):
     return "FINISHED" in done
 
 
-def unwrap(obj):
+def unwrap(obj, size):
+    """Smart UV Project, then its islands packed again by their real outline, turned at any angle. On the 50,000
+    triangles of a bust scan, the texture's used share goes from 55 to 62 % for one second more, and the gaps between
+    islands, at their first percentile, from 4.6 to 8.7 texels, which mipmaps need. The exact FRACTION margin takes
+    13 s."""
     select_only([], obj)
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.002)
+    bpy.ops.uv.select_all(action="SELECT")
+    bpy.ops.uv.pack_islands(rotate=True, rotate_method="ANY", scale=True, margin_method="ADD", margin=4 / size,
+                            shape_method="CONCAVE")
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def bake_image(target, sources, kind, image, reach):
-    """Selected-to-active bake into the target's active image node: the scan's colors, or the relief of the smooth
-    solid as a tangent-space normal map."""
+def bake_image(target, sources, kind, image, reach, samples=1):
+    """Selected-to-active bake into the target's image node that holds image: the scan's colors or roughness, or the
+    relief of the scan or of the smooth solid as a tangent-space normal map. Rays spread over each texel when there
+    are several, which smooths edges."""
     nodes = target.active_material.node_tree.nodes
     nodes.active = next(n for n in nodes if n.type == "TEX_IMAGE" and n.image is image)
     select_only(sources, target)
-    extra = {"pass_filter": {"COLOR"}} if kind == "DIFFUSE" else {"normal_space": "TANGENT"}
+    bpy.context.scene.cycles.samples = max(1, samples)
+    extra = {"DIFFUSE": {"pass_filter": {"COLOR"}}, "NORMAL": {"normal_space": "TANGENT"}}.get(kind, {})
     bpy.ops.object.bake(type=kind, use_selected_to_active=True, margin=8, cage_extrusion=reach,
                         max_ray_distance=2 * reach, target="IMAGE_TEXTURES", **extra)
 
@@ -698,13 +801,33 @@ def colors_usable(high, sources, reach):
     return problem is None
 
 
-def profile_material(obj, images):
-    """Principled BSDF with the color texture and the normal map, what the glTF, FBX and OBJ exporters read."""
+def linked_image(socket, depth=4):
+    """An image texture feeds this socket, directly or through a few nodes (Separate Color, Normal Map)."""
+    for link in socket.links if depth else ():
+        node = link.from_node
+        if node.type == "TEX_IMAGE" and node.image or any(linked_image(s, depth - 1) for s in node.inputs):
+            return True
+    return False
+
+
+def roughness_mapped(sources):
+    """The scan has a roughness map of its own (Object Capture at High), to bake like its colors."""
+    return any(linked_image(n.inputs["Roughness"]) for o in sources for s in o.material_slots
+               if s.material and s.material.node_tree for n in s.material.node_tree.nodes
+               if n.type == "BSDF_PRINCIPLED")
+
+
+def profile_material(obj, images, roughness):
+    """Principled BSDF with the color texture, the normal map and the roughness, what the glTF, FBX and OBJ
+    exporters read. One side only: a closed solid, so the GLB says doubleSided false."""
     mat = bpy.data.materials.new(obj.name)
     if mat.node_tree is None:
         mat.use_nodes = True
+    mat.use_backface_culling = True
     nodes = mat.node_tree.nodes
     bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Roughness"].default_value = roughness
+    bsdf.inputs["Metallic"].default_value = 0.0
     texs = {}
     for kind, img in images.items():
         texs[kind] = nodes.new("ShaderNodeTexImage")
@@ -714,8 +837,19 @@ def profile_material(obj, images):
     return mat, bsdf, texs
 
 
-def export_profile(p, high, sources, colors, reach, workdir, name, size):
+def image_formats(a, p):
+    """Format and quality of each map: lossless for 3D software; for games a JPEG color keeps the three GLB of the
+    levels of detail light and normal maps stay lossless; JPEG or WebP throughout for the web."""
+    if p == "web":
+        fmt = "WEBP" if a.web_images == "webp" else "JPEG"
+        return {"color": (fmt, 90), "normal": (fmt, 95), "roughness": (fmt, 90)}
+    return {"color": ("JPEG", 95) if p == "game" else ("PNG", 100), "normal": ("PNG", 100), "roughness": ("PNG", 100)}
+
+
+def export_profile(a, p, high, sources, colors, reach, workdir, size, scale, rough_map, roughness):
+    name = a.name
     faces, quads, _, lods = PROFILES[p]
+    faces = max(200, min(int(faces * a.density), len(high.data.polygons)))
     t1 = time.time()
     low = high.copy()
     low.data = high.data.copy()
@@ -736,30 +870,53 @@ def export_profile(p, high, sources, colors, reach, workdir, name, size):
     log(i18n.tr("srv.bl_profile_retopo", profile=p, s=seconds) if quads else
         i18n.tr("srv.bl_profile_decimate", profile=p, s=seconds))
     t1 = time.time()
-    unwrap(low)
+    unwrap(low, size)
 
-    images = {"normal": bpy.data.images.new(f"{name}_{p}_normal", size, size, is_data=True)}
+    relief = sources if a.relief == "scan" and sources else [high]
+    images = {"normal": new_image(f"{name}_{p}_normal", size, data=True, color=(0.5, 0.5, 1.0, 1.0))}
     if colors:
-        images["color"] = bpy.data.images.new(f"{name}_{p}_color", size, size)
-    mat, bsdf, texs = profile_material(low, images)
+        images["color"] = new_image(f"{name}_{p}_color", size)
+    if rough_map:  # roughness varies slowly: half the size
+        images["roughness"] = new_image(f"{name}_{p}_roughness", max(size // 2, 1024), data=True)
+    mat, bsdf, texs = profile_material(low, images, roughness)
     if colors:
-        bake_image(low, sources, "DIFFUSE", images["color"], reach)
-    bake_image(low, [high], "NORMAL", images["normal"], reach / 2)
+        bake_image(low, sources, "DIFFUSE", images["color"], reach, a.bake_samples)
+        fill_unseen(images["color"])
+    # the scan lies farther from the low mesh than the solid it was made from; a missed ray leaves the low normal
+    bake_image(low, relief, "NORMAL", images["normal"], reach if relief is sources else reach / 2, a.bake_samples)
+    if rough_map:
+        bake_image(low, sources, "ROUGHNESS", images["roughness"], reach, a.bake_samples)
+        # web: metalness 0 in blue, glTF's channel for it, next to the roughness in green
+        roughness = mat["roughness_mean"] = fill_unseen(images["roughness"], 0.0 if p == "web" else None)
     links = mat.node_tree.links
     if colors:
         links.new(texs["color"].outputs["Color"], bsdf.inputs["Base Color"])
     nmap = mat.node_tree.nodes.new("ShaderNodeNormalMap")
     links.new(texs["normal"].outputs["Color"], nmap.inputs["Color"])
     links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    if rough_map:
+        sep = mat.node_tree.nodes.new("ShaderNodeSeparateColor")
+        links.new(texs["roughness"].outputs["Color"], sep.inputs["Color"])
+        links.new(sep.outputs["Green"], bsdf.inputs["Roughness"])
+        if p == "web":
+            # both read from one file: the glTF exporter takes it as it is, a JPEG or WebP; with roughness alone it
+            # packs a new PNG, white in blue, three times heavier
+            links.new(sep.outputs["Blue"], bsdf.inputs["Metallic"])
+    formats = image_formats(a, p)
     for kind, img in images.items():
-        # game: a JPEG color keeps the three GLB of the levels of detail light; normal maps stay lossless
-        jpeg = p == "game" and kind == "color"
-        img.filepath_raw = os.path.join(workdir, f"{name}_{p}_{kind}.{'jpg' if jpeg else 'png'}")
-        img.file_format = "JPEG" if jpeg else "PNG"
-        img.save(quality=90)
-    log(i18n.tr("srv.bl_profile_textures", profile=p, size=size, s=f"{time.time() - t1:.1f}"))
+        fmt, quality = formats[kind]
+        save_image(img, os.path.join(workdir, f"{name}_{p}_{kind}.{IMAGE_EXT[fmt]}"), fmt, quality)
+    if p == "game":
+        dx = flipped_green(images["normal"], f"{name}_{p}_normal_dx")
+        save_image(dx, os.path.join(workdir, f"{name}_{p}_normal_dx.png"), "PNG", 100)
+    log(i18n.tr("srv.bl_profile_textures", profile=p, size=size, n=a.bake_samples, s=f"{time.time() - t1:.1f}"))
+    if relief is sources:
+        log(i18n.tr("srv.bl_profile_relief_scan", profile=p))
+    if rough_map:
+        log(i18n.tr("srv.bl_profile_roughness_map", profile=p, size=images["roughness"].size[0],
+                    value=f"{roughness:.2f}"))
 
-    low.data.transform(Matrix.Scale(0.001, 4))  # mm -> m
+    low.data.transform(Matrix.Scale(scale, 4))
     levels = [low]
     for frac in lods:
         lod = low.copy()
@@ -769,43 +926,99 @@ def export_profile(p, high, sources, colors, reach, workdir, name, size):
         decimate(lod, int(faces * frac))
         levels.append(lod)
     count = sum(len(f.vertices) - 2 for f in low.data.polygons) if not quads else len(low.data.polygons)
-    return levels, quads, count
+    info = {"faces": count, "quads": quads, "lods": len(levels), "colors": colors, "size": size,
+            "relief": "scan" if relief is sources else "solid", "roughness": round(roughness, 2),
+            "roughness_map": rough_map}
+    return levels, info
 
 
-def write_profile_files(p, levels, workdir, name):
-    """The formats of each profile, in meters. GLB: Y up as glTF requires. FBX and OBJ: the exporters' Y up axes,
-    what Maya, Unity or Unreal expect."""
+@contextlib.contextmanager
+def roughness_constant(obj):
+    """FBX has no roughness slot: Blender's exporter puts the map in the Phong shininess one, which the FBX import of
+    Unreal 5.7 (Interchange, ufbx) takes as a shininess map. The FBX gets the map's mean instead; the map itself goes
+    beside it and stays in the GLB."""
+    mat = obj.active_material
+    socket = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Roughness"]
+    if not socket.is_linked:
+        yield
+        return
+    source = socket.links[0].from_socket
+    mat.node_tree.links.remove(socket.links[0])
+    socket.default_value = mat.get("roughness_mean", socket.default_value)
+    try:
+        yield
+    finally:
+        mat.node_tree.links.new(source, socket)
+
+
+def export_fbx(path):
+    """With tangents, the MikkTSpace frame the normal map was baked in. They need triangles or quads only, which the
+    profiles have; on a refusal the FBX goes out without them."""
+    opts = dict(filepath=path, use_selection=True, path_mode="STRIP", embed_textures=False, apply_unit_scale=True)
+    try:
+        bpy.ops.export_scene.fbx(use_tspace=True, **opts)
+    except RuntimeError as e:
+        log(i18n.tr("srv.bl_profile_fbx_no_tangents", error=e))
+        bpy.ops.export_scene.fbx(**opts)
+    return path
+
+
+def compressed_glbs(stem, glb):
+    """The web GLB again, compressed by Draco and by meshopt, each kept only if it really is: without the library,
+    Blender's exporter writes an uncompressed file and still reports success, and older versions lack meshopt.
+    Draco keeps UVs at 14 bits: its default 12 rounds them to half a texel of a 2048 texture."""
     files = []
-    for obj in levels:
-        select_only([], obj)
-        stem = os.path.join(workdir, obj.name if p == "game" else f"{name}_{p}")
-        if p in ("web", "game"):
-            fmt = {"export_image_format": "JPEG", "export_jpeg_quality": 85} if p == "web" else {}
-            bpy.ops.export_scene.gltf(filepath=stem + ".glb", export_format="GLB", use_selection=True,
-                                      export_yup=True, export_materials="EXPORT", **fmt)
+    for suffix, opts, tag, missing in (
+            ("_draco", {"export_draco_mesh_compression_enable": True, "export_draco_texcoord_quantization": 14},
+             b"KHR_draco_mesh_compression", "srv.bl_profile_no_draco"),
+            ("_meshopt", {"export_meshopt_compression_enable": True}, b"EXT_meshopt_compression",
+             "srv.bl_profile_no_meshopt")):
+        path = stem + suffix + ".glb"
+        try:
+            bpy.ops.export_scene.gltf(filepath=path, **glb, **opts)
+            with open(path, "rb") as f:
+                done = tag in f.read(1 << 16)
+        except (TypeError, OSError):
+            done = False
+        if done:
+            files.append(path)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
+            log(i18n.tr(missing))
+    return files
+
+
+def write_profile_files(a, p, levels, workdir):
+    """The formats of each profile, in meters. GLB: Y up as glTF requires, with tangents, without which three.js
+    derives its own frame from screen derivatives instead of the MikkTSpace one the normal map was baked in. FBX and
+    OBJ: the exporters' Y up axes, what Maya, Unity or Unreal expect."""
+    name = a.name
+    files = []
+    stems = [os.path.join(workdir, obj.name if p == "game" else f"{name}_{p}") for obj in levels]
+    # AUTO keeps each map as the JPEG, WebP or PNG file saved above, with no second encoding
+    glb = dict(export_format="GLB", use_selection=True, export_yup=True, export_materials="EXPORT",
+               export_tangents=True, export_image_format="AUTO", export_image_quality=95)
+    if p in ("web", "game"):
+        for obj, stem in zip(levels, stems):
+            select_only([], obj)
+            bpy.ops.export_scene.gltf(filepath=stem + ".glb", **glb)
             files.append(stem + ".glb")
-        if p == "web":
-            draco = stem + "_draco.glb"
-            bpy.ops.export_scene.gltf(filepath=draco, export_format="GLB", use_selection=True, export_yup=True,
-                                      export_materials="EXPORT", export_draco_mesh_compression_enable=True, **fmt)
-            # without Blender's Draco library the exporter writes an uncompressed file and still reports success
-            with open(draco, "rb") as f:
-                if b"KHR_draco_mesh_compression" in f.read(1 << 16):
-                    files.append(draco)
-                else:
-                    os.remove(draco)
-                    log(i18n.tr("srv.bl_profile_no_draco"))
-        if p in ("game", "software"):
-            bpy.ops.export_scene.fbx(filepath=stem + ".fbx", use_selection=True, path_mode="STRIP",
-                                     embed_textures=False, apply_unit_scale=True)
-            files.append(stem + ".fbx")
-        if p == "software":
-            bpy.ops.wm.obj_export(filepath=stem + ".obj", export_selected_objects=True, export_uv=True,
-                                  export_normals=True, export_materials=True, path_mode="STRIP")
-            files += [stem + ".obj", stem + ".mtl"]
+    if p == "web":
+        files += compressed_glbs(stems[0], glb)
+    if p in ("game", "software"):
+        with roughness_constant(levels[0]):
+            for obj, stem in zip(levels, stems):
+                select_only([], obj)
+                files.append(export_fbx(stem + ".fbx"))
+    if p == "software":
+        select_only([], levels[0])
+        bpy.ops.wm.obj_export(filepath=stems[0] + ".obj", export_selected_objects=True, export_uv=True,
+                              export_normals=True, export_materials=True, path_mode="STRIP")
+        files += [stems[0] + ".obj", stems[0] + ".mtl"]
     if p != "web":
         files += sorted(os.path.join(workdir, f) for f in os.listdir(workdir) if f.startswith(f"{name}_{p}_")
-                        and f.endswith((".png", ".jpg")))
+                        and f.endswith(tuple("." + e for e in IMAGE_EXT.values())))
     if p == "software":
         obj = levels[0]
         for o in list(bpy.data.objects):
@@ -820,9 +1033,46 @@ def write_profile_files(p, levels, workdir, name):
     return files
 
 
+def write_readme(a, p, info, files, workdir):
+    """README.txt in the app's language: units, maps and their conventions, what each file is for."""
+    t = i18n.tr
+    names = {os.path.basename(f) for f in files}
+    titles = {"software": "ui.opt_software", "game": "ui.opt_game", "web": "ui.opt_web"}
+    lines = [a.name, t(titles[p]), "", t("srv.readme_units", height=f"{info['height_m']:.4g}"),
+             t("srv.readme_mesh_quads" if info["quads"] else "srv.readme_mesh_triangles", faces=info["faces"])]
+    if info["lods"] > 1:
+        lines.append(t("srv.readme_lods"))
+    lines += ["", t("srv.readme_textures", size=info["size"])]
+    if info["colors"]:
+        lines.append("- " + t("srv.readme_color"))
+    lines.append("- " + t("srv.readme_normal"))
+    lines.append("  " + t("srv.readme_relief_scan" if info["relief"] == "scan" else "srv.readme_relief_solid"))
+    if p == "game":
+        lines.append("- " + t("srv.readme_normal_dx"))
+    if info["roughness_map"] and p != "web":
+        lines.append("- " + t("srv.readme_roughness_map" if p == "game" else "srv.readme_roughness_file",
+                              value=info["roughness"]))
+    else:
+        lines.append(t("srv.readme_roughness_embedded") if info["roughness_map"] else
+                     t("srv.readme_roughness_value", value=info["roughness"]))
+    if p == "web" and a.web_images == "webp":
+        lines.append(t("srv.readme_webp"))
+    lines += ["", t("srv.readme_files")]
+    lines += ["- " + t(key) for ext, key in ((".glb", "srv.readme_glb"), ("_draco.glb", "srv.readme_draco"),
+                                             ("_meshopt.glb", "srv.readme_meshopt"), (".fbx", "srv.readme_fbx"),
+                                             (".obj", "srv.readme_obj"), (".blend", "srv.readme_blend"))
+              if any(n.endswith(ext) for n in names)]
+    path = os.path.join(workdir, "README.txt")
+    # BOM and CRLF: Windows Notepad shows the accents and the line breaks right
+    with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
 def export_profiles(a, high, sources, placed, fit, turn, height):
-    """The cleaned solid for 3D software, game engines and the web: base centered at the origin, real size in
-    meters, the scan's colors and the solid's relief baked into textures. One zip per profile."""
+    """The cleaned solid for 3D software, game engines and the web: base centered at the origin, in meters, at the
+    printed size or the real one, the scan's colors and roughness, and the relief of the scan or of the solid baked
+    into textures. One zip per profile."""
     lo, hi = bounds(object_to_bm(high))
     base = Matrix.Translation((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z))
     high.data.transform(base)
@@ -831,7 +1081,17 @@ def export_profiles(a, high, sources, placed, fit, turn, height):
     sc = bpy.context.scene
     sc.render.engine, sc.cycles.device, sc.cycles.samples = "CYCLES", "CPU", 1  # only Cycles bakes
     reach = 0.03 * height
-    colors = colors_usable(high, sources, reach)
+    colors = has_colors(sources) and colors_usable(high, sources, reach)
+    if a.relief == "scan":
+        # without normals of its own, flat faces would print the scan's triangles into the normal map
+        for o in sources:
+            if not o.data.has_custom_normals:
+                o.data.shade_smooth()
+    rough_map = a.finish == "auto" and roughness_mapped(sources)
+    roughness = FINISHES.get(a.finish, FINISHES["matte"])
+    scale = 0.001 * (a.real_height_mm / (hi.z - lo.z) if a.real_height_mm > 0 else 1.0)  # mm -> m
+    if a.real_height_mm > 0:
+        log(i18n.tr("srv.bl_profiles_real_height", m=f"{(hi.z - lo.z) * scale:.4g}", mm=f"{hi.z - lo.z:.0f}"))
     wanted = [p for p in PROFILES if p in a.profiles_only.split(",")]
     results = {}
     for p in wanted:
@@ -839,19 +1099,23 @@ def export_profiles(a, high, sources, placed, fit, turn, height):
         workdir = os.path.join(a.outdir, f"{a.name}_{p}")
         os.makedirs(workdir, exist_ok=True)
         try:
-            size = texture_size(a, PROFILES[p][2]) if p == "software" else PROFILES[p][2]
-            levels, quads, count = export_profile(p, high, sources, colors, reach, workdir, a.name, size)
-            files = write_profile_files(p, levels, workdir, a.name)
+            size = texture_size(a, PROFILES[p][2], TEXTURE_STEPS if p == "software" else POWERS_OF_TWO)
+            levels, info = export_profile(a, p, high, sources, colors, reach, workdir, size, scale, rough_map,
+                                          roughness)
+            info["height_m"] = round((hi.z - lo.z) * scale, 4)
+            files = write_profile_files(a, p, levels, workdir)
+            files.append(write_readme(a, p, info, files, workdir))
             path = os.path.join(a.outdir, f"{a.name}_{p}.zip")
             with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
                 for f in files:
                     z.write(f, os.path.basename(f))
-            results[p] = {"path": path, "faces": count, "quads": quads, "lods": len(levels), "colors": colors}
+            results[p] = {"path": path, **info}
             seconds = f"{time.time() - t1:.1f}"
-            if len(levels) > 1:
-                log(i18n.tr("srv.bl_profile_done_lods", profile=p, faces=count, n=len(levels), s=seconds))
+            count = info["faces"]
+            if info["lods"] > 1:
+                log(i18n.tr("srv.bl_profile_done_lods", profile=p, faces=count, n=info["lods"], s=seconds))
             else:
-                log(i18n.tr("srv.bl_profile_done_quads", profile=p, faces=count, s=seconds) if quads else
+                log(i18n.tr("srv.bl_profile_done_quads", profile=p, faces=count, s=seconds) if info["quads"] else
                     i18n.tr("srv.bl_profile_done_triangles", profile=p, faces=count, s=seconds))
         except (RuntimeError, OSError) as e:
             log(i18n.tr("srv.bl_profile_failed", profile=p, error=e))
@@ -861,6 +1125,9 @@ def export_profiles(a, high, sources, placed, fit, turn, height):
                 for o in list(bpy.data.objects):
                     if o is not high and o not in sources:
                         bpy.data.objects.remove(o, do_unlink=True)
+                # an 8192 map weighs 256 MB: the next profile's bakes get that memory back
+                for img in [i for i in bpy.data.images if i.name.startswith(f"{a.name}_{p}_")]:
+                    bpy.data.images.remove(img)
     print("PROFILES " + json.dumps(results), flush=True)
 
 
@@ -869,8 +1136,10 @@ def clean_solid(a):
     profiles share."""
     meshes = import_any(a.input, a.raw_axes)
     bm = merge_to_bmesh(meshes)
-    # the colored scan stays aside, frozen where it is, to color the result at the end
-    sources = meshes if a.colors and has_colors(meshes) else []
+    # the colored scan stays aside, frozen where it is, to color the result at the end, and the export profiles keep
+    # it to bake its relief too
+    colored = a.colors and has_colors(meshes)
+    sources = meshes if colored or (a.profiles_only and a.relief == "scan") else []
     placed = []
     for o in sources:
         mw = o.matrix_world.copy()
@@ -881,9 +1150,9 @@ def clean_solid(a):
     for o in list(bpy.data.objects):
         if o not in sources:
             bpy.data.objects.remove(o, do_unlink=True)
-    log(i18n.tr("srv.bl_import_colors", n=len(meshes), faces=len(bm.faces)) if sources else
+    log(i18n.tr("srv.bl_import_colors", n=len(meshes), faces=len(bm.faces)) if colored else
         i18n.tr("srv.bl_import", n=len(meshes), faces=len(bm.faces)))
-    if sources:
+    if colored:
         describe_textures(sources)
 
     turn = Euler([math.radians(r) for r in a.rot], "XYZ").to_matrix().to_4x4()
@@ -1015,7 +1284,7 @@ def main():
                     try:
                         png = os.path.join(a.outdir, f"{a.name}_colors.png")
                         t1, size = time.time(), texture_size(a, TEXTURE_SIZE[a.level])
-                        bake_texture(work, sources, 0.03 * height, size, png)
+                        bake_texture(work, sources, 0.03 * height, size, png, a.bake_samples)
                         report["texture"] = export_textured(work, a.outdir, a.name, png)
                         log(i18n.tr("srv.bl_texture_done", size=size, s=f"{time.time() - t1:.1f}"))
                     except (RuntimeError, OSError) as e:

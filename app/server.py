@@ -31,7 +31,14 @@ MODES = ("auto", "photogrammetry", "ia")
 DEFAULTS = {"height_mm": 80.0, "level": "lowpoly", "faces": 1000, "base_cut": 3.0,
             "rot_seq": "", "keep_parts": False, "nozzle": 0.4, "smooth": 0, "filaments": 4,
             "color_3mf": True, "color_obj": True, "color_texture": True,
-            "export_software": False, "export_game": False, "export_web": False, "photo_res": "auto"}
+            "export_software": False, "export_game": False, "export_web": False, "photo_res": "auto",
+            "texture_size": "auto", "bake_samples": 4, "real_height_cm": 0.0, "relief": "auto", "finish": "auto",
+            "web_images": "jpeg", "export_density": 1.0}
+# baked textures and export profiles: the choices the interface offers, the first one as fallback
+CHOICES = {"texture_size": ("auto", "1024", "2048", "4096", "8192"), "relief": ("auto", "scan", "solid"),
+           "finish": ("auto", "matte", "satin", "gloss"), "web_images": ("jpeg", "webp")}
+BAKE_SAMPLES = (1, 4, 16)
+DENSITIES = (0.5, 1.0, 2.0, 4.0)
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 
 i18n.startup_language(pl.DATA)
@@ -93,6 +100,13 @@ def clean_settings(raw, base=None):
         s["level"] = "lowpoly"
     if s["photo_res"] not in pl.PHOTO_RES:
         s["photo_res"] = "auto"
+    # 0: the exports keep the printed height
+    real = num("real_height_cm", 0.0, 100000.0)
+    s["real_height_cm"] = max(real, 0.1) if real > 0 else 0.0
+    s["bake_samples"] = min(BAKE_SAMPLES, key=lambda v: abs(v - num("bake_samples", 1, 16, int)))
+    s["export_density"] = min(DENSITIES, key=lambda v: abs(v - num("export_density", 0.5, 4.0)))
+    for key, choices in CHOICES.items():
+        s[key] = str(s[key]) if str(s[key]) in choices else choices[0]
     return s
 
 

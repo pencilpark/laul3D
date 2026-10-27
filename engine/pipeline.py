@@ -362,6 +362,14 @@ def blender_prep(raw, out_dir, name, level, s, log, res=None):
         cmd += ["--faces", str(int(s["faces"]))]
     if res:
         cmd += ["--photo-res", res]
+    relief = s.get("relief", "auto")
+    if relief not in ("scan", "solid"):
+        # auto: the scan's own relief, except for a shape the AI guessed or a medium or strong smoothing asked for
+        relief = "scan" if res and int(s.get("smooth", 0)) < 2 else "solid"
+    cmd += ["--texture-size", str(s.get("texture_size", "auto")), "--bake-samples", str(int(s.get("bake_samples", 4))),
+            "--real-height-mm", str(float(s.get("real_height_cm", 0)) * 10), "--relief", relief,
+            "--finish", s.get("finish", "auto"), "--web-images", s.get("web_images", "jpeg"),
+            "--density", str(float(s.get("export_density", 1)))]
     if s.get("keep_parts"):
         cmd += ["--keep-parts"]
     try:  # photogrammetry_win: the scan stays in COLMAP's frame, this rotation stands it up

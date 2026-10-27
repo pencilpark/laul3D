@@ -73,6 +73,11 @@ jobs:
           }
           tools\blender\blender.exe --version
 
+      - name: Export profiles (tangents, scan roughness, real height, filled textures, small-memory fallback)
+        env:
+          LOWPOLY_BLENDER: ${{ github.workspace }}\tools\blender\blender.exe
+        run: .venv\Scripts\python.exe tests\exports_test.py
+
       - name: Cache Hugging Face models
         uses: actions/cache@v4
         with:
