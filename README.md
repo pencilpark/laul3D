@@ -1,6 +1,13 @@
 # Berria Craft
 
-**[Download Berria Craft for macOS and Windows](https://demo.pencil-park.com/berriacraft/)** · [Watch the demo video](https://demo.pencil-park.com/berriacraft/demo.mp4) (MP4, 47 MB)
+**[Download Berria Craft for macOS and Windows](https://demo.pencil-park.com/berriacraft/)** · 
+
+
+
+https://github.com/user-attachments/assets/9952f246-1567-4dbd-bbff-58af364a2d9b
+
+
+[Watch HD video](https://demo.pencil-park.com/berriacraft/demo.mp4) (MP4, 47 MB)
 
 Desktop app for macOS and Windows: drop in photos of an object and get back a watertight STL sized for the Creality
 Ender-3 V3 (build volume 220 × 220 × 250 mm), turning a faceted Low-Poly look into a detailed model. It also writes colour
